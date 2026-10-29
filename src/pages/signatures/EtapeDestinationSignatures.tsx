@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Badge, Button, Group, List, Paper, Stack, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconCheck, IconFolderPlus } from "@tabler/icons-react";
+import { IconBrandWindows, IconCheck, IconFolderPlus } from "@tabler/icons-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ecrireFichiers, type FichierAEcrire } from "../../moteur";
 import { emailAgent, nomAgent } from "../../signatures/agents";
 import { genererSignature, texteSignature } from "../../signatures/html";
+import { construireKit } from "../../signatures/kit";
 import { preparerLogo } from "../../signatures/logo";
 import type { ModeleSignature } from "../../signatures/modele";
 import { nomsDeFichiers, pageAgent, pageRecapitulatif } from "../../signatures/pages";
@@ -24,6 +25,7 @@ function octetsDe(dataUrl: string): number[] {
 
 export default function EtapeDestinationSignatures({ modele, agents }: { modele: ModeleSignature; agents: AgentSignature[] }) {
   const [enCours, setEnCours] = useState(false);
+  const [kitEnCours, setKitEnCours] = useState(false);
   const logo = modele.source === "mise-en-page" ? modele.logo : null;
 
   async function creer() {
@@ -63,29 +65,66 @@ export default function EtapeDestinationSignatures({ modele, agents }: { modele:
     }
   }
 
+  async function creerKit() {
+    const dossier = await open({ directory: true, multiple: false, title: t.choisirDossier });
+    if (typeof dossier !== "string") return;
+    setKitEnCours(true);
+    try {
+      const fichiers = construireKit(
+        modele.nom,
+        agents.map((agent) => ({
+          nom: nomAgent(modele, agent.valeurs),
+          email: emailAgent(agent.valeurs),
+          html: genererSignature(modele, agent.valeurs),
+          texte: texteSignature(modele, agent.valeurs),
+        })),
+      );
+      const chemin = await ecrireFichiers(dossier, t.kit.nomDossier(modele.nom), fichiers);
+      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.kit.cree, message: chemin, autoClose: 10000 });
+    } catch (e) {
+      signalerErreur(e);
+    } finally {
+      setKitEnCours(false);
+    }
+  }
+
   return (
-    <Paper withBorder p="lg" maw={520}>
-      <Stack gap="md">
-        <Group justify="space-between">
-          <Title order={5}>{t.titre}</Title>
-          <Badge variant="light">{t.resume(agents.length)}</Badge>
-        </Group>
-        <Text size="sm">{t.detail}</Text>
-        <List size="sm" spacing={4}>
-          <List.Item>{t.nomDossier(modele.nom)}/</List.Item>
-          <List.Item ml="md">{t.recapitulatif}</List.Item>
-          <List.Item ml="md">{nomsDeFichiers([nomAgent(modele, agents[0]?.valeurs ?? {})])[0]} …</List.Item>
-          {logo && <List.Item ml="md">{FICHIER_LOGO}</List.Item>}
-        </List>
-        {logo && (
-          <Text size="sm" c="dimmed">
-            {t.logo}
+    <Stack gap="md" maw={520}>
+      <Paper withBorder p="lg">
+        <Stack gap="md">
+          <Group justify="space-between">
+            <Title order={5}>{t.titre}</Title>
+            <Badge variant="light">{t.resume(agents.length)}</Badge>
+          </Group>
+          <Text size="sm">{t.detail}</Text>
+          <List size="sm" spacing={4}>
+            <List.Item>{t.nomDossier(modele.nom)}/</List.Item>
+            <List.Item ml="md">{t.recapitulatif}</List.Item>
+            <List.Item ml="md">{nomsDeFichiers([nomAgent(modele, agents[0]?.valeurs ?? {})])[0]} …</List.Item>
+            {logo && <List.Item ml="md">{FICHIER_LOGO}</List.Item>}
+          </List>
+          {logo && (
+            <Text size="sm" c="dimmed">
+              {t.logo}
+            </Text>
+          )}
+          <Button leftSection={<IconFolderPlus size={18} />} loading={enCours} disabled={agents.length === 0} onClick={creer}>
+            {t.creer}
+          </Button>
+        </Stack>
+      </Paper>
+      <Paper withBorder p="lg" data-kit-outlook>
+        <Stack gap="sm">
+          <Title order={5}>{t.kit.titre}</Title>
+          <Text size="sm">{t.kit.detail}</Text>
+          <Text size="xs" c="dimmed">
+            {t.kit.attention}
           </Text>
-        )}
-        <Button leftSection={<IconFolderPlus size={18} />} loading={enCours} disabled={agents.length === 0} onClick={creer}>
-          {t.creer}
-        </Button>
-      </Stack>
-    </Paper>
+          <Button variant="light" leftSection={<IconBrandWindows size={18} />} loading={kitEnCours} disabled={agents.length === 0} onClick={creerKit}>
+            {t.kit.creer}
+          </Button>
+        </Stack>
+      </Paper>
+    </Stack>
   );
 }

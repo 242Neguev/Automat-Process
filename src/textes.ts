@@ -319,6 +319,15 @@ export const textes = {
       cree: "Pages de signature créées",
       recapitulatif: "_Toutes les signatures.html",
       nomDossier: (nom: string) => `Signatures - ${nom}`,
+      kit: {
+        titre: "Kit Outlook (installation en un double-clic)",
+        detail:
+          "Un seul dossier pour tous, à déposer sur un partage réseau ou une clé USB : chaque agent lance « Installer ma signature.cmd » et choisit son nom ; sa signature s'installe dans Outlook classique et devient celle des nouveaux messages et des réponses.",
+        attention: "Les messageries bloquent souvent les scripts envoyés par e-mail : préférez un partage réseau.",
+        creer: "Créer le kit Outlook…",
+        cree: "Kit Outlook créé",
+        nomDossier: (nom: string) => `Kit Outlook - ${nom}`,
+      },
     },
   },
   word: {

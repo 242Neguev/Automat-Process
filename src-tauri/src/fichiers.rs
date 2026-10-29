@@ -108,7 +108,15 @@ pub fn nom_sur(nom: &str) -> Option<String> {
     (!propre.is_empty()).then_some(propre)
 }
 
+/// Chemin relatif sans risque (« signatures/001/logo.png ») : chaque élément est un nom sûr ; les
+/// « . » et « .. » sont écartés, on ne sort jamais du dossier.
+fn chemin_sur(nom: &str) -> Option<std::path::PathBuf> {
+    let elements: Vec<String> = nom.split(['/', '\\']).filter_map(nom_sur).collect();
+    (!elements.is_empty()).then(|| elements.iter().collect())
+}
+
 /// Crée (ou complète) le dossier `sous_dossier` dans `dossier` et y écrit les fichiers ; renvoie son chemin.
+/// Un nom de fichier peut contenir des sous-dossiers (« signatures/001/signature.htm »).
 pub fn ecrire(
     dossier: &str,
     sous_dossier: &str,
@@ -125,9 +133,12 @@ pub fn ecrire(
     };
     std::fs::create_dir_all(&cible).map_err(echec)?;
     for fichier in fichiers {
-        let nom = nom_sur(&fichier.nom).ok_or_else(|| {
+        let nom = chemin_sur(&fichier.nom).ok_or_else(|| {
             ErreurMoteur::simple(format!("Nom de fichier invalide : {}", fichier.nom))
         })?;
+        if let Some(parent) = cible.join(&nom).parent() {
+            std::fs::create_dir_all(parent).map_err(echec)?;
+        }
         let contenu = match (&fichier.texte, &fichier.octets) {
             (Some(texte), _) => texte.as_bytes(),
             (None, Some(octets)) => octets.as_slice(),
@@ -181,6 +192,11 @@ mod tests {
                 texte: None,
                 octets: Some(vec![1, 2, 3]),
             },
+            FichierAEcrire {
+                nom: "signatures/001/signature.htm".into(),
+                texte: Some("<p>kit</p>".into()),
+                octets: None,
+            },
         ];
         let cible = ecrire(dossier.to_str().unwrap(), "Signatures : équipe", &fichiers).unwrap();
         assert!(cible.ends_with("Signatures - équipe"));
@@ -189,9 +205,16 @@ mod tests {
             std::fs::read_to_string(cible.join("Aïssatou DIALLO.html")).unwrap(),
             "<p>ok</p>"
         );
-        // « ../../évasion.html » devient un simple nom de fichier dans le dossier.
-        assert!(cible.join("..-..-évasion.html").exists());
+        // « ../../évasion.html » reste dans le dossier : les « .. » sont écartés.
+        assert!(cible.join("évasion.html").exists());
         assert!(!dossier.join("évasion.html").exists());
         assert_eq!(std::fs::read(cible.join("logo.png")).unwrap(), [1, 2, 3]);
+        assert!(
+            cible
+                .join("signatures")
+                .join("001")
+                .join("signature.htm")
+                .exists()
+        );
     }
 }

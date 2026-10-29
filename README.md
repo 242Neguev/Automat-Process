@@ -35,6 +35,7 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 | **PDF des courriers** : un PDF par personne et un PDF fusionné, produits par Microsoft Word piloté sans s'afficher (sinon LibreOffice) ; **aperçu fidèle** du courrier affiché | ✅ (à essayer avec Word sous Windows) |
 | **Signatures e-mail** : trois mises en page compatibles Outlook et Gmail (classique, logo à gauche, bandeau) ou **signature existante** avec balises (fichier .htm d'Outlook, images locales intégrées) ; police sûre, couleurs, logo intégré ; aperçu clair et sombre ; taille contrôlée (limite de Gmail) | ✅ |
 | **Pages à envoyer aux agents** : sa signature à copier (version Gmail sans logo, code HTML pour Thunderbird, texte pour le téléphone) et le mode d'emploi d'Outlook et de Gmail ; une page récapitule tout le monde | ✅ (collage à essayer dans Outlook) |
+| **Kit Outlook** : un seul dossier pour tous (partage réseau, clé USB) ; chaque agent lance « Installer ma signature.cmd », choisit son nom (proposé d'office d'après ses comptes Outlook) et sa signature devient celle des nouveaux messages et des réponses ; installation sans question possible pour le service informatique (`-Choix`) | ✅ (à essayer dans Outlook) |
 
 ## Développer (Mac ou Windows)
 
