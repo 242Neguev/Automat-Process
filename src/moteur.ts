@@ -228,9 +228,32 @@ export interface Courrier {
   parties: Record<string, string>;
 }
 
-/** Écrit des courriers Word d'après le modèle, dans le dossier `sousDossier` de `dossier` ; renvoie son chemin. */
+/** Courriers écrits : leur dossier et le chemin de chacun. */
+export interface CourriersEcrits {
+  dossier: string;
+  fichiers: string[];
+}
+
+/** Écrit des courriers Word d'après le modèle, dans le dossier `sousDossier` de `dossier` (créé au besoin). */
 export const ecrireCourriers = (modele: string, courriers: Courrier[], dossier: string, sousDossier: string) =>
-  invoke<string>("ecrire_courriers", { modele, courriers, dossier, sousDossier });
+  invoke<CourriersEcrits>("ecrire_courriers", { modele, courriers, dossier, sousDossier });
+
+/** Conversion en PDF : logiciel utilisé et PDF créés, dans l'ordre des documents. */
+export interface Conversion {
+  convertisseur: "word" | "libreoffice";
+  pdfs: string[];
+}
+
+/** Convertit des courriers Word en PDF (Word, sinon LibreOffice) dans le dossier `sousDossier` de `dossier`. */
+export const convertirCourriers = (documents: string[], dossier: string, sousDossier: string, supprimerSources: boolean) =>
+  invoke<Conversion>("convertir_courriers", { documents, dossier, sousDossier, supprimerSources });
+
+/** Aperçu fidèle d'un courrier : ses pages en SVG, telles que Word les produit. */
+export const apercuCourrier = (modele: string, courrier: Courrier) => invoke<string[]>("apercu_courrier", { modele, courrier });
+
+/** Dossier temporaire neuf, et sa suppression (documents intermédiaires). */
+export const dossierTemporaire = () => invoke<string>("dossier_temporaire");
+export const supprimerTemporaire = (dossier: string) => invoke<void>("supprimer_temporaire", { dossier });
 
 /** Imprimante installée (impression directe, sous Windows). */
 export interface Imprimante {

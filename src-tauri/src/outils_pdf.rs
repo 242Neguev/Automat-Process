@@ -5,7 +5,9 @@ use std::collections::BTreeMap;
 
 use lopdf::{Dictionary, Document, Object, ObjectId, dictionary};
 
-use crate::moteur::ErreurMoteur;
+use typst::foundations::Bytes;
+
+use crate::moteur::{ErreurMoteur, Fichiers, Moteur};
 
 /// Attributs qu'une page peut hériter de ses parents dans l'arbre des pages.
 const HERITES: [&[u8]; 4] = [b"Resources", b"MediaBox", b"CropBox", b"Rotate"];
@@ -92,6 +94,20 @@ fn assembler(
         ErreurMoteur::simple(format!("Le PDF n'a pas pu être écrit : {erreur}"))
     })?;
     Ok(octets)
+}
+
+/// Pages d'un PDF en SVG, pour les afficher (aperçu fidèle d'un courrier) : le moteur de rendu
+/// lit le PDF comme une image, page par page, polices incorporées comprises.
+pub fn rendre_pages(moteur: &Moteur, pdf: Vec<u8>) -> Result<Vec<String>, ErreurMoteur> {
+    let pages = nombre_de_pages(&pdf, "aperçu")?;
+    let source: String = (1..=pages)
+        .map(|page| format!("#page(width: auto, height: auto, margin: 0pt, image(\"/apercu.pdf\", page: {page}))\n"))
+        .collect();
+    let fichiers = Fichiers::from([("/apercu.pdf".to_string(), Bytes::new(pdf))]);
+    let document = moteur.compiler(&source, &fichiers, &[])?;
+    (0..document.nb_pages())
+        .map(|page| document.svg(page))
+        .collect()
 }
 
 /// Nombre de pages d'un PDF.
@@ -224,6 +240,13 @@ mod tests {
         assert_eq!(resultats.len(), 3);
         // Une partie ne garde pas les pages des autres.
         assert!(parties[2].len() < parties[0].len());
+    }
+
+    #[test]
+    fn rend_chaque_page_pour_l_apercu() {
+        let pages = rendre_pages(&Moteur::nouveau(), pdf_herite(2, "Courrier")).unwrap();
+        assert_eq!(pages.len(), 2);
+        assert!(pages.iter().all(|svg| svg.starts_with("<svg")));
     }
 
     #[test]

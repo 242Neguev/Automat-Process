@@ -10,6 +10,7 @@ use tauri::State;
 use tauri::ipc::Response;
 
 use crate::cartes::{self, DonneesAgent, Face, Feuille, OptionsNumerique, Projet, Sortie, Zone};
+use crate::conversion::{self, Conversion};
 use crate::fichiers::{self, FichierAEcrire, Nature};
 use crate::fonds::{FondImporte, Fonds, TexteRetire};
 use crate::impression::{self, Imprimante, Reglages};
@@ -296,21 +297,114 @@ pub async fn lire_modele_word(chemin: String) -> Result<HashMap<String, String>,
     en_arriere_plan(move || word::lire_parties(&fichiers::lire(&chemin, Nature::Word)?)).await
 }
 
+/// Courriers écrits : leur dossier et le chemin de chacun.
+#[derive(Serialize)]
+pub struct CourriersEcrits {
+    dossier: String,
+    fichiers: Vec<String>,
+}
+
 /// Écrit des courriers Word d'après le modèle `modele`, dans le dossier `sous_dossier` de `dossier`
-/// (créé au besoin : les courriers peuvent arriver en plusieurs fois) ; renvoie son chemin.
+/// (créé au besoin : les courriers peuvent arriver en plusieurs fois).
 #[tauri::command]
 pub async fn ecrire_courriers(
     modele: String,
     courriers: Vec<Courrier>,
     dossier: String,
     sous_dossier: String,
-) -> Result<String, ErreurMoteur> {
+) -> Result<CourriersEcrits, ErreurMoteur> {
     en_arriere_plan(move || {
-        let nom = fichiers::nom_sur(&sous_dossier)
-            .ok_or_else(|| ErreurMoteur::simple("Nom de dossier invalide."))?;
-        let cible = Path::new(&dossier).join(nom);
-        word::ecrire(&fichiers::lire(&modele, Nature::Word)?, &courriers, &cible)?;
-        Ok(cible.to_string_lossy().into_owned())
+        let cible = sous_dossier_de(&dossier, &sous_dossier)?;
+        let fichiers = word::ecrire(&fichiers::lire(&modele, Nature::Word)?, &courriers, &cible)?;
+        Ok(CourriersEcrits {
+            dossier: cible.to_string_lossy().into_owned(),
+            fichiers: fichiers
+                .iter()
+                .map(|f| f.to_string_lossy().into_owned())
+                .collect(),
+        })
+    })
+    .await
+}
+
+fn sous_dossier_de(dossier: &str, sous_dossier: &str) -> Result<std::path::PathBuf, ErreurMoteur> {
+    let nom = fichiers::nom_sur(sous_dossier)
+        .ok_or_else(|| ErreurMoteur::simple("Nom de dossier invalide."))?;
+    Ok(Path::new(dossier).join(nom))
+}
+
+/// Dossier temporaire neuf (documents intermédiaires d'une conversion).
+#[tauri::command]
+pub fn dossier_temporaire() -> Result<String, ErreurMoteur> {
+    static COMPTEUR: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let numero = COMPTEUR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let dossier =
+        std::env::temp_dir().join(format!("automat-process-{}-{numero}", std::process::id()));
+    std::fs::create_dir_all(&dossier).map_err(|e| {
+        ErreurMoteur::simple(format!("Dossier temporaire impossible à créer : {e}"))
+    })?;
+    Ok(dossier.to_string_lossy().into_owned())
+}
+
+/// Supprime un dossier temporaire créé par l'application (rien en dehors du dossier temporaire du système).
+#[tauri::command]
+pub fn supprimer_temporaire(dossier: String) {
+    let chemin = Path::new(&dossier);
+    let temporaire = std::env::temp_dir();
+    let nom = chemin
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if chemin.parent() == Some(temporaire.as_path()) && nom.starts_with("automat-process-") {
+        let _ = std::fs::remove_dir_all(chemin);
+    }
+}
+
+/// Convertit des courriers Word en PDF dans le dossier `sous_dossier` de `dossier` ; les documents
+/// Word sont supprimés ensuite quand ils n'étaient qu'intermédiaires.
+#[tauri::command]
+pub async fn convertir_courriers(
+    documents: Vec<String>,
+    dossier: String,
+    sous_dossier: String,
+    supprimer_sources: bool,
+) -> Result<Conversion, ErreurMoteur> {
+    en_arriere_plan(move || {
+        let documents: Vec<std::path::PathBuf> = documents.iter().map(Into::into).collect();
+        let conversion =
+            conversion::en_pdf(&documents, &sous_dossier_de(&dossier, &sous_dossier)?)?;
+        if supprimer_sources {
+            for document in &documents {
+                let _ = std::fs::remove_file(document);
+            }
+        }
+        Ok(conversion)
+    })
+    .await
+}
+
+/// Aperçu fidèle d'un courrier : converti en PDF (Word ou LibreOffice), puis ses pages en SVG.
+#[tauri::command]
+pub async fn apercu_courrier(
+    etat: State<'_, EtatMoteur>,
+    modele: String,
+    courrier: Courrier,
+) -> Result<Vec<String>, ErreurMoteur> {
+    executer(&etat, move |moteur| {
+        let travail = std::path::PathBuf::from(dossier_temporaire()?);
+        let resultat = (|| {
+            let documents = word::ecrire(
+                &fichiers::lire(&modele, Nature::Word)?,
+                std::slice::from_ref(&courrier),
+                &travail,
+            )?;
+            let conversion = conversion::en_pdf(&documents, &travail)?;
+            let pdf = std::fs::read(&conversion.pdfs[0])
+                .map_err(|e| ErreurMoteur::simple(format!("PDF illisible : {e}")))?;
+            outils_pdf::rendre_pages(moteur, pdf)
+        })();
+        let _ = std::fs::remove_dir_all(&travail);
+        resultat
     })
     .await
 }

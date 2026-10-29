@@ -1,5 +1,6 @@
 mod cartes;
 mod commandes;
+mod conversion;
 mod fichiers;
 mod fonds;
 mod impression;
@@ -48,6 +49,10 @@ pub fn run() {
             commandes::separer_pdf,
             commandes::lire_modele_word,
             commandes::ecrire_courriers,
+            commandes::dossier_temporaire,
+            commandes::supprimer_temporaire,
+            commandes::convertir_courriers,
+            commandes::apercu_courrier,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Automat-Process");

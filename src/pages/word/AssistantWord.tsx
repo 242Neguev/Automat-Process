@@ -9,6 +9,7 @@ import {
   Paper,
   Progress,
   ScrollArea,
+  SegmentedControl,
   Select,
   Stack,
   Stepper,
@@ -19,17 +20,28 @@ import {
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconCheck, IconChevronLeft, IconChevronRight, IconFileImport, IconFileTypeDocx, IconInfoCircle } from "@tabler/icons-react";
+import { join } from "@tauri-apps/api/path";
 import { open } from "@tauri-apps/plugin-dialog";
 import { remplir, valeursDeLigne } from "../../donnees/agents";
 import type { Transformation } from "../../donnees/nettoyage";
 import { nomsUniques } from "../../donnees/noms";
 import { transformationsParDefaut } from "../../modele/champs";
-import { ecrireCourriers, lireModeleWord, type Courrier } from "../../moteur";
+import {
+  convertirCourriers,
+  dossierTemporaire,
+  ecrireCourriers,
+  fusionnerPdf,
+  lireModeleWord,
+  supprimerTemporaire,
+  type Conversion,
+  type Courrier,
+} from "../../moteur";
 import { textes } from "../../textes";
 import { apercuTexte, fusionnerCorps, preparerModele, remplirModele, type ModelePrepare } from "../../word/docx";
 import EtapeListe from "../commun/EtapeListe";
 import { signalerErreur } from "../commun/signalerErreur";
 import { useListe } from "../commun/useListe";
+import ApercuFidele from "./ApercuFidele";
 import ApercuTexte from "./ApercuTexte";
 
 const t = textes.word;
@@ -50,6 +62,9 @@ export default function AssistantWord() {
   const [courant, setCourant] = useState(0);
   const [parPersonne, setParPersonne] = useState(true);
   const [fusion, setFusion] = useState(false);
+  const [pdfParPersonne, setPdfParPersonne] = useState(false);
+  const [pdfFusion, setPdfFusion] = useState(false);
+  const [vue, setVue] = useState<"texte" | "fidele">("texte");
   const [nommage, setNommage] = useState("{{Prénom}} {{NOM}}");
   const [avancement, setAvancement] = useState<{ fait: number; total: number } | null>(null);
   const balises = modele?.balises ?? [];
@@ -87,17 +102,28 @@ export default function AssistantWord() {
       return { ...m, transformations };
     });
 
+  /**
+   * Crée les documents demandés. Les courriers sont remplis et écrits par lots ; les .docx qui ne
+   * servent qu'à produire les PDF passent par un dossier temporaire, supprimé à la fin.
+   */
   async function creer() {
     if (!modele) return;
     const dossier = await open({ directory: true, multiple: false, title: t.destination.choisirDossier });
     if (typeof dossier !== "string") return;
     const sousDossier = t.destination.nomDossier(modele.nomFichier.replace(/\.(docx|dotx)$/i, ""));
     const noms = nomsUniques(destinataires.map((d, i) => nomDe(d.valeurs, i + 1)));
-    const total = (parPersonne ? destinataires.length : 0) + (fusion ? 1 : 0);
-    setAvancement({ fait: 0, total });
+    const veutPdf = pdfParPersonne || pdfFusion;
+    const temporaires: string[] = [];
+    setAvancement({ fait: 0, total: destinataires.length });
     try {
-      let chemin = "";
+      // Le dossier des résultats existe d'emblée (un PDF fusionné seul y est écrit à la fin).
+      const final = (await ecrireCourriers(modele.chemin, [], dossier, sousDossier)).dossier;
+      const docxTemporaires = veutPdf && !parPersonne ? await dossierTemporaire() : null;
+      const pdfTemporaires = pdfFusion && !pdfParPersonne ? await dossierTemporaire() : null;
+      temporaires.push(...[docxTemporaires, pdfTemporaires].filter((d): d is string => d !== null));
       const corps: string[] = [];
+      const pdfs: string[] = [];
+      let conversion: Conversion | null = null;
       // Parties du premier courrier : le document fusionné reprend ses en-têtes et pieds de page.
       const premier: { parties?: Record<string, string> } = {};
       for (let debut = 0; debut < destinataires.length; debut += LOT) {
@@ -107,20 +133,26 @@ export default function AssistantWord() {
           premier.parties ??= parties;
           return { nom: noms[debut + i], parties };
         });
-        if (parPersonne) {
-          chemin = await ecrireCourriers(modele.chemin, lot, dossier, sousDossier);
-          setAvancement({ fait: Math.min(debut + LOT, destinataires.length), total });
+        if (parPersonne || veutPdf) {
+          const ecrits = await ecrireCourriers(modele.chemin, lot, docxTemporaires ?? dossier, docxTemporaires ? "docx" : sousDossier);
+          if (veutPdf) {
+            conversion = await convertirCourriers(ecrits.fichiers, pdfTemporaires ?? dossier, pdfTemporaires ? "pdf" : sousDossier, docxTemporaires !== null);
+            pdfs.push(...conversion.pdfs);
+          }
         }
+        setAvancement({ fait: Math.min(debut + LOT, destinataires.length), total: destinataires.length });
       }
       if (fusion && premier.parties) {
         const parties = { ...premier.parties, "word/document.xml": fusionnerCorps(corps) };
-        chemin = await ecrireCourriers(modele.chemin, [{ nom: t.destination.fichierFusion, parties }], dossier, sousDossier);
-        setAvancement({ fait: total, total });
+        await ecrireCourriers(modele.chemin, [{ nom: t.destination.fichierFusion, parties }], dossier, sousDossier);
       }
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.destination.cree, message: chemin, autoClose: 10000 });
+      if (pdfFusion) await fusionnerPdf(pdfs, await join(final, t.destination.pdfFusionne));
+      const message = conversion ? `${final}\n${t.destination.conversion(t.destination.logiciels[conversion.convertisseur])}` : final;
+      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.destination.cree, message, autoClose: 10000 });
     } catch (e) {
       signalerErreur(e);
     } finally {
+      temporaires.forEach((d) => void supprimerTemporaire(d));
       setAvancement(null);
     }
   }
@@ -223,7 +255,17 @@ export default function AssistantWord() {
           {destinataires.length > 0 && (
             <Group align="flex-start" gap="lg" wrap="nowrap">
               <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
-                <ApercuTexte paragraphes={apercuCourrier} />
+                <SegmentedControl
+                  w="fit-content"
+                  value={vue}
+                  onChange={(valeur) => setVue(valeur as typeof vue)}
+                  data={(["texte", "fidele"] as const).map((value) => ({ value, label: t.verification.vues[value] }))}
+                />
+                {vue === "texte" || !modele ? (
+                  <ApercuTexte paragraphes={apercuCourrier} />
+                ) : (
+                  <ApercuFidele modele={modele.chemin} courrier={{ nom: "apercu", parties: remplirModele(modele.parties, destinataires[index].valeurs) }} />
+                )}
                 <Group gap="xs">
                   <ActionIcon variant="default" size="lg" aria-label={textes.cartes.verification.precedent} disabled={index <= 0} onClick={() => setCourant(index - 1)}>
                     <IconChevronLeft size={18} />
@@ -271,6 +313,13 @@ export default function AssistantWord() {
               </Group>
               <Switch label={t.destination.parPersonne} checked={parPersonne} onChange={(e) => setParPersonne(e.currentTarget.checked)} />
               <Switch label={t.destination.fusion} description={t.destination.fusionAide} checked={fusion} onChange={(e) => setFusion(e.currentTarget.checked)} />
+              <Switch label={t.destination.pdfParPersonne} checked={pdfParPersonne} onChange={(e) => setPdfParPersonne(e.currentTarget.checked)} />
+              <Switch label={t.destination.pdfFusion} checked={pdfFusion} onChange={(e) => setPdfFusion(e.currentTarget.checked)} />
+              {(pdfParPersonne || pdfFusion) && (
+                <Text size="xs" c="dimmed">
+                  {t.destination.pdfAide}
+                </Text>
+              )}
               <TextInput label={t.destination.nommage} description={t.destination.nommageAide} value={nommage} onChange={(e) => setNommage(e.currentTarget.value)} />
               {avancement && (
                 <Stack gap={4}>
@@ -280,7 +329,12 @@ export default function AssistantWord() {
                   </Text>
                 </Stack>
               )}
-              <Button leftSection={<IconFileTypeDocx size={18} />} loading={avancement !== null} disabled={!parPersonne && !fusion} onClick={creer}>
+              <Button
+                leftSection={<IconFileTypeDocx size={18} />}
+                loading={avancement !== null}
+                disabled={!parPersonne && !fusion && !pdfParPersonne && !pdfFusion}
+                onClick={creer}
+              >
                 {t.destination.creer}
               </Button>
             </Stack>
