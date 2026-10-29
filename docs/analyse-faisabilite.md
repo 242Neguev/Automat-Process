@@ -468,4 +468,4 @@ Durées **indicatives**, en temps de développement assisté.
 
 1. **Fichiers réels** à déposer dans `exemples-reels/` : deux ou trois modèles par logiciel, un Excel anonymisé, une signature e-mail existante et un modèle Word. C'est le test le plus important.
 2. **Hébergement web**, le moment venu, pour les images des signatures (rendu « image », logos dans Gmail) et les cartes en ligne.
-3. **Modèles d'imprimantes PVC** utilisées, pour tester l'impression directe.
+3. **Imprimantes PVC** : décidé le 29 octobre 2026, toutes les marques sont prises en charge (choix parmi les imprimantes installées, imprimante à cartes proposée d'office). Reste à **essayer l'impression directe** sur une vraie imprimante (Evolis, Zebra…), notamment le recto verso et le sens du verso.
