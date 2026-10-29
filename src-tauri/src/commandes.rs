@@ -10,6 +10,7 @@ use tauri::ipc::Response;
 
 use crate::cartes::{self, DonneesAgent, Face, Feuille, Projet, Sortie, Zone};
 use crate::fonds::{FondImporte, Fonds, TexteRetire};
+use crate::impression::{self, Imprimante, Reglages};
 use crate::moteur::{ErreurMoteur, Moteur, VERSION_TYPST};
 use crate::projet_fichier::{self, ProjetOuvert};
 
@@ -166,6 +167,35 @@ pub async fn vignettes_cartes(
     };
     executer(&etat, move |moteur| {
         cartes::vignettes(moteur, &projet, &agents, largeur_px).map(Response::new)
+    })
+    .await
+}
+
+/// Imprimantes installées, pour l'impression directe des badges (sous Windows ; liste vide ailleurs).
+#[tauri::command]
+pub async fn imprimantes() -> Result<Vec<Imprimante>, ErreurMoteur> {
+    tauri::async_runtime::spawn_blocking(impression::imprimantes)
+        .await
+        .map_err(|erreur| ErreurMoteur::simple(format!("Recherche interrompue : {erreur}")))?
+        .map_err(ErreurMoteur::simple)
+}
+
+/// Imprime directement les cartes des agents sur l'imprimante choisie.
+#[tauri::command]
+pub async fn imprimer_cartes(
+    etat: State<'_, EtatMoteur>,
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+    agents: Vec<DonneesAgent>,
+    imprimante: String,
+    reglages: Reglages,
+) -> Result<(), ErreurMoteur> {
+    let projet = Projet {
+        modele,
+        fonds: fonds.fichiers(),
+    };
+    executer(&etat, move |moteur| {
+        cartes::imprimer(moteur, &projet, &agents, &imprimante, reglages)
     })
     .await
 }

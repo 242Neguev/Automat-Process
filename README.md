@@ -28,7 +28,7 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 | **Contrôle des cartes** après mise en page : texte trop long même réduit, texte sur le QR code, hors de la zone de sécurité (affichée dans l'éditeur), textes qui se chevauchent ou descendent plus bas que prévu ; résumé cliquable, filtre « cartes à vérifier », confirmation avant export | ✅ |
 | **Mosaïque** de toutes les cartes et bouton **« cas le plus long »** (la carte où chaque information est la plus difficile à loger) | ✅ |
 | **Contrôle des données de la liste** : e-mails et numéros mal formés, agents en double, informations vides, colonne vide, avec les lignes à corriger dans le fichier | ✅ |
-| Impression directe des badges PVC | Phase 1, incrément 3 (suite) |
+| **Impression directe** (badges PVC sur Evolis, Zebra, Magicard… ou toute imprimante installée) : choix de l'imprimante, d'une carte ou de toutes, recto verso, verso retourné, exemplaires ; carte rendue à la résolution de l'imprimante, à sa taille réelle | ✅ (à tester sous Windows) |
 | Signatures e-mail | Phase 1, incrément 4 |
 
 ## Développer (Mac ou Windows)
@@ -96,6 +96,7 @@ src-tauri/               Cœur Rust (Tauri)
   src/fonds.rs           Visuels importés (recto, verso), gardés en mémoire
   src/pdf_textes.rs      Lignes de texte d'un PDF : lecture, retrait ciblé
   src/projet_fichier.rs  Fichiers de projet « .automat »
+  src/impression.rs      Impression directe par le pilote Windows (badges PVC)
   gabarits/carte.typ     Gabarit graphique des cartes (aperçu, cartes unitaires, planches)
   ressources/demo/       Données et fonds de la démonstration
 docs/                    Analyse de faisabilité, images, PDF d'exemple

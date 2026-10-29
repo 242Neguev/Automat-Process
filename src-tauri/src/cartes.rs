@@ -8,6 +8,7 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 use typst::foundations::Bytes;
 
+use crate::impression;
 use crate::moteur::{Document, ErreurMoteur, Fichiers, Moteur};
 use crate::qr::{self, CodeQr};
 
@@ -252,6 +253,43 @@ pub fn vignettes(
         sortie.extend_from_slice(&jpeg);
     }
     Ok(sortie)
+}
+
+/// Impression directe des cartes sur une imprimante Windows : recto, et verso au dos si demandé.
+pub fn imprimer(
+    moteur: &Moteur,
+    projet: &Projet,
+    agents: &[DonneesAgent],
+    imprimante: &str,
+    reglages: impression::Reglages,
+) -> Result<(), ErreurMoteur> {
+    if agents.is_empty() {
+        return Err(ErreurMoteur::simple("Aucune carte à imprimer."));
+    }
+    let document = compiler(moteur, projet, agents, &[("mode", "cartes")])?;
+    let avec_verso = projet.modele["fond_verso"]
+        .as_str()
+        .is_some_and(|chemin| !chemin.is_empty());
+    let faces = impression::faces(agents.len(), avec_verso, reglages);
+    let format = &projet.modele["format"];
+    let taille_mm = (
+        format["largeur_mm"].as_f64().unwrap_or(85.6),
+        format["hauteur_mm"].as_f64().unwrap_or(54.0),
+    );
+    let rendre = |page: usize, dpi: f64| {
+        document
+            .pixels(page, dpi / 72.0)
+            .map_err(|erreur| erreur.message)
+    };
+    impression::imprimer(
+        imprimante,
+        "Automat-Process : cartes",
+        taille_mm,
+        &faces,
+        reglages.retourner_verso,
+        &rendre,
+    )
+    .map_err(ErreurMoteur::simple)
 }
 
 fn compiler(

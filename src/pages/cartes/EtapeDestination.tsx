@@ -3,15 +3,26 @@ import { Badge, Button, Group, List, Loader, Modal, Paper, SegmentedControl, Sel
 import { notifications } from "@mantine/notifications";
 import { IconAlertTriangle, IconCheck, IconFileTypePdf } from "@tabler/icons-react";
 import { save } from "@tauri-apps/plugin-dialog";
-import { compter, regrouper } from "../../controle/cartes";
-import { enErreurMoteur, exporterCartes, type DonneesAgent, type Feuille, type ModeleCarte, type Sortie } from "../../moteur";
+import { compter, graviteCarte, regrouper } from "../../controle/cartes";
+import {
+  enErreurMoteur,
+  exporterCartes,
+  imprimerCartes,
+  type DonneesAgent,
+  type Feuille,
+  type ModeleCarte,
+  type ReglagesImpression,
+  type Sortie,
+} from "../../moteur";
 import { textes } from "../../textes";
 import IconeGravite from "./IconeGravite";
+import ImpressionDirecte from "./ImpressionDirecte";
 import type { Controle } from "./useControle";
 
 const t = textes.cartes.destination;
 const tc = textes.cartes.controle;
 const FEUILLES: Feuille[] = ["A4", "A3", "SRA3"];
+type Mode = "pdf" | "impression";
 
 interface Props {
   modele: ModeleCarte;
@@ -21,18 +32,26 @@ interface Props {
   onVoirCartes: () => void;
 }
 
+function signalerErreur(e: unknown) {
+  const { message, details } = enErreurMoteur(e);
+  notifications.show({ color: "red", icon: <IconAlertTriangle size={18} />, title: textes.erreur, message: [message, ...details].join("\n") });
+}
+
 export default function EtapeDestination({ modele, agents, controle, onVoirCartes }: Props) {
+  // Un badge PVC (sans fond perdu) s'imprime en général directement ; une carte de visite part chez l'imprimeur.
+  const [mode, setMode] = useState<Mode>(modele.format.fond_perdu_mm === 0 ? "impression" : "pdf");
   const [sortie, setSortie] = useState<Sortie>("planches");
   const [feuille, setFeuille] = useState<Feuille>("A4");
   const [enCours, setEnCours] = useState(false);
-  const [confirmation, setConfirmation] = useState(false);
-  const nombres = controle.rapport ? compter(controle.rapport) : null;
-  const graves = controle.rapport ? regrouper(controle.rapport).filter((g) => g.gravite === "erreur") : [];
+  const [aConfirmer, setAConfirmer] = useState<{ cartes: DonneesAgent[]; action: () => void } | null>(null);
+  const { rapport } = controle;
+  const nombres = rapport ? compter(rapport) : null;
 
-  /** Les problèmes graves sont signalés avant l'export ; l'utilisateur peut exporter quand même. */
-  function demanderExport() {
-    if (nombres && nombres.erreur > 0) setConfirmation(true);
-    else exporter();
+  /** Les cartes qui ont un problème grave sont signalées avant l'export ou l'impression. */
+  function avecConfirmation(cartes: DonneesAgent[], action: () => void) {
+    const graves = rapport ? cartes.filter((agent) => graviteCarte(rapport.get(agent.id)) === "erreur") : [];
+    if (graves.length > 0) setAConfirmer({ cartes: graves, action });
+    else action();
   }
 
   async function exporter() {
@@ -43,42 +62,39 @@ export default function EtapeDestination({ modele, agents, controle, onVoirCarte
       await exporterCartes(modele, agents, sortie, feuille, chemin);
       notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.enregistre, message: chemin });
     } catch (e) {
-      const { message, details } = enErreurMoteur(e);
-      notifications.show({ color: "red", icon: <IconAlertTriangle size={18} />, title: textes.erreur, message: [message, ...details].join("\n") });
+      signalerErreur(e);
     } finally {
       setEnCours(false);
     }
   }
 
+  async function imprimer(imprimante: string, cartes: DonneesAgent[], reglages: ReglagesImpression) {
+    setEnCours(true);
+    try {
+      await imprimerCartes(modele, cartes, imprimante, reglages);
+      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.impression.envoyee(imprimante), message: t.impression.nbCartes(cartes.length) });
+    } catch (e) {
+      signalerErreur(e);
+    } finally {
+      setEnCours(false);
+    }
+  }
+
+  const groupesGraves =
+    rapport && aConfirmer
+      ? regrouper(rapport)
+          .filter((g) => g.gravite === "erreur")
+          .map((g) => ({ ...g, agents: g.agents.filter((id) => aConfirmer.cartes.some((agent) => agent.id === id)) }))
+          .filter((g) => g.agents.length > 0)
+      : [];
+
   return (
-    <Paper withBorder p="lg" maw={460}>
+    <Paper withBorder p="lg" maw={480}>
       <Stack gap="md">
         <Group justify="space-between">
           <Title order={5}>{t.titre}</Title>
           <Badge variant="light">{t.resume(agents.length)}</Badge>
         </Group>
-        <SegmentedControl
-          orientation="vertical"
-          fullWidth
-          value={sortie}
-          onChange={(valeur) => setSortie(valeur as Sortie)}
-          data={[
-            { value: "planches", label: t.planches },
-            { value: "cartes", label: t.uneCarteParPage },
-          ]}
-        />
-        {sortie === "planches" && (
-          <Select
-            label={t.feuille}
-            value={feuille}
-            allowDeselect={false}
-            onChange={(valeur) => valeur && setFeuille(valeur as Feuille)}
-            data={FEUILLES.map((f) => ({ value: f, label: t.feuilles[f] }))}
-          />
-        )}
-        <Text size="sm" c="dimmed">
-          {sortie === "planches" ? t.detailPlanches : t.detailCartes}
-        </Text>
         {controle.enCours ? (
           <Group gap="xs">
             <Loader size={14} />
@@ -96,16 +112,56 @@ export default function EtapeDestination({ modele, agents, controle, onVoirCarte
             </Group>
           )
         )}
-        <Button leftSection={<IconFileTypePdf size={18} />} loading={enCours} disabled={controle.enCours} onClick={demanderExport}>
-          {t.enregistrer}
-        </Button>
+        <SegmentedControl
+          fullWidth
+          value={mode}
+          onChange={(valeur) => setMode(valeur as Mode)}
+          data={(["pdf", "impression"] as const).map((value) => ({ value, label: t.modes[value] }))}
+        />
+
+        {mode === "pdf" ? (
+          <>
+            <SegmentedControl
+              orientation="vertical"
+              fullWidth
+              value={sortie}
+              onChange={(valeur) => setSortie(valeur as Sortie)}
+              data={[
+                { value: "planches", label: t.planches },
+                { value: "cartes", label: t.uneCarteParPage },
+              ]}
+            />
+            {sortie === "planches" && (
+              <Select
+                label={t.feuille}
+                value={feuille}
+                allowDeselect={false}
+                onChange={(valeur) => valeur && setFeuille(valeur as Feuille)}
+                data={FEUILLES.map((f) => ({ value: f, label: t.feuilles[f] }))}
+              />
+            )}
+            <Text size="sm" c="dimmed">
+              {sortie === "planches" ? t.detailPlanches : t.detailCartes}
+            </Text>
+            <Button leftSection={<IconFileTypePdf size={18} />} loading={enCours} disabled={controle.enCours} onClick={() => avecConfirmation(agents, exporter)}>
+              {t.enregistrer}
+            </Button>
+          </>
+        ) : (
+          <ImpressionDirecte
+            modele={modele}
+            agents={agents}
+            enCours={enCours || controle.enCours}
+            onImprimer={(imprimante, cartes, reglages) => avecConfirmation(cartes, () => imprimer(imprimante, cartes, reglages))}
+          />
+        )}
       </Stack>
 
-      <Modal opened={confirmation} onClose={() => setConfirmation(false)} title={t.confirmation.titre} centered>
+      <Modal opened={aConfirmer !== null} onClose={() => setAConfirmer(null)} title={t.confirmation.titre[mode]} centered>
         <Stack gap="sm">
-          <Text>{t.confirmation.message(nombres?.erreur ?? 0)}</Text>
+          <Text>{t.confirmation.message(aConfirmer?.cartes.length ?? 0)}</Text>
           <List spacing={4} size="sm" center>
-            {graves.map((g) => (
+            {groupesGraves.map((g) => (
               <List.Item key={g.cle} icon={<IconeGravite gravite="erreur" taille={16} />}>
                 {g.resume} ({tc.nbCartes(g.agents.length)})
               </List.Item>
@@ -118,7 +174,7 @@ export default function EtapeDestination({ modele, agents, controle, onVoirCarte
             <Button
               variant="default"
               onClick={() => {
-                setConfirmation(false);
+                setAConfirmer(null);
                 onVoirCartes();
               }}
             >
@@ -127,11 +183,11 @@ export default function EtapeDestination({ modele, agents, controle, onVoirCarte
             <Button
               color="red"
               onClick={() => {
-                setConfirmation(false);
-                exporter();
+                aConfirmer?.action();
+                setAConfirmer(null);
               }}
             >
-              {t.confirmation.exporter}
+              {mode === "pdf" ? t.confirmation.exporter : t.confirmation.imprimer}
             </Button>
           </Group>
         </Stack>

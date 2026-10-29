@@ -1,6 +1,7 @@
 mod cartes;
 mod commandes;
 mod fonds;
+mod impression;
 pub mod moteur;
 mod pdf_textes;
 mod projet_fichier;
@@ -29,6 +30,8 @@ pub fn run() {
             commandes::exporter_cartes,
             commandes::controler_cartes,
             commandes::vignettes_cartes,
+            commandes::imprimantes,
+            commandes::imprimer_cartes,
             commandes::couleur_autour,
             commandes::retirer_texte_pdf,
             commandes::enregistrer_projet,

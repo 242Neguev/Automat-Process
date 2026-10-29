@@ -181,6 +181,27 @@ export async function vignettesCartes(modele: ModeleCarte, agents: DonneesAgent[
   return images;
 }
 
+/** Imprimante installée (impression directe, sous Windows). */
+export interface Imprimante {
+  nom: string;
+  parDefaut: boolean;
+  /** Le pilote sait imprimer recto verso. */
+  rectoVerso: boolean;
+}
+
+export interface ReglagesImpression {
+  rectoVerso: boolean;
+  /** Le verso est tourné d'un demi-tour (selon le sens où l'imprimante retourne la carte). */
+  retournerVerso: boolean;
+  /** Exemplaires de chaque carte. */
+  exemplaires: number;
+}
+
+export const imprimantes = () => invoke<Imprimante[]>("imprimantes");
+
+export const imprimerCartes = (modele: ModeleCarte, agents: DonneesAgent[], imprimante: string, reglages: ReglagesImpression) =>
+  invoke<void>("imprimer_cartes", { modele, agents, imprimante, reglages });
+
 /** Couleur du visuel tout autour d'une zone : elle sert à effacer un texte incrusté. */
 export const couleurAutour = (modele: ModeleCarte, zone: Zone) => invoke<string>("couleur_autour", { modele, zone });
 
