@@ -21,7 +21,6 @@ import { analyserSvg, retirerTexteSvg } from "../../modele/svg";
 import { preparerVisuel, type Visuel } from "../../modele/visuels";
 import {
   couleurAutour,
-  enErreurMoteur,
   importerFond,
   remplacerFond,
   retirerTextePdf,
@@ -35,6 +34,7 @@ import {
   type Zone,
 } from "../../moteur";
 import { textes } from "../../textes";
+import { signalerErreur } from "../commun/signalerErreur";
 import ApercuCarte from "./ApercuCarte";
 import CoucheEdition, { type Outil, type TexteCliquable } from "./CoucheEdition";
 import PanneauVisuels from "./PanneauVisuels";
@@ -56,11 +56,6 @@ interface Props {
   visuels: Visuels;
   onVisuels: (modification: (visuels: Visuels) => Visuels) => void;
   polices: string[];
-}
-
-function signalerErreur(e: unknown) {
-  const { message, details } = enErreurMoteur(e);
-  notifications.show({ color: "red", icon: <IconAlertTriangle size={18} />, title: textes.erreur, message: [message, ...details].join("\n") });
 }
 
 /** Où le visuel apparaît sur la carte ; rien pour une image, dont on ne lit pas les textes. */

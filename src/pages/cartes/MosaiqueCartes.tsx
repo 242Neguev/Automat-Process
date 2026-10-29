@@ -4,7 +4,7 @@ import { IconAlertTriangle } from "@tabler/icons-react";
 import { graviteCarte, type Probleme } from "../../controle/cartes";
 import { libelleAgent } from "../../donnees/agents";
 import { enErreurMoteur, vignettesCartes, type DonneesAgent, type ErreurMoteur, type ModeleCarte } from "../../moteur";
-import IconeGravite from "./IconeGravite";
+import IconeGravite from "../commun/IconeGravite";
 
 const PAR_PAGE = 24;
 const LARGEUR_VIGNETTE = 260; // px à l'écran

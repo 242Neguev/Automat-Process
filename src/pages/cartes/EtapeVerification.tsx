@@ -25,7 +25,7 @@ import { libelleAgent } from "../../donnees/agents";
 import type { DonneesAgent, Face, ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import ApercuCarte from "./ApercuCarte";
-import IconeGravite from "./IconeGravite";
+import IconeGravite from "../commun/IconeGravite";
 import MosaiqueCartes from "./MosaiqueCartes";
 import type { Controle } from "./useControle";
 

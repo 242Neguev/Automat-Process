@@ -45,6 +45,7 @@ Les décisions techniques importantes, déjà validées par le prototype :
 | Technique | **Tauri 2 + React + TypeScript + Typst** | Phase 0 lancée |
 | Messageries ciblées | Microsoft 365 / Outlook, Google Workspace / Gmail, Thunderbird, webmails | Compatibilité la plus large possible |
 | Hébergement des images de signature | Aucun pour l'instant | MVP : signatures HTML sans image, ou kit Outlook avec images intégrées. Le rendu « image » et les logos dans Gmail attendront un hébergement. |
+| Signatures, incrément 4 | Logo **intégré** à la signature ; **une page par agent** (plus un récapitulatif) ; mises en page prêtes **et** signature HTML existante | Gmail refuse les images intégrées : la page de l'agent propose une version sans logo et joint le fichier du logo à insérer avec le bouton Image de Gmail |
 | Ordre de la phase 1 | Socle commun et cartes d'abord, signatures ensuite | Les signatures réutiliseront le socle : listes, correspondances, projets |
 | Langues des documents | Français, anglais, arabe, autres | Unicode complet et écriture de droite à gauche dans l'éditeur dès le départ |
 | Éditeur | **Eau sèche** (+242 06 853 26 77 · gneguev@gmail.com), identifiant `com.eauseche.automatprocess` | Interface aux couleurs d'Eau sèche, logo dans « À propos » ; le produit garde son nom |

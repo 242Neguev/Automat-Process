@@ -6,7 +6,7 @@ import type { Liste } from "../../donnees/liste";
 import { textes } from "../../textes";
 import IconeGravite from "./IconeGravite";
 
-const t = textes.cartes.liste;
+const t = textes.liste;
 const LIGNES_APERCU = 8;
 
 function message(anomalie: Anomalie): string {

@@ -29,7 +29,8 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 | **Mosaïque** de toutes les cartes et bouton **« cas le plus long »** (la carte où chaque information est la plus difficile à loger) | ✅ |
 | **Contrôle des données de la liste** : e-mails et numéros mal formés, agents en double, informations vides, colonne vide, avec les lignes à corriger dans le fichier | ✅ |
 | **Impression directe** (badges PVC sur Evolis, Zebra, Magicard… ou toute imprimante installée) : choix de l'imprimante, d'une carte ou de toutes, recto verso, verso retourné, exemplaires ; carte rendue à la résolution de l'imprimante, à sa taille réelle | ✅ (à tester sous Windows) |
-| Signatures e-mail | Phase 1, incrément 4 |
+| **Signatures e-mail** : trois mises en page compatibles Outlook et Gmail (classique, logo à gauche, bandeau) ou **signature existante** avec balises (fichier .htm d'Outlook, images locales intégrées) ; police sûre, couleurs, logo intégré ; aperçu clair et sombre ; taille contrôlée (limite de Gmail) | ✅ |
+| **Pages à envoyer aux agents** : sa signature à copier (version Gmail sans logo, code HTML pour Thunderbird, texte pour le téléphone) et le mode d'emploi d'Outlook et de Gmail ; une page récapitule tout le monde | ✅ (collage à essayer dans Outlook) |
 
 ## Développer (Mac ou Windows)
 
@@ -86,9 +87,10 @@ src/                     Interface React + TypeScript
   textes.ts              Tous les textes de l'interface (traduction future)
   moteur.ts              Accès typé aux commandes du cœur
   controle/              Rapport de contrôle des cartes (à partir des mesures du moteur)
+  signatures/            Signatures e-mail : modèle, HTML compatible Outlook, import, pages des agents
   donnees/               Listes, correspondances, nettoyage, vCard, agents à rendre
   modele/                Formats, champs, analyse des SVG, visuels
-  pages/                 Écrans
+  pages/                 Écrans (cartes/, signatures/, et commun/ : étape Liste partagée)
 src-tauri/               Cœur Rust (Tauri)
   src/moteur/            Moteur de rendu Typst : compilation, fichiers virtuels, exports PDF/PNG/SVG
   src/commandes.rs       Commandes appelées par l'interface
@@ -97,6 +99,7 @@ src-tauri/               Cœur Rust (Tauri)
   src/pdf_textes.rs      Lignes de texte d'un PDF : lecture, retrait ciblé
   src/projet_fichier.rs  Fichiers de projet « .automat »
   src/impression.rs      Impression directe par le pilote Windows (badges PVC)
+  src/fichiers.rs        Lecture contrôlée des fichiers choisis, écriture des dossiers de résultats
   gabarits/carte.typ     Gabarit graphique des cartes (aperçu, cartes unitaires, planches)
   ressources/demo/       Données et fonds de la démonstration
 docs/                    Analyse de faisabilité, images, PDF d'exemple

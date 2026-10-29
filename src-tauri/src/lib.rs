@@ -1,5 +1,6 @@
 mod cartes;
 mod commandes;
+mod fichiers;
 mod fonds;
 mod impression;
 pub mod moteur;
@@ -37,6 +38,8 @@ pub fn run() {
             commandes::enregistrer_projet,
             commandes::ouvrir_projet,
             commandes::lire_liste,
+            commandes::lire_fichier,
+            commandes::ecrire_fichiers,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Automat-Process");

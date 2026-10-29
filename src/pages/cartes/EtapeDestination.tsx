@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Badge, Button, Group, List, Loader, Modal, Paper, SegmentedControl, Select, Stack, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconAlertTriangle, IconCheck, IconFileTypePdf } from "@tabler/icons-react";
+import { IconCheck, IconFileTypePdf } from "@tabler/icons-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { compter, graviteCarte, regrouper } from "../../controle/cartes";
 import {
-  enErreurMoteur,
   exporterCartes,
   imprimerCartes,
   type DonneesAgent,
@@ -15,7 +14,8 @@ import {
   type Sortie,
 } from "../../moteur";
 import { textes } from "../../textes";
-import IconeGravite from "./IconeGravite";
+import IconeGravite from "../commun/IconeGravite";
+import { signalerErreur } from "../commun/signalerErreur";
 import ImpressionDirecte from "./ImpressionDirecte";
 import type { Controle } from "./useControle";
 
@@ -30,11 +30,6 @@ interface Props {
   controle: Controle;
   /** Retour à la vérification, sur les cartes à corriger. */
   onVoirCartes: () => void;
-}
-
-function signalerErreur(e: unknown) {
-  const { message, details } = enErreurMoteur(e);
-  notifications.show({ color: "red", icon: <IconAlertTriangle size={18} />, title: textes.erreur, message: [message, ...details].join("\n") });
 }
 
 export default function EtapeDestination({ modele, agents, controle, onVoirCartes }: Props) {

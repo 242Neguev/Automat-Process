@@ -1,24 +1,27 @@
 import { useEffect, useState } from "react";
-import { ActionIcon, AppShell, Badge, Group, Loader, NavLink, Stack, Text, ThemeIcon, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, AppShell, Badge, Box, Group, Loader, NavLink, Stack, Text, ThemeIcon, Title, Tooltip } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconCpu, IconDeviceMobile, IconFiles, IconFileTypeDocx, IconId, IconInfoCircle, IconMail } from "@tabler/icons-react";
 import APropos from "./APropos";
 import AssistantCartes from "./pages/cartes/AssistantCartes";
+import AssistantSignatures from "./pages/signatures/AssistantSignatures";
 import { infosMoteur, type InfosMoteur } from "./moteur";
 import { textes } from "./textes";
 import { COULEURS } from "./theme";
 
 const MODULES = [
   { cle: "cartes", icone: IconId, disponible: true },
-  { cle: "signatures", icone: IconMail, disponible: false },
+  { cle: "signatures", icone: IconMail, disponible: true },
   { cle: "numerique", icone: IconDeviceMobile, disponible: false },
   { cle: "word", icone: IconFileTypeDocx, disponible: false },
   { cle: "pdf", icone: IconFiles, disponible: false },
 ] as const;
+type Module = (typeof MODULES)[number]["cle"];
 
 export default function App() {
   const [infos, setInfos] = useState<InfosMoteur | null>(null);
   const [aProposOuvert, aPropos] = useDisclosure(false);
+  const [module, setModule] = useState<Module>("cartes");
 
   useEffect(() => {
     infosMoteur().then(setInfos, () => setInfos(null));
@@ -64,8 +67,9 @@ export default function App() {
                   </Badge>
                 )
               }
-              active={cle === "cartes"}
+              active={cle === module}
               disabled={!disponible}
+              onClick={() => setModule(cle)}
             />
           ))}
         </Stack>
@@ -77,8 +81,14 @@ export default function App() {
         </Group>
       </AppShell.Navbar>
 
+      {/* Les assistants restent montés : on retrouve son travail en changeant de module. */}
       <AppShell.Main>
-        <AssistantCartes />
+        <Box display={module === "cartes" ? undefined : "none"}>
+          <AssistantCartes />
+        </Box>
+        <Box display={module === "signatures" ? undefined : "none"}>
+          <AssistantSignatures />
+        </Box>
       </AppShell.Main>
 
       <APropos ouvert={aProposOuvert} fermer={aPropos.close} versionTypst={infos?.versionTypst} />

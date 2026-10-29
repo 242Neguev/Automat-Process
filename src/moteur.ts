@@ -217,6 +217,16 @@ export const ouvrirProjet = (chemin: string) => invoke<ProjetOuvert>("ouvrir_pro
 /** Contenu brut d'un fichier de liste choisi par l'utilisateur. */
 export const lireListe = (chemin: string) => invoke<ArrayBuffer>("lire_liste", { chemin });
 
+/** Contenu brut d'un fichier choisi par l'utilisateur, après contrôle de son format et de sa taille. */
+export const lireFichier = (chemin: string, nature: "liste" | "image" | "signature") => invoke<ArrayBuffer>("lire_fichier", { chemin, nature });
+
+/** Fichier à créer : un texte (HTML) ou des octets (image). */
+export type FichierAEcrire = { nom: string; texte: string } | { nom: string; octets: number[] };
+
+/** Écrit des fichiers dans un nouveau dossier `sousDossier` de `dossier` ; renvoie son chemin. */
+export const ecrireFichiers = (dossier: string, sousDossier: string, fichiers: FichierAEcrire[]) =>
+  invoke<string>("ecrire_fichiers", { dossier, sousDossier, fichiers });
+
 /** Ramène toute erreur (Rust ou JavaScript) au format affiché par l'interface. */
 export function enErreurMoteur(erreur: unknown): ErreurMoteur {
   if (typeof erreur === "object" && erreur !== null && "message" in erreur) {

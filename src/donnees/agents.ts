@@ -3,7 +3,7 @@ import type { Champ, ChampQr, ChampTexte, DonneesAgent, ModeleCarte } from "../m
 import { textes } from "../textes";
 import type { Correspondances } from "./correspondances";
 import type { LigneListe } from "./liste";
-import { nettoyer } from "./nettoyage";
+import { nettoyer, type Transformation } from "./nettoyage";
 import { vcard, type ChampsVCard } from "./vcard";
 
 const BALISE = /\{\{([^}]+)\}\}/g;
@@ -33,8 +33,8 @@ export function remplir(texte: string, valeurs: Record<string, string>): string 
     .trim();
 }
 
-/** Valeur nettoyée de chaque balise pour une ligne de la liste. */
-export function valeursDeLigne(modele: ModeleCarte, ligne: LigneListe, correspondances: Correspondances) {
+/** Valeur nettoyée de chaque balise pour une ligne de la liste (modèle de carte ou de signature). */
+export function valeursDeLigne(modele: { transformations?: Record<string, Transformation> }, ligne: LigneListe, correspondances: Correspondances) {
   return Object.fromEntries(
     Object.entries(correspondances).map(([balise, colonne]) => [
       balise,

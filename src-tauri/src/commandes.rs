@@ -1,7 +1,6 @@
 //! Commandes appelées par l'interface (`invoke`). Les calculs tournent hors du fil
 //! principal pour ne jamais figer la fenêtre.
 
-use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use serde::Serialize;
@@ -9,14 +8,11 @@ use tauri::State;
 use tauri::ipc::Response;
 
 use crate::cartes::{self, DonneesAgent, Face, Feuille, Projet, Sortie, Zone};
+use crate::fichiers::{self, FichierAEcrire, Nature};
 use crate::fonds::{FondImporte, Fonds, TexteRetire};
 use crate::impression::{self, Imprimante, Reglages};
 use crate::moteur::{ErreurMoteur, Moteur, VERSION_TYPST};
 use crate::projet_fichier::{self, ProjetOuvert};
-
-/// Formats de liste acceptés, et taille maximale d'un fichier (une liste d'agents pèse bien moins).
-const EXTENSIONS_LISTE: [&str; 7] = ["xlsx", "xlsm", "xls", "ods", "csv", "tsv", "txt"];
-const TAILLE_MAX_LISTE: u64 = 50 * 1024 * 1024;
 
 /// Le moteur est préparé en arrière-plan dès le démarrage (recensement des polices) ;
 /// les commandes attendent qu'il soit prêt.
@@ -203,29 +199,29 @@ pub async fn imprimer_cartes(
 /// Contenu brut d'une liste choisie par l'utilisateur ; elle est décodée dans l'interface.
 #[tauri::command]
 pub async fn lire_liste(chemin: String) -> Result<Response, ErreurMoteur> {
-    let extension = Path::new(&chemin)
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .map(str::to_lowercase)
-        .unwrap_or_default();
-    if !EXTENSIONS_LISTE.contains(&extension.as_str()) {
-        return Err(ErreurMoteur::simple(format!(
-            "Format de liste non pris en charge (.{extension}) : utilisez un fichier Excel, CSV ou ODS."
-        )));
-    }
+    lire_fichier(chemin, Nature::Liste).await
+}
+
+/// Contenu brut d'un fichier choisi par l'utilisateur (liste, logo, signature existante).
+#[tauri::command]
+pub async fn lire_fichier(chemin: String, nature: Nature) -> Result<Response, ErreurMoteur> {
+    tauri::async_runtime::spawn_blocking(move || fichiers::lire(&chemin, nature).map(Response::new))
+        .await
+        .map_err(|erreur| ErreurMoteur::simple(format!("Lecture interrompue : {erreur}")))?
+}
+
+/// Écrit des fichiers (pages de signature…) dans un nouveau dossier ; renvoie son chemin.
+#[tauri::command]
+pub async fn ecrire_fichiers(
+    dossier: String,
+    sous_dossier: String,
+    fichiers: Vec<FichierAEcrire>,
+) -> Result<String, ErreurMoteur> {
     tauri::async_runtime::spawn_blocking(move || {
-        let illisible = |erreur: std::io::Error| {
-            ErreurMoteur::simple(format!("Impossible de lire « {chemin} » : {erreur}"))
-        };
-        if std::fs::metadata(&chemin).map_err(illisible)?.len() > TAILLE_MAX_LISTE {
-            return Err(ErreurMoteur::simple(
-                "Le fichier dépasse 50 Mo : est-ce bien une liste ?",
-            ));
-        }
-        std::fs::read(&chemin).map(Response::new).map_err(illisible)
+        fichiers::ecrire(&dossier, &sous_dossier, &fichiers)
     })
     .await
-    .map_err(|erreur| ErreurMoteur::simple(format!("Lecture interrompue : {erreur}")))?
+    .map_err(|erreur| ErreurMoteur::simple(format!("Écriture interrompue : {erreur}")))?
 }
 
 /// Couleur du visuel autour d'une zone : elle sert à effacer un texte incrusté sur un fond uni.
