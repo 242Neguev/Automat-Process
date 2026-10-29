@@ -6,6 +6,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import type { WorkBook } from "xlsx";
 import urlListeExemple from "../../assets/exemple-agents.xlsx?url";
 import { balisesDuModele, construireAgent, valeursDeLigne } from "../../donnees/agents";
+import { controlerListe } from "../../donnees/controle";
 import { fusionner, type Correspondances } from "../../donnees/correspondances";
 import { lireFeuille, ouvrirClasseur } from "../../donnees/liste";
 import { FORMATS } from "../../modele/formats";
@@ -67,6 +68,7 @@ export default function AssistantCartes() {
     () => (modele && liste ? liste.lignes.map((ligne) => construireAgent(modele, ligne, correspondances)) : []),
     [modele, liste, correspondances],
   );
+  const anomalies = useMemo(() => (liste ? controlerListe(liste, balises, correspondances) : []), [liste, balises, correspondances]);
   // Le contrôle des cartes sert à la vérification et à l'export.
   const controle = useControle(modele, agents, etape >= 2);
   const exemple = useMemo(
@@ -182,6 +184,7 @@ export default function AssistantCartes() {
             balises={balises}
             correspondances={correspondances}
             exemple={exemple}
+            anomalies={anomalies}
             onImporter={importer}
             onExemple={utiliserExemple}
             onFeuille={setFeuille}

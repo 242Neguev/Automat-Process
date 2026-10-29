@@ -12,20 +12,33 @@ export const normaliser = (texte: string) =>
     .replace(/[^a-z0-9]/g, "");
 
 // Chaque groupe réunit des intitulés courants qui désignent la même information.
-const SYNONYMES = [
-  ["prenom", "prenoms", "firstname", "givenname"],
-  ["nom", "noms", "nomdefamille", "lastname", "surname", "familyname"],
-  ["fonction", "poste", "titre", "intitule", "intituledeposte", "jobtitle", "title"],
-  ["email", "mail", "courriel", "adressemail", "adresseemail", "emailprofessionnel", "mailprofessionnel"],
-  ["mobile", "portable", "gsm", "cellulaire", "telmobile", "telephonemobile", "telportable", "cell"],
-  ["fixe", "telfixe", "telephonefixe", "bureau", "telbureau", "telephonebureau", "lignedirecte"],
-  ["telephone", "tel", "phone", "numerodetelephone"],
-  ["matricule", "identifiant", "numeroagent", "numerodagent", "id"],
-  ["direction", "departement", "service", "division", "pole"],
-  ["site", "ville", "localisation", "agence", "implantation"],
-];
+const SYNONYMES = {
+  prenom: ["prenom", "prenoms", "firstname", "givenname"],
+  nom: ["nom", "noms", "nomdefamille", "lastname", "surname", "familyname"],
+  fonction: ["fonction", "poste", "titre", "intitule", "intituledeposte", "jobtitle", "title"],
+  email: ["email", "mail", "courriel", "adressemail", "adresseemail", "emailprofessionnel", "mailprofessionnel"],
+  mobile: ["mobile", "portable", "gsm", "cellulaire", "telmobile", "telephonemobile", "telportable", "cell"],
+  fixe: ["fixe", "telfixe", "telephonefixe", "bureau", "telbureau", "telephonebureau", "lignedirecte"],
+  telephone: ["telephone", "tel", "phone", "numerodetelephone"],
+  matricule: ["matricule", "identifiant", "numeroagent", "numerodagent", "id"],
+  direction: ["direction", "departement", "service", "division", "pole"],
+  site: ["site", "ville", "localisation", "agence", "implantation"],
+};
 
-const groupe = (nom: string) => SYNONYMES.find((g) => g.includes(nom)) ?? [nom];
+/** Nature d'une information, d'après les intitulés courants. */
+export type Nature = keyof typeof SYNONYMES;
+
+const groupe = (nom: string) => Object.values(SYNONYMES).find((g) => g.includes(nom)) ?? [nom];
+
+/** Nature d'une balise ou d'une colonne : « Courriel » → « email », « Tél. bureau » → « fixe ». */
+export function nature(nom: string): Nature | null {
+  const simple = normaliser(nom);
+  const connue = (Object.keys(SYNONYMES) as Nature[]).find((cle) => SYNONYMES[cle].includes(simple));
+  if (connue) return connue;
+  if (simple.includes("mail")) return "email";
+  if (/^(tel|phone|mobile|portable|gsm)/.test(simple)) return "telephone";
+  return null;
+}
 
 /**
  * Associe chaque balise à une colonne : d'abord le même nom (au format près), puis un synonyme.

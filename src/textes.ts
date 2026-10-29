@@ -148,6 +148,21 @@ export const textes = {
       apercuTitre: "Aperçu de la liste",
       lignesAffichees: (affichees: number, total: number) => `${affichees} premières lignes sur ${total}`,
       vide: "Aucune ligne de données n'a été trouvée dans cette feuille.",
+      controle: {
+        titre: "Contrôle des données",
+        aide: "À corriger de préférence dans le fichier, puis à réimporter.",
+        aucune: "Aucune anomalie : les données sont prêtes.",
+        lignes: (numeros: number[]) => `${numeros.length > 1 ? "Lignes" : "Ligne"} ${numeros.slice(0, 12).join(", ")}${numeros.length > 12 ? "…" : ""}`,
+        exemple: (valeur: string) => `ex. « ${valeur} »`,
+        messages: {
+          "colonne-vide": (balise: string) => `La colonne choisie pour « ${balise} » est vide : vérifiez la correspondance.`,
+          doublon: (balise: string) => `Agent en double (même ${balise})`,
+          email: (balise: string, n: number) => `${n} e-mail${n > 1 ? "s" : ""} mal formé${n > 1 ? "s" : ""} (« ${balise} »)`,
+          telephone: (balise: string, n: number) => `${n} numéro${n > 1 ? "s" : ""} douteux (« ${balise} »)`,
+          vide: (balise: string, n: number, masquee: boolean) =>
+            `${n} agent${n > 1 ? "s" : ""} sans « ${balise} »${masquee ? ` : la ligne est masquée sur ${n > 1 ? "leur" : "sa"} carte` : ""}`,
+        },
+      },
     },
     controle: {
       calcul: "Contrôle des cartes…",

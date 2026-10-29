@@ -1,11 +1,67 @@
 import { Alert, Badge, Button, Group, Paper, ScrollArea, Select, Stack, Table, Text, Title } from "@mantine/core";
 import { IconFileSpreadsheet, IconListDetails } from "@tabler/icons-react";
+import type { Anomalie } from "../../donnees/controle";
 import type { Correspondances } from "../../donnees/correspondances";
 import type { Liste } from "../../donnees/liste";
 import { textes } from "../../textes";
+import IconeGravite from "./IconeGravite";
 
 const t = textes.cartes.liste;
 const LIGNES_APERCU = 8;
+
+function message(anomalie: Anomalie): string {
+  const { messages } = t.controle;
+  const n = anomalie.lignes.length;
+  switch (anomalie.type) {
+    case "colonne-vide":
+      return messages["colonne-vide"](anomalie.balise);
+    case "doublon":
+      return messages.doublon(anomalie.balise);
+    case "email":
+    case "telephone":
+      return messages[anomalie.type](anomalie.balise, n);
+    case "vide":
+      return messages.vide(anomalie.balise, n, anomalie.gravite === "info");
+  }
+}
+
+/** Anomalies de la liste, avec les lignes à corriger dans le fichier. */
+function ControleDonnees({ anomalies }: { anomalies: Anomalie[] }) {
+  return (
+    <Stack gap="xs" data-controle-liste>
+      <div>
+        <Title order={5}>{t.controle.titre}</Title>
+        {anomalies.some((anomalie) => anomalie.gravite === "attention") && (
+          <Text size="sm" c="dimmed">
+            {t.controle.aide}
+          </Text>
+        )}
+      </div>
+      {anomalies.length === 0 ? (
+        <Group gap="xs">
+          <IconeGravite gravite={null} />
+          <Text size="sm">{t.controle.aucune}</Text>
+        </Group>
+      ) : (
+        anomalies.map((anomalie) => (
+          <Group key={`${anomalie.type}:${anomalie.balise}:${anomalie.lignes.join(",")}`} gap="xs" wrap="nowrap" align="flex-start">
+            <IconeGravite gravite={anomalie.gravite} />
+            <div>
+              <Text size="sm">{message(anomalie)}</Text>
+              {(anomalie.lignes.length > 0 || anomalie.exemple) && (
+                <Text size="xs" c="dimmed" dir="auto">
+                  {[anomalie.lignes.length > 0 && t.controle.lignes(anomalie.lignes), anomalie.exemple && t.controle.exemple(anomalie.exemple)]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+              )}
+            </div>
+          </Group>
+        ))
+      )}
+    </Stack>
+  );
+}
 
 interface Props {
   liste: Liste | null;
@@ -14,13 +70,14 @@ interface Props {
   correspondances: Correspondances;
   /** Valeur nettoyée de chaque balise pour la première ligne, pour vérifier d'un coup d'œil. */
   exemple: Record<string, string>;
+  anomalies: Anomalie[];
   onImporter: () => void;
   onExemple: () => void;
   onFeuille: (feuille: string) => void;
   onCorrespondance: (balise: string, colonne: string | null) => void;
 }
 
-export default function EtapeListe({ liste, feuilles, balises, correspondances, exemple, onImporter, onExemple, onFeuille, onCorrespondance }: Props) {
+export default function EtapeListe({ liste, feuilles, balises, correspondances, exemple, anomalies, onImporter, onExemple, onFeuille, onCorrespondance }: Props) {
   return (
     <Stack gap="lg">
       <Group>
@@ -107,6 +164,8 @@ export default function EtapeListe({ liste, feuilles, balises, correspondances, 
                   ))}
                 </Table.Tbody>
               </Table>
+
+              <ControleDonnees anomalies={anomalies} />
 
               <div>
                 <Title order={5}>{t.apercuTitre}</Title>
