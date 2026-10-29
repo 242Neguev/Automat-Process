@@ -1,6 +1,7 @@
 //! Commandes appelées par l'interface (`invoke`). Les calculs tournent hors du fil
 //! principal pour ne jamais figer la fenêtre.
 
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
@@ -15,6 +16,7 @@ use crate::impression::{self, Imprimante, Reglages};
 use crate::moteur::{ErreurMoteur, Moteur, VERSION_TYPST};
 use crate::outils_pdf;
 use crate::projet_fichier::{self, ProjetOuvert};
+use crate::word::{self, Courrier};
 
 /// Le moteur est préparé en arrière-plan dès le démarrage (recensement des polices) ;
 /// les commandes attendent qu'il soit prêt.
@@ -284,6 +286,31 @@ pub async fn separer_pdf(
             })
             .collect();
         fichiers::ecrire(&dossier, &sous_dossier, &a_ecrire)
+    })
+    .await
+}
+
+/// Parties XML à remplir d'un modèle Word (.docx ou .dotx).
+#[tauri::command]
+pub async fn lire_modele_word(chemin: String) -> Result<HashMap<String, String>, ErreurMoteur> {
+    en_arriere_plan(move || word::lire_parties(&fichiers::lire(&chemin, Nature::Word)?)).await
+}
+
+/// Écrit des courriers Word d'après le modèle `modele`, dans le dossier `sous_dossier` de `dossier`
+/// (créé au besoin : les courriers peuvent arriver en plusieurs fois) ; renvoie son chemin.
+#[tauri::command]
+pub async fn ecrire_courriers(
+    modele: String,
+    courriers: Vec<Courrier>,
+    dossier: String,
+    sous_dossier: String,
+) -> Result<String, ErreurMoteur> {
+    en_arriere_plan(move || {
+        let nom = fichiers::nom_sur(&sous_dossier)
+            .ok_or_else(|| ErreurMoteur::simple("Nom de dossier invalide."))?;
+        let cible = Path::new(&dossier).join(nom);
+        word::ecrire(&fichiers::lire(&modele, Nature::Word)?, &courriers, &cible)?;
+        Ok(cible.to_string_lossy().into_owned())
     })
     .await
 }

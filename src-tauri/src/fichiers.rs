@@ -15,6 +15,7 @@ pub enum Nature {
     Image,
     Signature,
     Pdf,
+    Word,
 }
 
 impl Nature {
@@ -24,6 +25,7 @@ impl Nature {
             Nature::Image => &["png", "jpg", "jpeg", "gif", "svg"],
             Nature::Signature => &["htm", "html"],
             Nature::Pdf => &["pdf"],
+            Nature::Word => &["docx", "dotx"],
         }
     }
 
@@ -33,6 +35,7 @@ impl Nature {
             Nature::Image => 10 * 1024 * 1024,
             Nature::Signature => 5 * 1024 * 1024,
             Nature::Pdf => 500 * 1024 * 1024,
+            Nature::Word => 100 * 1024 * 1024,
         }
     }
 
@@ -48,6 +51,9 @@ impl Nature {
                 "Format non pris en charge (.{extension}) : choisissez une signature enregistrée en HTML (.htm ou .html)."
             ),
             Nature::Pdf => format!("Format non pris en charge (.{extension}) : choisissez un PDF."),
+            Nature::Word => format!(
+                "Format non pris en charge (.{extension}) : choisissez un document Word (.docx ou .dotx)."
+            ),
         }
     }
 }
@@ -86,7 +92,7 @@ pub struct FichierAEcrire {
 }
 
 /// Nom de fichier sans risque : ni séparateur, ni caractère interdit par Windows, ni « .. ».
-fn nom_sur(nom: &str) -> Option<String> {
+pub fn nom_sur(nom: &str) -> Option<String> {
     let propre: String = nom
         .chars()
         .map(|c| {

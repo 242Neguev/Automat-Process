@@ -8,6 +8,7 @@ mod outils_pdf;
 mod pdf_textes;
 mod projet_fichier;
 mod qr;
+mod word;
 
 use std::sync::Arc;
 
@@ -45,6 +46,8 @@ pub fn run() {
             commandes::infos_pdf,
             commandes::fusionner_pdf,
             commandes::separer_pdf,
+            commandes::lire_modele_word,
+            commandes::ecrire_courriers,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Automat-Process");

@@ -31,7 +31,8 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 | **Cartes numériques** : une image PNG ou JPG par agent (WhatsApp, LinkedIn, e-mail), ou un PDF par agent avec téléphone, e-mail et site cliquables ; fiche contact .vcf de chacun | ✅ |
 | **Impression directe** (badges PVC sur Evolis, Zebra, Magicard… ou toute imprimante installée) : choix de l'imprimante, d'une carte ou de toutes, recto verso, verso retourné, exemplaires ; carte rendue à la résolution de l'imprimante, à sa taille réelle | ✅ (à tester sous Windows) |
 | **Outils PDF** : fusionner plusieurs PDF dans l'ordre voulu ; séparer un PDF par page ou toutes les N pages, fichiers nommés d'après une liste (`{{Prénom}} {{NOM}}`) ; pages recopiées telles quelles, CMJN compris | ✅ |
-| Courriers Word personnalisés (`.docx` par personne, document fusionné, PDF via Word) | Phase 2, en cours |
+| **Courriers Word** : modèle `.docx` ou `.dotx` avec balises `{{…}}` ou **champs de publipostage existants** (convertis), balises coupées par Word recollées ; aperçu du texte de chaque courrier ; un `.docx` par personne et un **document fusionné** (une section par courrier, pages numérotées à partir de 1) ; lignes vides retirées, valeurs sur plusieurs lignes gardées | ✅ |
+| PDF des courriers (via Word, sinon LibreOffice), aperçu fidèle | Phase 2, en cours |
 | **Signatures e-mail** : trois mises en page compatibles Outlook et Gmail (classique, logo à gauche, bandeau) ou **signature existante** avec balises (fichier .htm d'Outlook, images locales intégrées) ; police sûre, couleurs, logo intégré ; aperçu clair et sombre ; taille contrôlée (limite de Gmail) | ✅ |
 | **Pages à envoyer aux agents** : sa signature à copier (version Gmail sans logo, code HTML pour Thunderbird, texte pour le téléphone) et le mode d'emploi d'Outlook et de Gmail ; une page récapitule tout le monde | ✅ (collage à essayer dans Outlook) |
 
@@ -91,9 +92,10 @@ src/                     Interface React + TypeScript
   moteur.ts              Accès typé aux commandes du cœur
   controle/              Rapport de contrôle des cartes (à partir des mesures du moteur)
   signatures/            Signatures e-mail : modèle, HTML compatible Outlook, import, pages des agents
+  word/                  Courriers Word : préparation du modèle, remplissage, document fusionné
   donnees/               Listes, correspondances, nettoyage, vCard, agents à rendre
   modele/                Formats, champs, analyse des SVG, visuels
-  pages/                 Écrans (cartes/, signatures/, pdf/, et commun/ : étape Liste partagée)
+  pages/                 Écrans (cartes/, signatures/, word/, pdf/, et commun/ : étape Liste partagée)
 src-tauri/               Cœur Rust (Tauri)
   src/moteur/            Moteur de rendu Typst : compilation, fichiers virtuels, exports PDF/PNG/SVG
   src/commandes.rs       Commandes appelées par l'interface
@@ -104,6 +106,7 @@ src-tauri/               Cœur Rust (Tauri)
   src/impression.rs      Impression directe par le pilote Windows (badges PVC)
   src/fichiers.rs        Lecture contrôlée des fichiers choisis, écriture des dossiers de résultats
   src/outils_pdf.rs      Fusion et séparation de PDF (pages recopiées telles quelles)
+  src/word.rs            Modèles Word : lecture des parties à remplir, écriture des courriers
   gabarits/carte.typ     Gabarit graphique des cartes (aperçu, cartes unitaires, planches)
   ressources/demo/       Données et fonds de la démonstration
 docs/                    Analyse de faisabilité, images, PDF d'exemple

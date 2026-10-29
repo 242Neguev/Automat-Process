@@ -219,6 +219,19 @@ export const fusionnerPdf = (chemins: string[], sortie: string) => invoke<void>(
 export const separerPdf = (chemin: string, pagesParFichier: number, noms: string[], dossier: string, sousDossier: string) =>
   invoke<string>("separer_pdf", { chemin, pagesParFichier, noms, dossier, sousDossier });
 
+/** Parties XML à remplir d'un modèle Word (chemin dans l'archive → XML). */
+export const lireModeleWord = (chemin: string) => invoke<Record<string, string>>("lire_modele_word", { chemin });
+
+/** Un courrier à écrire : nom du fichier (sans extension) et parties remplies. */
+export interface Courrier {
+  nom: string;
+  parties: Record<string, string>;
+}
+
+/** Écrit des courriers Word d'après le modèle, dans le dossier `sousDossier` de `dossier` ; renvoie son chemin. */
+export const ecrireCourriers = (modele: string, courriers: Courrier[], dossier: string, sousDossier: string) =>
+  invoke<string>("ecrire_courriers", { modele, courriers, dossier, sousDossier });
+
 /** Imprimante installée (impression directe, sous Windows). */
 export interface Imprimante {
   nom: string;

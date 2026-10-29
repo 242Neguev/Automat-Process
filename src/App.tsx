@@ -5,6 +5,7 @@ import { IconCpu, IconDeviceMobile, IconFiles, IconFileTypeDocx, IconId, IconInf
 import APropos from "./APropos";
 import AssistantCartes from "./pages/cartes/AssistantCartes";
 import OutilsPdf from "./pages/pdf/OutilsPdf";
+import AssistantWord from "./pages/word/AssistantWord";
 import AssistantSignatures from "./pages/signatures/AssistantSignatures";
 import { infosMoteur, type InfosMoteur } from "./moteur";
 import { textes } from "./textes";
@@ -14,7 +15,7 @@ const MODULES = [
   { cle: "cartes", icone: IconId, disponible: true },
   { cle: "signatures", icone: IconMail, disponible: true },
   { cle: "numerique", icone: IconDeviceMobile, disponible: false },
-  { cle: "word", icone: IconFileTypeDocx, disponible: false },
+  { cle: "word", icone: IconFileTypeDocx, disponible: true },
   { cle: "pdf", icone: IconFiles, disponible: true },
 ] as const;
 type Module = (typeof MODULES)[number]["cle"];
@@ -89,6 +90,9 @@ export default function App() {
         </Box>
         <Box display={module === "signatures" ? undefined : "none"}>
           <AssistantSignatures />
+        </Box>
+        <Box display={module === "word" ? undefined : "none"}>
+          <AssistantWord />
         </Box>
         <Box display={module === "pdf" ? undefined : "none"}>
           <OutilsPdf />
