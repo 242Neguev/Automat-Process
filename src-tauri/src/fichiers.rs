@@ -14,6 +14,7 @@ pub enum Nature {
     Liste,
     Image,
     Signature,
+    Pdf,
 }
 
 impl Nature {
@@ -22,6 +23,7 @@ impl Nature {
             Nature::Liste => &["xlsx", "xlsm", "xls", "ods", "csv", "tsv", "txt"],
             Nature::Image => &["png", "jpg", "jpeg", "gif", "svg"],
             Nature::Signature => &["htm", "html"],
+            Nature::Pdf => &["pdf"],
         }
     }
 
@@ -30,6 +32,7 @@ impl Nature {
             Nature::Liste => 50 * 1024 * 1024,
             Nature::Image => 10 * 1024 * 1024,
             Nature::Signature => 5 * 1024 * 1024,
+            Nature::Pdf => 500 * 1024 * 1024,
         }
     }
 
@@ -44,6 +47,7 @@ impl Nature {
             Nature::Signature => format!(
                 "Format non pris en charge (.{extension}) : choisissez une signature enregistrée en HTML (.htm ou .html)."
             ),
+            Nature::Pdf => format!("Format non pris en charge (.{extension}) : choisissez un PDF."),
         }
     }
 }

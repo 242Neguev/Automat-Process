@@ -1,6 +1,7 @@
 //! Commandes appelées par l'interface (`invoke`). Les calculs tournent hors du fil
 //! principal pour ne jamais figer la fenêtre.
 
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use serde::Serialize;
@@ -12,6 +13,7 @@ use crate::fichiers::{self, FichierAEcrire, Nature};
 use crate::fonds::{FondImporte, Fonds, TexteRetire};
 use crate::impression::{self, Imprimante, Reglages};
 use crate::moteur::{ErreurMoteur, Moteur, VERSION_TYPST};
+use crate::outils_pdf;
 use crate::projet_fichier::{self, ProjetOuvert};
 
 /// Le moteur est préparé en arrière-plan dès le démarrage (recensement des polices) ;
@@ -196,6 +198,92 @@ pub async fn exporter_numerique(
             &dossier,
             &sous_dossier,
         )
+    })
+    .await
+}
+
+/// Nom d'un fichier, sans son dossier.
+fn nom_de(chemin: &str) -> String {
+    Path::new(chemin)
+        .file_name()
+        .map(|nom| nom.to_string_lossy().into_owned())
+        .unwrap_or_else(|| chemin.to_string())
+}
+
+async fn en_arriere_plan<T: Send + 'static>(
+    travail: impl FnOnce() -> Result<T, ErreurMoteur> + Send + 'static,
+) -> Result<T, ErreurMoteur> {
+    tauri::async_runtime::spawn_blocking(travail)
+        .await
+        .map_err(|erreur| {
+            ErreurMoteur::simple(format!("Le traitement a été interrompu : {erreur}"))
+        })?
+}
+
+/// Nombre de pages d'un PDF choisi par l'utilisateur.
+#[tauri::command]
+pub async fn infos_pdf(chemin: String) -> Result<usize, ErreurMoteur> {
+    en_arriere_plan(move || {
+        outils_pdf::nombre_de_pages(&fichiers::lire(&chemin, Nature::Pdf)?, &nom_de(&chemin))
+    })
+    .await
+}
+
+/// Fusionne des PDF, dans l'ordre donné, dans le fichier `sortie`.
+#[tauri::command]
+pub async fn fusionner_pdf(chemins: Vec<String>, sortie: String) -> Result<(), ErreurMoteur> {
+    en_arriere_plan(move || {
+        let sources = chemins
+            .iter()
+            .map(|chemin| Ok((nom_de(chemin), fichiers::lire(chemin, Nature::Pdf)?)))
+            .collect::<Result<Vec<_>, ErreurMoteur>>()?;
+        let pdf = outils_pdf::fusionner(&sources)?;
+        std::fs::write(&sortie, pdf).map_err(|erreur| {
+            ErreurMoteur::simple(format!("Impossible d'enregistrer « {sortie} » : {erreur}"))
+        })
+    })
+    .await
+}
+
+/// Sépare un PDF en fichiers de `pages_par_fichier` pages, dans un nouveau dossier (chemin renvoyé).
+/// Chaque fichier prend le nom donné par `noms`, sinon celui du PDF suivi d'un numéro.
+#[tauri::command]
+pub async fn separer_pdf(
+    chemin: String,
+    pages_par_fichier: usize,
+    noms: Vec<String>,
+    dossier: String,
+    sous_dossier: String,
+) -> Result<String, ErreurMoteur> {
+    en_arriere_plan(move || {
+        let nom = nom_de(&chemin);
+        let parties = outils_pdf::separer(
+            &fichiers::lire(&chemin, Nature::Pdf)?,
+            &nom,
+            pages_par_fichier,
+        )?;
+        let base = nom
+            .strip_suffix(".pdf")
+            .or_else(|| nom.strip_suffix(".PDF"))
+            .unwrap_or(&nom);
+        let chiffres = parties.len().to_string().len().max(3);
+        let a_ecrire: Vec<FichierAEcrire> = parties
+            .into_iter()
+            .enumerate()
+            .map(|(i, octets)| {
+                let nom = noms
+                    .get(i)
+                    .filter(|nom| !nom.trim().is_empty())
+                    .cloned()
+                    .unwrap_or_else(|| format!("{base} - {:0chiffres$}", i + 1));
+                FichierAEcrire {
+                    nom: format!("{nom}.pdf"),
+                    texte: None,
+                    octets: Some(octets),
+                }
+            })
+            .collect();
+        fichiers::ecrire(&dossier, &sous_dossier, &a_ecrire)
     })
     .await
 }

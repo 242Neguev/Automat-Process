@@ -4,6 +4,7 @@ mod fichiers;
 mod fonds;
 mod impression;
 pub mod moteur;
+mod outils_pdf;
 mod pdf_textes;
 mod projet_fichier;
 mod qr;
@@ -41,6 +42,9 @@ pub fn run() {
             commandes::lire_liste,
             commandes::lire_fichier,
             commandes::ecrire_fichiers,
+            commandes::infos_pdf,
+            commandes::fusionner_pdf,
+            commandes::separer_pdf,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Automat-Process");

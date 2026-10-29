@@ -4,6 +4,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { IconCpu, IconDeviceMobile, IconFiles, IconFileTypeDocx, IconId, IconInfoCircle, IconMail } from "@tabler/icons-react";
 import APropos from "./APropos";
 import AssistantCartes from "./pages/cartes/AssistantCartes";
+import OutilsPdf from "./pages/pdf/OutilsPdf";
 import AssistantSignatures from "./pages/signatures/AssistantSignatures";
 import { infosMoteur, type InfosMoteur } from "./moteur";
 import { textes } from "./textes";
@@ -14,7 +15,7 @@ const MODULES = [
   { cle: "signatures", icone: IconMail, disponible: true },
   { cle: "numerique", icone: IconDeviceMobile, disponible: false },
   { cle: "word", icone: IconFileTypeDocx, disponible: false },
-  { cle: "pdf", icone: IconFiles, disponible: false },
+  { cle: "pdf", icone: IconFiles, disponible: true },
 ] as const;
 type Module = (typeof MODULES)[number]["cle"];
 
@@ -88,6 +89,9 @@ export default function App() {
         </Box>
         <Box display={module === "signatures" ? undefined : "none"}>
           <AssistantSignatures />
+        </Box>
+        <Box display={module === "pdf" ? undefined : "none"}>
+          <OutilsPdf />
         </Box>
       </AppShell.Main>
 
