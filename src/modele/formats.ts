@@ -19,6 +19,9 @@ export const FORMATS: FormatPredefini[] = [
   { id: "cr80", libelle: "Badge PVC CR80 85,6 × 54 mm", largeur_mm: 85.6, hauteur_mm: 54, fond_perdu_mm: 0 },
 ];
 
+/** Les textes doivent rester à cette distance du bord de coupe (mm) : la coupe n'est jamais parfaite. */
+export const MARGE_SECURITE_MM = 3;
+
 const MM_PAR_UNITE: Record<string, number> = { mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / 96 };
 
 /** Tailles « attendues » d'un visuel de carte, avec et sans fond perdu, dans les deux orientations. */

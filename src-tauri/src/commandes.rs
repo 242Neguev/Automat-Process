@@ -133,6 +133,43 @@ pub async fn exporter_cartes(
     .await
 }
 
+/// Mesures de mise en page de chaque texte de chaque agent, pour le rapport de contrôle.
+#[tauri::command]
+pub async fn controler_cartes(
+    etat: State<'_, EtatMoteur>,
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+    agents: Vec<DonneesAgent>,
+) -> Result<Vec<serde_json::Value>, ErreurMoteur> {
+    let projet = Projet {
+        modele,
+        fonds: fonds.fichiers(),
+    };
+    executer(&etat, move |moteur| {
+        cartes::controler(moteur, &projet, &agents)
+    })
+    .await
+}
+
+/// Vignettes JPEG du recto des agents, pour la mosaïque (format décrit dans `cartes::vignettes`).
+#[tauri::command]
+pub async fn vignettes_cartes(
+    etat: State<'_, EtatMoteur>,
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+    agents: Vec<DonneesAgent>,
+    largeur_px: u32,
+) -> Result<Response, ErreurMoteur> {
+    let projet = Projet {
+        modele,
+        fonds: fonds.fichiers(),
+    };
+    executer(&etat, move |moteur| {
+        cartes::vignettes(moteur, &projet, &agents, largeur_px).map(Response::new)
+    })
+    .await
+}
+
 /// Contenu brut d'une liste choisie par l'utilisateur ; elle est décodée dans l'interface.
 #[tauri::command]
 pub async fn lire_liste(chemin: String) -> Result<Response, ErreurMoteur> {

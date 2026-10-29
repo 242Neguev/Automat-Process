@@ -25,7 +25,9 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 | **Textes d'exemple remplacés d'un clic** (PDF, SVG) : le texte quitte le visuel et devient une information, au même endroit et au même style | ✅ |
 | **Zones effacées** pour un texte incrusté dans une image (Canva, Photoshop…) : un aplat de la couleur mesurée tout autour le recouvre | ✅ |
 | **Projets `.automat`** : le modèle, ses visuels et les correspondances dans un seul fichier, à rouvrir avec la liste suivante (les données des agents n'y sont jamais copiées) | ✅ |
-| Contrôle avant impression, mosaïque, badges PVC | Phase 1, incrément 3 |
+| **Contrôle des cartes** après mise en page : texte trop long même réduit, texte sur le QR code, hors de la zone de sécurité (affichée dans l'éditeur), textes qui se chevauchent ou descendent plus bas que prévu ; résumé cliquable, filtre « cartes à vérifier », confirmation avant export | ✅ |
+| **Mosaïque** de toutes les cartes et bouton **« cas le plus long »** (la carte où chaque information est la plus difficile à loger) | ✅ |
+| Contrôle des données de la liste, impression directe des badges PVC | Phase 1, incrément 3 (suite) |
 | Signatures e-mail | Phase 1, incrément 4 |
 
 ## Développer (Mac ou Windows)
@@ -82,6 +84,7 @@ Pour produire aussi un `.msi`, lancer `scripts\compiler-windows.cmd -Msi` dans u
 src/                     Interface React + TypeScript
   textes.ts              Tous les textes de l'interface (traduction future)
   moteur.ts              Accès typé aux commandes du cœur
+  controle/              Rapport de contrôle des cartes (à partir des mesures du moteur)
   donnees/               Listes, correspondances, nettoyage, vCard, agents à rendre
   modele/                Formats, champs, analyse des SVG, visuels
   pages/                 Écrans

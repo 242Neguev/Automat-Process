@@ -305,6 +305,7 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
             </Text>
             {modele.fond_verso && (
               <SegmentedControl
+                style={{ flexShrink: 0 }}
                 value={faceAffichee}
                 onChange={(valeur) => {
                   setTexteChoisi(null);

@@ -1,6 +1,8 @@
-// Gabarit « carte » : aperçu d'une carte, cartes unitaires avec fond perdu, ou planches imposées.
+// Gabarit « carte » : aperçu d'une carte, cartes unitaires avec fond perdu, planches imposées, vignettes
+// de la mosaïque, ou mesures de contrôle seules.
 // Fichiers virtuels : /projet.json (format, fonds, champs) et /agents.json (valeurs de chaque agent).
-// Entrées (sys.inputs) : mode = apercu | cartes | planches ; agent et face (aperçu) ; feuille = A4 | A3 | SRA3.
+// Entrées (sys.inputs) : mode = apercu | cartes | planches | mosaique | controle ; agent et face (aperçu) ;
+// feuille = A4 | A3 | SRA3.
 // Les positions des champs sont en mm depuis le coin haut-gauche de la carte finie (hors fond perdu).
 #let projet = json("/projet.json")
 #let agents = json("/agents.json")
@@ -39,6 +41,20 @@
   (taille: t, lignes: lignes, deborde: deborde)
 }
 
+// Mesures d'un texte posé, pour le rapport de contrôle (mm depuis le coin haut-gauche de la carte finie) :
+// taille retenue, lignes, débordement, encombrement réel de l'encre et ligne de base de sa dernière ligne.
+#let mesures(a, f, valeur, r, y) = {
+  let mm(longueur) = calc.round(longueur / 1mm, digits: 2)
+  let w = measure(width: f.largeur_max_mm * 1mm, paragraphe(f, valeur, r.taille)).width
+  let x = f.x_mm * 1mm
+  let gauche = if f.ancre == "middle" { x - w / 2 } else if f.ancre == "end" { x - w } else { x }
+  let encre(haut, bas) = measure(text(size: r.taille, ..style(f), top-edge: haut, bottom-edge: bas, valeur)).height
+  let derniere = y + (r.lignes - 1) * K * r.taille
+  (agent: a.id, champ: f.id, taille: calc.round(r.taille / 1pt, digits: 1), origine: f.taille_pt,
+    lignes: r.lignes, deborde: r.deborde, gauche: mm(gauche), droite: mm(gauche + w),
+    haut: mm(y - encre("bounds", "baseline")), bas: mm(derniere + encre("baseline", "bounds")), base: mm(derniere))
+}
+
 #let poser(f, valeur, t, y) = {
   let W = f.largeur_max_mm * 1mm
   let x = f.x_mm * 1mm
@@ -64,8 +80,7 @@
     let r = ajuster(f, v)
     y = if y == none { f.y_mm * 1mm } else { y + calc.max(ecart, if ecart-en-attente == none { 0mm } else { ecart-en-attente }) }
     ecart-en-attente = none
-    [#metadata((agent: a.id, champ: f.id, taille: calc.round(r.taille / 1pt, digits: 1), origine: f.taille_pt,
-      lignes: r.lignes, deborde: r.deborde)) <controle>]
+    [#metadata(mesures(a, f, v, r, y)) <controle>]
     poser(f, v, r.taille, y)
     y += (r.lignes - 1) * K * r.taille
   }
@@ -200,4 +215,9 @@
   }
 } else if mode == "planches" {
   planches(FEUILLES.at(entree("feuille", "A4")))
+} else if mode == "mosaique" {
+  for a in agents { page-carte(carte-recto(a)) }
+} else if mode == "controle" {
+  // Les textes seuls (ni visuel ni QR code) : seules comptent les mesures <controle>.
+  for a in agents { page(width: cw, height: ch, margin: 0pt, textes-variables(a)) }
 }

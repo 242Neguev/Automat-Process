@@ -1,18 +1,39 @@
 import { useState } from "react";
-import { Badge, Button, Group, Paper, SegmentedControl, Select, Stack, Text, Title } from "@mantine/core";
+import { Badge, Button, Group, List, Loader, Modal, Paper, SegmentedControl, Select, Stack, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconAlertTriangle, IconCheck, IconFileTypePdf } from "@tabler/icons-react";
 import { save } from "@tauri-apps/plugin-dialog";
+import { compter, regrouper } from "../../controle/cartes";
 import { enErreurMoteur, exporterCartes, type DonneesAgent, type Feuille, type ModeleCarte, type Sortie } from "../../moteur";
 import { textes } from "../../textes";
+import IconeGravite from "./IconeGravite";
+import type { Controle } from "./useControle";
 
 const t = textes.cartes.destination;
+const tc = textes.cartes.controle;
 const FEUILLES: Feuille[] = ["A4", "A3", "SRA3"];
 
-export default function EtapeDestination({ modele, agents }: { modele: ModeleCarte; agents: DonneesAgent[] }) {
+interface Props {
+  modele: ModeleCarte;
+  agents: DonneesAgent[];
+  controle: Controle;
+  /** Retour à la vérification, sur les cartes à corriger. */
+  onVoirCartes: () => void;
+}
+
+export default function EtapeDestination({ modele, agents, controle, onVoirCartes }: Props) {
   const [sortie, setSortie] = useState<Sortie>("planches");
   const [feuille, setFeuille] = useState<Feuille>("A4");
   const [enCours, setEnCours] = useState(false);
+  const [confirmation, setConfirmation] = useState(false);
+  const nombres = controle.rapport ? compter(controle.rapport) : null;
+  const graves = controle.rapport ? regrouper(controle.rapport).filter((g) => g.gravite === "erreur") : [];
+
+  /** Les problèmes graves sont signalés avant l'export ; l'utilisateur peut exporter quand même. */
+  function demanderExport() {
+    if (nombres && nombres.erreur > 0) setConfirmation(true);
+    else exporter();
+  }
 
   async function exporter() {
     const chemin = await save({ defaultPath: t.nomFichier[sortie], filters: [{ name: t.filtrePdf, extensions: ["pdf"] }] });
@@ -58,10 +79,63 @@ export default function EtapeDestination({ modele, agents }: { modele: ModeleCar
         <Text size="sm" c="dimmed">
           {sortie === "planches" ? t.detailPlanches : t.detailCartes}
         </Text>
-        <Button leftSection={<IconFileTypePdf size={18} />} loading={enCours} onClick={exporter}>
+        {controle.enCours ? (
+          <Group gap="xs">
+            <Loader size={14} />
+            <Text size="sm">{tc.calcul}</Text>
+          </Group>
+        ) : (
+          nombres && (
+            <Group gap="xs" wrap="nowrap">
+              <IconeGravite gravite={nombres.erreur > 0 ? "erreur" : nombres.attention > 0 ? "attention" : null} taille={18} />
+              <Text size="sm">
+                {nombres.erreur + nombres.attention === 0
+                  ? tc.toutesCorrectes
+                  : [nombres.erreur > 0 && tc.aCorriger(nombres.erreur), nombres.attention > 0 && tc.aVerifier(nombres.attention)].filter(Boolean).join(" · ")}
+              </Text>
+            </Group>
+          )
+        )}
+        <Button leftSection={<IconFileTypePdf size={18} />} loading={enCours} disabled={controle.enCours} onClick={demanderExport}>
           {t.enregistrer}
         </Button>
       </Stack>
+
+      <Modal opened={confirmation} onClose={() => setConfirmation(false)} title={t.confirmation.titre} centered>
+        <Stack gap="sm">
+          <Text>{t.confirmation.message(nombres?.erreur ?? 0)}</Text>
+          <List spacing={4} size="sm" center>
+            {graves.map((g) => (
+              <List.Item key={g.cle} icon={<IconeGravite gravite="erreur" taille={16} />}>
+                {g.resume} ({tc.nbCartes(g.agents.length)})
+              </List.Item>
+            ))}
+          </List>
+          <Text size="sm" c="dimmed">
+            {t.confirmation.conseil}
+          </Text>
+          <Group justify="flex-end" mt="xs">
+            <Button
+              variant="default"
+              onClick={() => {
+                setConfirmation(false);
+                onVoirCartes();
+              }}
+            >
+              {t.confirmation.voir}
+            </Button>
+            <Button
+              color="red"
+              onClick={() => {
+                setConfirmation(false);
+                exporter();
+              }}
+            >
+              {t.confirmation.exporter}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Paper>
   );
 }

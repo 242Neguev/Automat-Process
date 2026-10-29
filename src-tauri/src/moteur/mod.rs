@@ -8,8 +8,9 @@ use std::fmt;
 
 use serde::Serialize;
 use typst::diag::{Severity, SourceDiagnostic};
-use typst::foundations::{Bytes, Dict, Str, Value};
-use typst::utils::{LazyHash, Scalar};
+use typst::foundations::{Bytes, Dict, Label, Selector, Str, Value};
+use typst::introspection::Introspector;
+use typst::utils::{LazyHash, PicoStr, Scalar};
 use typst::{Library, LibraryExt, World, WorldExt};
 use typst_kit::fonts::{self, FontStore};
 use typst_layout::{Page, PagedDocument};
@@ -75,6 +76,27 @@ pub struct Document(PagedDocument);
 impl Document {
     pub fn nb_pages(&self) -> usize {
         self.0.pages().len()
+    }
+
+    /// Valeurs des `metadata` portant l'étiquette `etiquette` (ex. « controle »), dans l'ordre du document.
+    pub fn metadonnees(&self, etiquette: &str) -> Result<Vec<serde_json::Value>, ErreurMoteur> {
+        let Some(label) = Label::new(PicoStr::intern(etiquette)) else {
+            return Ok(Vec::new());
+        };
+        let illisible = |cause: String| {
+            ErreurMoteur::simple(format!("Mesure « {etiquette} » illisible : {cause}"))
+        };
+        self.0
+            .introspector()
+            .query(&Selector::Label(label))
+            .iter()
+            .map(|element| {
+                let valeur = element
+                    .get_by_name("value")
+                    .map_err(|_| illisible("ce n'est pas une métadonnée".into()))?;
+                serde_json::to_value(&valeur).map_err(|erreur| illisible(erreur.to_string()))
+            })
+            .collect()
     }
 
     /// PDF vectoriel ; les pages avec fond perdu reçoivent une TrimBox (zone de coupe).

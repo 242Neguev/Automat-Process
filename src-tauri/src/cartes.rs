@@ -12,6 +12,7 @@ use crate::moteur::{Document, ErreurMoteur, Fichiers, Moteur};
 use crate::qr::{self, CodeQr};
 
 const GABARIT_CARTE: &str = include_str!("../gabarits/carte.typ");
+const MM_PAR_POINT: f64 = 25.4 / 72.0;
 const MODELE_DEMO: &[u8] = include_bytes!("../ressources/demo/projet.json");
 
 /// Fonds du modèle de démonstration, toujours disponibles.
@@ -205,6 +206,54 @@ pub fn exporter(
     .pdf()
 }
 
+/// Mesures de mise en page de chaque texte de chaque agent : taille retenue, nombre de lignes,
+/// débordement et encombrement réel (mm). L'interface en tire le rapport de contrôle.
+pub fn controler(
+    moteur: &Moteur,
+    projet: &Projet,
+    agents: &[DonneesAgent],
+) -> Result<Vec<serde_json::Value>, ErreurMoteur> {
+    if agents.is_empty() {
+        return Ok(Vec::new());
+    }
+    compiler(moteur, projet, agents, &[("mode", "controle")])?.metadonnees("controle")
+}
+
+/// Vignettes JPEG du recto de chaque agent (carte finie), larges de `largeur_px`, pour la mosaïque.
+/// Elles sont mises bout à bout, chacune précédée de sa taille sur 4 octets (gros-boutiste).
+pub fn vignettes(
+    moteur: &Moteur,
+    projet: &Projet,
+    agents: &[DonneesAgent],
+    largeur_px: u32,
+) -> Result<Vec<u8>, ErreurMoteur> {
+    if agents.is_empty() {
+        return Ok(Vec::new());
+    }
+    let largeur_pt = projet.modele["format"]["largeur_mm"]
+        .as_f64()
+        .unwrap_or(85.0)
+        / MM_PAR_POINT;
+    let pixels_par_point = f64::from(largeur_px.clamp(40, 2000)) / largeur_pt;
+    let document = compiler(moteur, projet, agents, &[("mode", "mosaique")])?;
+    let mut sortie = Vec::new();
+    for page in 0..document.nb_pages() {
+        let (largeur, hauteur, rvba) = document.pixels(page, pixels_par_point)?;
+        // Les cartes sont opaques (fond blanc) : le canal alpha peut être ignoré.
+        let rvb: Vec<u8> = rvba
+            .chunks_exact(4)
+            .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+            .collect();
+        let mut jpeg = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 85)
+            .encode(&rvb, largeur, hauteur, image::ExtendedColorType::Rgb8)
+            .map_err(|erreur| ErreurMoteur::simple(format!("Vignette impossible : {erreur}")))?;
+        sortie.extend_from_slice(&(jpeg.len() as u32).to_be_bytes());
+        sortie.extend_from_slice(&jpeg);
+    }
+    Ok(sortie)
+}
+
 fn compiler(
     moteur: &Moteur,
     projet: &Projet,
@@ -340,6 +389,71 @@ mod tests {
         );
         let verso = apercu(&moteur, &projet, &agents[0], Face::Verso).unwrap();
         assert!(verso.starts_with("<svg"));
+    }
+
+    #[test]
+    fn controle_mesure_chaque_texte() {
+        let moteur = Moteur::nouveau();
+        let mut long = agent(1, true);
+        long.valeurs.insert(
+            "c1".into(),
+            "Jean-Baptiste Emmanuel NKOULOU MBARGA ABESSOLO ESSOMBA".into(),
+        );
+        long.valeurs.insert(
+            "c2".into(),
+            "Directeur Adjoint des Ressources Humaines et de la Formation continue".into(),
+        );
+        let mesures = controler(&moteur, &projet_demo(), &[agent(0, true), long]).unwrap();
+        // Quatre textes non vides par agent : le téléphone fixe est vide.
+        assert_eq!(mesures.len(), 8);
+        let mesure = |agent: &str, champ: &str| {
+            let trouvee = mesures
+                .iter()
+                .find(|m| m["agent"] == agent && m["champ"] == champ);
+            trouvee.unwrap().clone()
+        };
+        let nombre = |m: &serde_json::Value, cle: &str| m[cle].as_f64().unwrap();
+
+        let nom = mesure("ligne 1", "c1");
+        assert_eq!(
+            (nombre(&nom, "taille"), nombre(&nom, "lignes")),
+            (11.0, 1.0)
+        );
+        assert_eq!(nom["deborde"], false);
+        assert!((nombre(&nom, "base") - 23.81).abs() < 0.01);
+        assert!((nombre(&nom, "gauche") - 8.01).abs() < 0.01);
+        assert!(nombre(&nom, "haut") < nombre(&nom, "base"));
+        assert!(nombre(&nom, "base") <= nombre(&nom, "bas"));
+        assert!(nombre(&nom, "droite") - nombre(&nom, "gauche") < 52.0);
+
+        // Nom trop long : réduit jusqu'au minimum, il déborde encore.
+        let nom_long = mesure("ligne 2", "c1");
+        assert_eq!(nombre(&nom_long, "taille"), 8.0);
+        assert_eq!(nom_long["deborde"], true);
+        // Fonction passée sur deux lignes : le mobile descend d'autant.
+        assert_eq!(nombre(&mesure("ligne 2", "c2"), "lignes"), 2.0);
+        let descente =
+            nombre(&mesure("ligne 2", "c3"), "base") - nombre(&mesure("ligne 1", "c3"), "base");
+        assert!(descente > 2.0, "descente de {descente} mm");
+    }
+
+    #[test]
+    fn vignettes_jpeg_de_la_mosaique() {
+        let moteur = Moteur::nouveau();
+        let agents: Vec<_> = (0..3).map(|n| agent(n, n != 1)).collect();
+        let octets = vignettes(&moteur, &projet_demo(), &agents, 300).unwrap();
+        let mut reste = &octets[..];
+        let mut nombre = 0;
+        while !reste.is_empty() {
+            let taille = u32::from_be_bytes(reste[..4].try_into().unwrap()) as usize;
+            let jpeg = &reste[4..4 + taille];
+            assert_eq!(jpeg[..2], [0xFF, 0xD8]);
+            let dimensions = imagesize::blob_size(jpeg).unwrap();
+            assert!(dimensions.width.abs_diff(300) <= 1);
+            reste = &reste[4 + taille..];
+            nombre += 1;
+        }
+        assert_eq!(nombre, 3);
     }
 
     #[test]

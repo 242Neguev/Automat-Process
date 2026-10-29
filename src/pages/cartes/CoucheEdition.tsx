@@ -1,6 +1,7 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent as PointerEventReact } from "react";
 import { Box, Tooltip } from "@mantine/core";
 import { arrondir, boiteChamp } from "../../modele/champs";
+import { MARGE_SECURITE_MM } from "../../modele/formats";
 import type { Champ, ModeleCarte, Zone } from "../../moteur";
 import { COULEURS } from "../../theme";
 
@@ -28,16 +29,13 @@ interface Props {
   onTexteVisuel: (id: number) => void;
 }
 
-/** Marge de sécurité : les textes restent à 3 mm au moins du bord de coupe. */
-const MARGE_SECURITE = 3;
-
 /** Nouvelle géométrie d'un champ après un geste de (dx, dy) mm depuis son état de départ. */
 function appliquerGeste(champ: Champ, geste: Geste, dx: number, dy: number, largeurCarte: number): Partial<Champ> {
   if (geste === "deplacer") {
     const deplace = { x_mm: arrondir(champ.x_mm + dx), y_mm: arrondir(champ.y_mm + dy) };
     // Un texte aligné à gauche que l'on rapproche du bord droit voit sa largeur se resserrer.
     if (champ.type !== "texte" || champ.ancre !== "start") return deplace;
-    const disponible = largeurCarte - MARGE_SECURITE - deplace.x_mm;
+    const disponible = largeurCarte - MARGE_SECURITE_MM - deplace.x_mm;
     return { ...deplace, largeur_max_mm: arrondir(Math.max(10, Math.min(champ.largeur_max_mm, disponible))) };
   }
   if (champ.type === "qr") return { taille_mm: arrondir(Math.max(8, champ.taille_mm + Math.max(dx, dy))) };
@@ -138,6 +136,20 @@ export default function CoucheEdition({ modele, selection, outil, textesVisuel, 
       inset={0}
       style={{ outline: "none", touchAction: "none", cursor: outil === "effacer" ? "crosshair" : "default" }}
     >
+      {/* Zone de sécurité : les textes restent à l'intérieur, la coupe n'est jamais parfaite. */}
+      <Box
+        data-zone-securite
+        pos="absolute"
+        style={{
+          ...enPourcents(
+            { x: MARGE_SECURITE_MM, y: MARGE_SECURITE_MM, largeur: largeur_mm - 2 * MARGE_SECURITE_MM, hauteur: hauteur_mm - 2 * MARGE_SECURITE_MM },
+            largeur_mm,
+            hauteur_mm,
+          ),
+          border: "1px dashed rgba(34, 37, 42, 0.35)",
+          pointerEvents: "none",
+        }}
+      />
       {champs.map((champ) => {
         const choisi = champ.id === selection && outil === "edition";
         return (

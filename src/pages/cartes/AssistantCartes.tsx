@@ -15,7 +15,8 @@ import { textes } from "../../textes";
 import EtapeDestination from "./EtapeDestination";
 import EtapeListe from "./EtapeListe";
 import EtapeModele, { type Source } from "./EtapeModele";
-import EtapeVerification from "./EtapeVerification";
+import EtapeVerification, { type Filtre } from "./EtapeVerification";
+import { useControle } from "./useControle";
 
 const t = textes.cartes;
 const EXTENSIONS_LISTE = ["xlsx", "xlsm", "xls", "ods", "csv", "tsv", "txt"];
@@ -39,6 +40,7 @@ export default function AssistantCartes() {
   const [classeur, setClasseur] = useState<{ nomFichier: string; contenu: WorkBook } | null>(null);
   const [feuille, setFeuille] = useState<string | null>(null);
   const [correspondances, setCorrespondances] = useState<Correspondances>({});
+  const [filtre, setFiltre] = useState<Filtre>("toutes");
   // Change à chaque projet ouvert : l'étape Modèle repart d'un état neuf (outil, sélection).
   const [ouvertures, setOuvertures] = useState(0);
   const modele = modeles[source];
@@ -65,6 +67,8 @@ export default function AssistantCartes() {
     () => (modele && liste ? liste.lignes.map((ligne) => construireAgent(modele, ligne, correspondances)) : []),
     [modele, liste, correspondances],
   );
+  // Le contrôle des cartes sert à la vérification et à l'export.
+  const controle = useControle(modele, agents, etape >= 2);
   const exemple = useMemo(
     () => (modele && liste?.lignes[0] ? valeursDeLigne(modele, liste.lignes[0], correspondances) : {}),
     [modele, liste, correspondances],
@@ -185,10 +189,20 @@ export default function AssistantCartes() {
           />
         </Stepper.Step>
         <Stepper.Step label={t.etapes.verification.titre} description={t.etapes.verification.description}>
-          {modele && <EtapeVerification modele={modele} agents={agents} />}
+          {modele && <EtapeVerification modele={modele} agents={agents} controle={controle} filtre={filtre} onFiltre={setFiltre} />}
         </Stepper.Step>
         <Stepper.Step label={t.etapes.destination.titre} description={t.etapes.destination.description}>
-          {modele && <EtapeDestination modele={modele} agents={agents} />}
+          {modele && (
+            <EtapeDestination
+              modele={modele}
+              agents={agents}
+              controle={controle}
+              onVoirCartes={() => {
+                setFiltre("a-verifier");
+                setEtape(2);
+              }}
+            />
+          )}
         </Stepper.Step>
       </Stepper>
 

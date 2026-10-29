@@ -101,6 +101,25 @@ export interface TexteVisuel {
   interlettrageEm?: number;
 }
 
+/**
+ * Mise en page réelle d'un texte sur la carte d'un agent (mm depuis le coin haut-gauche de la carte
+ * finie) : taille retenue, nombre de lignes, débordement et encombrement de l'encre.
+ */
+export interface MesureTexte {
+  agent: string;
+  champ: string;
+  taille: number;
+  origine: number;
+  lignes: number;
+  deborde: boolean;
+  gauche: number;
+  droite: number;
+  haut: number;
+  bas: number;
+  /** Ligne de base de la dernière ligne. */
+  base: number;
+}
+
 /** Visuel importé : chemin virtuel à reprendre dans le modèle et ce qu'on sait de ses dimensions. */
 export interface FondImporte {
   chemin: string;
@@ -144,6 +163,23 @@ export const apercuCarte = (modele: ModeleCarte, agent: DonneesAgent, face: Face
 
 export const exporterCartes = (modele: ModeleCarte, agents: DonneesAgent[], sortie: Sortie, feuille: Feuille, chemin: string) =>
   invoke<void>("exporter_cartes", { modele, agents, sortie, feuille, chemin });
+
+/** Mesures de mise en page de chaque texte de chaque agent, pour le rapport de contrôle. */
+export const controlerCartes = (modele: ModeleCarte, agents: DonneesAgent[]) => invoke<MesureTexte[]>("controler_cartes", { modele, agents });
+
+/** Vignettes JPEG du recto des agents (dans leur ordre), larges de `largeurPx` pixels. */
+export async function vignettesCartes(modele: ModeleCarte, agents: DonneesAgent[], largeurPx: number): Promise<Blob[]> {
+  const octets = new Uint8Array(await invoke<ArrayBuffer>("vignettes_cartes", { modele, agents, largeurPx }));
+  // Chaque image est précédée de sa taille sur 4 octets (gros-boutiste).
+  const vue = new DataView(octets.buffer, octets.byteOffset, octets.byteLength);
+  const images: Blob[] = [];
+  for (let i = 0; i + 4 <= octets.length; ) {
+    const taille = vue.getUint32(i);
+    images.push(new Blob([octets.slice(i + 4, i + 4 + taille)], { type: "image/jpeg" }));
+    i += 4 + taille;
+  }
+  return images;
+}
 
 /** Couleur du visuel tout autour d'une zone : elle sert à effacer un texte incrusté. */
 export const couleurAutour = (modele: ModeleCarte, zone: Zone) => invoke<string>("couleur_autour", { modele, zone });

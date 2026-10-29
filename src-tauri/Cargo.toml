@@ -25,6 +25,8 @@ tiny-skia = "0.12"
 qrcode = { version = "0.14", default-features = false }
 # Lecture et retrait ciblé des balises dans les modèles PDF.
 lopdf = { version = "0.46", default-features = false }
+# Vignettes JPEG de la mosaïque (déjà compilé pour Typst).
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
 # Fichiers de projet « .automat » (archives ZIP).
 zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 typst = "=0.15.1"

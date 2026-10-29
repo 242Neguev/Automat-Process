@@ -1,5 +1,6 @@
 // Construction des agents à rendre : chaque ligne de la liste donne le texte final de chaque champ du modèle.
 import type { Champ, ChampQr, ChampTexte, DonneesAgent, ModeleCarte } from "../moteur";
+import { textes } from "../textes";
 import type { Correspondances } from "./correspondances";
 import type { LigneListe } from "./liste";
 import { nettoyer } from "./nettoyage";
@@ -63,3 +64,6 @@ export function agentBalises(modele: ModeleCarte): DonneesAgent {
     vcard: modele.champs.some(estQr) ? vcard({ prenom: "Prénom", nom: "NOM", email: "prenom.nom@exemple.com" }) : undefined,
   };
 }
+
+/** Nom d'un agent pour les listes : le premier texte non vide de sa carte (en général son nom). */
+export const libelleAgent = (agent: DonneesAgent) => Object.values(agent.valeurs).find(Boolean) ?? textes.cartes.verification.sansNom;
