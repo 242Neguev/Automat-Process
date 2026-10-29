@@ -81,8 +81,9 @@ export function analyser(modele: ModeleCarte, agents: DonneesAgent[], mesures: M
       if (m.lignes > 1 && !m.deborde) signaler("lignes", [m], (l) => t.problemes.lignes(l, m.lignes));
       // Le QR code n'est imprimé que pour les agents qui ont une fiche contact.
       if (zoneQr && agent.vcard && chevauchent(m, zoneQr)) signaler("chevauche-qr", [m], (l) => t.problemes["chevauche-qr"](l));
+      // À l'écran, pas de coupe : seule la carte imprimée a une zone de sécurité.
       const marge = MARGE_SECURITE_MM - TOLERANCE;
-      if (m.gauche < marge || m.haut < marge || m.droite > largeur_mm - marge || m.bas > hauteur_mm - marge) {
+      if (!modele.format.px && (m.gauche < marge || m.haut < marge || m.droite > largeur_mm - marge || m.bas > hauteur_mm - marge)) {
         signaler("hors-zone", [m], (l) => t.problemes["hors-zone"](l, MARGE_SECURITE_MM));
       }
     }

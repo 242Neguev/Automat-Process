@@ -23,12 +23,12 @@ const VERSION_FORMAT: u64 = 1;
 const ENTREE_PROJET: &str = "projet.json";
 const FACES: [&str; 2] = ["recto", "verso"];
 /// Sortes de documents : chacune s'ouvre dans son module.
-const DOCUMENTS: [&str; 3] = ["carte", "signature", "word"];
+const DOCUMENTS: [&str; 4] = ["carte", "ecran", "signature", "word"];
 
 /// Ce que l'interface récupère en ouvrant un projet.
 #[derive(Debug, Serialize)]
 pub struct ProjetOuvert {
-    /// « carte » ou « signature ».
+    /// « carte », « ecran » (visuel numérique), « signature » ou « word ».
     pub document: String,
     pub modele: Value,
     pub correspondances: Value,
@@ -253,6 +253,18 @@ mod tests {
         assert_eq!(ouvert.visuels["verso"]["genre"], "pdf");
         assert!(fonds.contenu(recto).is_some());
         assert_eq!(ouvert.modele["champs"], modele["champs"]);
+    }
+
+    #[test]
+    fn distingue_un_visuel_d_ecran_d_une_carte() {
+        let fonds = Fonds::default();
+        let chemin = chemin_temporaire("fond-teams.automat");
+        let mut modele = cartes::modele_demo();
+        modele["format"]["px"] = json!({ "largeur": 1920, "hauteur": 1080 });
+        enregistrer(&chemin, "ecran", &modele, &json!({}), &json!({}), &fonds).unwrap();
+        let ouvert = ouvrir(&chemin, &fonds).unwrap();
+        assert_eq!(ouvert.document, "ecran");
+        assert_eq!(ouvert.modele["format"]["px"]["largeur"], 1920);
     }
 
     #[test]

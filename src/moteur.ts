@@ -66,7 +66,8 @@ export type Champ = ChampTexte | ChampQr | ChampMasque;
 
 export interface ModeleCarte {
   nom: string;
-  format: { largeur_mm: number; hauteur_mm: number; fond_perdu_mm: number };
+  /** `px` : format d'écran (fond Teams, bannière…), exporté à cette taille en pixels. */
+  format: { largeur_mm: number; hauteur_mm: number; fond_perdu_mm: number; px?: { largeur: number; hauteur: number } };
   /** Chemins virtuels des visuels (« /fonds/1.pdf »), ou vide pour une carte blanche. */
   fond_recto: string | null;
   fond_verso: string | null;
@@ -157,7 +158,7 @@ export interface Zone {
 }
 
 /** Sorte de document d'un projet : chacune s'ouvre dans son module. */
-export type Document = "carte" | "signature" | "word";
+export type Document = "carte" | "ecran" | "signature" | "word";
 
 export interface ProjetOuvert {
   document: Document;

@@ -14,7 +14,7 @@ import { COULEURS } from "./theme";
 const MODULES = [
   { cle: "cartes", icone: IconId, disponible: true },
   { cle: "signatures", icone: IconMail, disponible: true },
-  { cle: "numerique", icone: IconDeviceMobile, disponible: false },
+  { cle: "numerique", icone: IconDeviceMobile, disponible: true },
   { cle: "word", icone: IconFileTypeDocx, disponible: true },
   { cle: "pdf", icone: IconFiles, disponible: true },
 ] as const;
@@ -87,6 +87,9 @@ export default function App() {
       <AppShell.Main>
         <Box display={module === "cartes" ? undefined : "none"}>
           <AssistantCartes />
+        </Box>
+        <Box display={module === "numerique" ? undefined : "none"}>
+          <AssistantCartes variante="ecran" />
         </Box>
         <Box display={module === "signatures" ? undefined : "none"}>
           <AssistantSignatures />

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ChampTexte, ModeleCarte } from "../moteur";
 import { boiteChamp, changerAncre, INFORMATIONS, nouveauChampTexte, nouveauQr, reserverPlaceQr, transformationsParDefaut } from "./champs";
-import { contientFondPerdu, diagnostiquer, FORMATS, placementVisuel, tailleSvg, versCarte } from "./formats";
+import { contientFondPerdu, diagnostiquer, diagnostiquerEcran, FORMATS, FORMATS_ECRAN, placementVisuel, tailleSvg, versCarte, zonePersonne } from "./formats";
 import { choisirPolice } from "./svg";
 
 const format = FORMATS[0]; // 85 × 55 mm, fond perdu de 3 mm
@@ -83,6 +83,42 @@ describe("champs de l'éditeur", () => {
     const [nomReduit, emailIntact] = reserverPlaceQr([nom, email], qr) as ChampTexte[];
     expect(nomReduit.x_mm + nomReduit.largeur_max_mm).toBeCloseTo(qr.x_mm - 2);
     expect(emailIntact.largeur_max_mm).toBe(email.largeur_max_mm);
+  });
+});
+
+describe("formats d'écran (Visuels numériques)", () => {
+  const [teams, linkedin] = FORMATS_ECRAN;
+
+  it("mesure les pixels en millimètres (1 px = 1/96 de pouce)", () => {
+    expect(teams.px).toEqual({ largeur: 1920, hauteur: 1080 });
+    expect(teams.largeur_mm).toBeCloseTo(508);
+    expect(teams.hauteur_mm).toBeCloseTo(285.75);
+    expect(teams.fond_perdu_mm).toBe(0);
+  });
+
+  it("réserve la zone de la personne sur un fond Teams seulement", () => {
+    const zone = zonePersonne(teams)!;
+    expect(zone.x + zone.largeur / 2).toBeCloseTo(teams.largeur_mm / 2);
+    expect(zone.y + zone.hauteur).toBeCloseTo(teams.hauteur_mm);
+    expect(zonePersonne(linkedin)).toBeNull();
+    expect(zonePersonne(format)).toBeNull();
+  });
+
+  it("juge la taille et les proportions de l'image", () => {
+    expect(diagnostiquerEcran({ largeurPx: 1920, hauteurPx: 1080 }, teams)).toEqual([{ niveau: "ok", message: "Image de 1920 × 1080 px : assez grande pour ce format." }]);
+    expect(diagnostiquerEcran({ largeurPx: 1280, hauteurPx: 720 }, teams).map((m) => m.niveau)).toEqual(["attention"]);
+    expect(diagnostiquerEcran({ largeurPx: 1920, hauteurPx: 1440 }, teams)[1].message).toContain("recadrée");
+    expect(diagnostiquerEcran({ largeurMm: 508, hauteurMm: 285.75 }, teams).map((m) => m.niveau)).toEqual(["ok"]);
+  });
+
+  it("agrandit les nouvelles informations à l'échelle du format", () => {
+    const vide: ModeleCarte = { nom: "Mon visuel", format: teams, fond_recto: null, fond_verso: null, champs: [] };
+    const nom = nouveauChampTexte(vide, INFORMATIONS[0]);
+    expect(nom.taille_pt).toBe(65.5); // 11 pt × 508/85 = 65,7, au demi-point près
+    expect(nom.x_mm + nom.largeur_max_mm).toBeLessThan(teams.largeur_mm);
+    const qr = nouveauQr(vide);
+    expect(qr.taille_mm).toBeLessThanOrEqual(teams.hauteur_mm * 0.3);
+    expect(qr.x_mm + qr.taille_mm).toBeLessThan(teams.largeur_mm);
   });
 });
 

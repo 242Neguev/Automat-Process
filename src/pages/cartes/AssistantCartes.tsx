@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Group, Stack, Stepper, Text, Title } from "@mantine/core";
 import { balisesDuModele, construireAgent, ficheContact, liensAgent, valeursDeLigne } from "../../donnees/agents";
-import { FORMATS } from "../../modele/formats";
+import { FORMATS, FORMATS_ECRAN } from "../../modele/formats";
 import { pourEnregistrer, preparerVisuel, type Visuel } from "../../modele/visuels";
 import { famillesPolices, modeleDemo, type Face, type ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
@@ -12,18 +12,27 @@ import { useListe } from "../commun/useListe";
 import EtapeDestination from "./EtapeDestination";
 import EtapeModele, { type Source } from "./EtapeModele";
 import EtapeVerification, { type Filtre } from "./EtapeVerification";
+import { libellesCartes } from "./libelles";
 import { useControle } from "./useControle";
 
 const t = textes.cartes;
 
-const { largeur_mm, hauteur_mm, fond_perdu_mm } = FORMATS[0];
-const MODELE_VIERGE: ModeleCarte = { nom: t.modele.nomPerso, format: { largeur_mm, hauteur_mm, fond_perdu_mm }, fond_recto: null, fond_verso: null, transformations: {}, champs: [] };
+/** Modèle vierge : carte de visite, ou fond d'écran pour les visuels numériques. */
+function modeleVierge(ecran: boolean): ModeleCarte {
+  const { largeur_mm, hauteur_mm, fond_perdu_mm, px } = ecran ? FORMATS_ECRAN[0] : FORMATS[0];
+  return { nom: ecran ? textes.ecran.nomModele : t.modele.nomPerso, format: { largeur_mm, hauteur_mm, fond_perdu_mm, px }, fond_recto: null, fond_verso: null, transformations: {}, champs: [] };
+}
 
-/** Assistant « Cartes de visite » : Modèle → Liste → Vérification → Destination. */
-export default function AssistantCartes() {
+/**
+ * Assistant « Cartes de visite » : Modèle → Liste → Vérification → Destination. La variante « écran »
+ * (module Visuels numériques) part d'un fond d'écran Teams et n'exporte que des images.
+ */
+export default function AssistantCartes({ variante = "cartes" }: { variante?: "cartes" | "ecran" }) {
+  const ecran = variante === "ecran";
+  const libelles = libellesCartes(ecran);
   const [etape, setEtape] = useState(0);
   const [source, setSource] = useState<Source>("perso");
-  const [modeles, setModeles] = useState<Record<Source, ModeleCarte | null>>({ perso: MODELE_VIERGE, demo: null });
+  const [modeles, setModeles] = useState<Record<Source, ModeleCarte | null>>({ perso: modeleVierge(ecran), demo: null });
   const [visuels, setVisuels] = useState<Partial<Record<Face, Visuel>>>({});
   const [polices, setPolices] = useState<string[]>([]);
   const [filtre, setFiltre] = useState<Filtre>("toutes");
@@ -65,11 +74,11 @@ export default function AssistantCartes() {
   function enregistrer() {
     if (!modele) return;
     const infos = Object.fromEntries(Object.entries(source === "perso" ? visuels : {}).map(([face, visuel]) => [face, pourEnregistrer(visuel)]));
-    return enregistrerSous("carte", modele.nom, modele, correspondances, infos);
+    return enregistrerSous(ecran ? "ecran" : "carte", modele.nom, modele, correspondances, infos);
   }
 
   async function ouvrirFichierProjet() {
-    const projet = await choisirProjet("carte");
+    const projet = await choisirProjet(ecran ? "ecran" : "carte");
     if (!projet) return;
     const modeleOuvert = projet.modele as ModeleCarte;
     const ouverts: Partial<Record<Face, Visuel>> = {};
@@ -93,14 +102,14 @@ export default function AssistantCartes() {
     <Stack gap="lg" maw={1240}>
       <Group justify="space-between" align="flex-start" wrap="nowrap">
         <div>
-          <Title order={2}>{t.titre}</Title>
-          <Text c="dimmed">{t.sousTitre}</Text>
+          <Title order={2}>{libelles.titre}</Title>
+          <Text c="dimmed">{libelles.sousTitre}</Text>
         </div>
         <BoutonsProjet onOuvrir={ouvrirFichierProjet} onEnregistrer={enregistrer} enregistrable={Boolean(modele)} />
       </Group>
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
-        <Stepper.Step label={t.etapes.modele.titre} description={t.etapes.modele.description}>
+        <Stepper.Step label={libelles.etapes.modele.titre} description={libelles.etapes.modele.description}>
           {modele && (
             <EtapeModele
               key={ouvertures}
@@ -111,6 +120,7 @@ export default function AssistantCartes() {
               visuels={source === "perso" ? visuels : {}}
               onVisuels={setVisuels}
               polices={polices}
+              avecDemo={!ecran}
             />
           )}
         </Stepper.Step>
@@ -128,10 +138,10 @@ export default function AssistantCartes() {
             onCorrespondance={donnees.relier}
           />
         </Stepper.Step>
-        <Stepper.Step label={t.etapes.verification.titre} description={t.etapes.verification.description}>
+        <Stepper.Step label={libelles.etapes.verification.titre} description={libelles.etapes.verification.description}>
           {modele && <EtapeVerification modele={modele} agents={agents} controle={controle} filtre={filtre} onFiltre={setFiltre} />}
         </Stepper.Step>
-        <Stepper.Step label={t.etapes.destination.titre} description={t.etapes.destination.description}>
+        <Stepper.Step label={libelles.etapes.destination.titre} description={libelles.etapes.destination.description}>
           {modele && (
             <EtapeDestination
               modele={modele}

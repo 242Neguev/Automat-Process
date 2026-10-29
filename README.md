@@ -2,12 +2,14 @@
 
 *Une solution développée par **Eau sèche**. Contact : +242 06 853 26 77 · gneguev@gmail.com*
 
-Application de bureau (Windows) qui produit en série des **documents personnalisés** à partir d'un **modèle** et d'une **liste Excel**. Le premier module, ce sont les cartes de visite imprimées et numériques. Viendront ensuite les signatures e-mail, les visuels numériques, les documents Word et les outils PDF.
+Application de bureau (Windows) qui produit en série des **documents personnalisés** à partir d'un **modèle** et d'une **liste Excel**. Cinq modules : cartes de visite imprimées et numériques, signatures e-mail, visuels numériques (fonds Teams et Zoom, bannières), courriers Word et outils PDF.
 
 - 📄 [Analyse de faisabilité, décisions et feuille de route](docs/analyse-faisabilite.md)
 - 🧪 [Prototype de validation](prototype/README.md)
 
-## État actuel : phase 1 en cours
+## État actuel
+
+Les cinq modules sont disponibles. Ce qui dépend de Windows (impression directe, conversion par Word, Outlook) reste à essayer sur un poste Windows.
 
 | Fonction | État |
 |---|---|
@@ -24,12 +26,13 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 | **Balises `{{…}}` d'un PDF** détectées, retirées du visuel et placées automatiquement, avec leur police, taille et couleur (CMJN conservé) | ✅ |
 | **Textes d'exemple remplacés d'un clic** (PDF, SVG) : le texte quitte le visuel et devient une information, au même endroit et au même style | ✅ |
 | **Zones effacées** pour un texte incrusté dans une image (Canva, Photoshop…) : un aplat de la couleur mesurée tout autour le recouvre | ✅ |
-| **Projets `.automat`** (cartes, signatures et courriers Word, modèle Word inclus) : le modèle, ses visuels et les correspondances dans un seul fichier, à rouvrir avec la liste suivante (les données des agents n'y sont jamais copiées) | ✅ |
+| **Projets `.automat`** (cartes, visuels numériques, signatures et courriers Word, modèle Word inclus) : le modèle, ses visuels et les correspondances dans un seul fichier, à rouvrir avec la liste suivante (les données des agents n'y sont jamais copiées) | ✅ |
 | **Contrôle des cartes** après mise en page : texte trop long même réduit, texte sur le QR code, hors de la zone de sécurité (affichée dans l'éditeur), textes qui se chevauchent ou descendent plus bas que prévu ; résumé cliquable, filtre « cartes à vérifier », confirmation avant export | ✅ |
 | **Mosaïque** de toutes les cartes et bouton **« cas le plus long »** (la carte où chaque information est la plus difficile à loger) | ✅ |
 | **Contrôle des données de la liste** : e-mails et numéros mal formés, agents en double, informations vides, colonne vide, avec les lignes à corriger dans le fichier | ✅ |
 | **Bon à tirer (BAT)** : une page A4 par carte à faire valider (la première et les cas les plus longs, ou toutes), recto et verso en taille réelle avec fond perdu et ligne de coupe, recto agrandi, filigrane « BON À TIRER » et encadré à signer | ✅ |
 | **Cartes numériques** : une image PNG ou JPG par agent (WhatsApp, LinkedIn, e-mail), ou un PDF par agent avec téléphone, e-mail et site cliquables ; fiche contact .vcf de chacun | ✅ |
+| **Visuels numériques** : fond d'écran Teams ou Zoom (1920 × 1080 px), bannière LinkedIn ou image carrée, avec les informations de chacun ; zone cachée par la personne affichée dans l'éditeur ; une image PNG ou JPG par agent, à la taille exacte du format | ✅ |
 | **Impression directe** (badges PVC sur Evolis, Zebra, Magicard… ou toute imprimante installée) : choix de l'imprimante, d'une carte ou de toutes, recto verso, verso retourné, exemplaires ; carte rendue à la résolution de l'imprimante, à sa taille réelle | ✅ (à tester sous Windows) |
 | **Outils PDF** : fusionner plusieurs PDF dans l'ordre voulu ; séparer un PDF par page ou toutes les N pages, fichiers nommés d'après une liste (`{{Prénom}} {{NOM}}`) ; pages recopiées telles quelles, CMJN compris | ✅ |
 | **Courriers Word** : modèle `.docx` ou `.dotx` avec balises `{{…}}` ou **champs de publipostage existants** (convertis), balises coupées par Word recollées ; aperçu du texte de chaque courrier ; un `.docx` par personne et un **document fusionné** (une section par courrier, pages numérotées à partir de 1) ; lignes vides retirées, valeurs sur plusieurs lignes gardées | ✅ |
@@ -97,7 +100,7 @@ src/                     Interface React + TypeScript
   word/                  Courriers Word : préparation du modèle, remplissage, document fusionné
   donnees/               Listes, correspondances, nettoyage, vCard, agents à rendre
   modele/                Formats, champs, analyse des SVG, visuels
-  pages/                 Écrans (cartes/, signatures/, word/, pdf/, et commun/ : étape Liste partagée)
+  pages/                 Écrans (cartes/, qui sert aussi aux visuels numériques, signatures/, word/, pdf/, et commun/ : étape Liste partagée)
 src-tauri/               Cœur Rust (Tauri)
   src/moteur/            Moteur de rendu Typst : compilation, fichiers virtuels, exports PDF/PNG/SVG
   src/commandes.rs       Commandes appelées par l'interface

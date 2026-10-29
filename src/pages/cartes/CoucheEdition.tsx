@@ -1,8 +1,9 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent as PointerEventReact } from "react";
 import { Box, Tooltip } from "@mantine/core";
 import { arrondir, boiteChamp } from "../../modele/champs";
-import { MARGE_SECURITE_MM } from "../../modele/formats";
+import { MARGE_SECURITE_MM, zonePersonne } from "../../modele/formats";
 import type { Champ, ModeleCarte, Zone } from "../../moteur";
+import { textes } from "../../textes";
 import { COULEURS } from "../../theme";
 
 type Geste = "deplacer" | "largeur" | "taille";
@@ -60,6 +61,7 @@ export default function CoucheEdition({ modele, selection, outil, textesVisuel, 
   const couche = useRef<HTMLDivElement>(null);
   const [trace, setTrace] = useState<Zone | null>(null);
   const { largeur_mm, hauteur_mm } = modele.format;
+  const zone = zonePersonne(modele.format);
   // Les zones effacées passent dessous : une information posée par-dessus reste facile à attraper.
   const champs = [...modele.champs.filter((c) => c.type === "masque"), ...modele.champs.filter((c) => c.type !== "masque")];
   const mmParPx = () => largeur_mm / (couche.current?.getBoundingClientRect().width || 1);
@@ -136,20 +138,44 @@ export default function CoucheEdition({ modele, selection, outil, textesVisuel, 
       inset={0}
       style={{ outline: "none", touchAction: "none", cursor: outil === "effacer" ? "crosshair" : "default" }}
     >
-      {/* Zone de sécurité : les textes restent à l'intérieur, la coupe n'est jamais parfaite. */}
-      <Box
-        data-zone-securite
-        pos="absolute"
-        style={{
-          ...enPourcents(
-            { x: MARGE_SECURITE_MM, y: MARGE_SECURITE_MM, largeur: largeur_mm - 2 * MARGE_SECURITE_MM, hauteur: hauteur_mm - 2 * MARGE_SECURITE_MM },
-            largeur_mm,
-            hauteur_mm,
-          ),
-          border: "1px dashed rgba(34, 37, 42, 0.35)",
-          pointerEvents: "none",
-        }}
-      />
+      {/* Zone de sécurité : les textes restent à l'intérieur, la coupe n'est jamais parfaite (pas à l'écran). */}
+      {!modele.format.px && (
+        <Box
+          data-zone-securite
+          pos="absolute"
+          style={{
+            ...enPourcents(
+              { x: MARGE_SECURITE_MM, y: MARGE_SECURITE_MM, largeur: largeur_mm - 2 * MARGE_SECURITE_MM, hauteur: hauteur_mm - 2 * MARGE_SECURITE_MM },
+              largeur_mm,
+              hauteur_mm,
+            ),
+            border: "1px dashed rgba(34, 37, 42, 0.35)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
+      {/* Fond Teams ou Zoom : la personne cache le centre de l'image. */}
+      {zone && (
+        <Box
+          data-zone-personne
+          pos="absolute"
+          style={{
+            ...enPourcents(zone, largeur_mm, hauteur_mm),
+            border: "1.5px dashed rgba(201, 42, 42, 0.5)",
+            background: "rgba(201, 42, 42, 0.06)",
+            borderRadius: "40% 40% 0 0",
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "rgba(201, 42, 42, 0.8)",
+            fontSize: 12,
+            textAlign: "center",
+          }}
+        >
+          {textes.ecran.zonePersonne}
+        </Box>
+      )}
       {champs.map((champ) => {
         const choisi = champ.id === selection && outil === "edition";
         return (

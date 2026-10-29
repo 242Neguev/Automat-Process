@@ -1,11 +1,10 @@
 import { Button, Group, List, NumberInput, Paper, Select, Stack, Switch, Text, TextInput, ThemeIcon, Title } from "@mantine/core";
 import { IconAlertTriangle, IconCheck, IconInfoSmall, IconPhoto } from "@tabler/icons-react";
-import { diagnostiquer, FORMATS, type Format, type Niveau } from "../../modele/formats";
+import { diagnostiquer, diagnostiquerEcran, FORMATS, FORMATS_ECRAN, type Format, type Niveau } from "../../modele/formats";
 import type { Visuel } from "../../modele/visuels";
 import type { Face } from "../../moteur";
-import { textes } from "../../textes";
+import { libellesCartes } from "./libelles";
 
-const t = textes.cartes.modele;
 const PERSONNALISE = "personnalise";
 const ICONES: Record<Niveau, { couleur: string; icone: typeof IconCheck }> = {
   ok: { couleur: "teal", icone: IconCheck },
@@ -26,7 +25,11 @@ interface Props {
 }
 
 export default function PanneauVisuels({ nom, onNom, format, visuels, avecFondPerdu, onFormat, onFondPerdu, onImporter, onRetirer }: Props) {
-  const predefini = FORMATS.find(
+  // Format d'écran (Visuels numériques) : formats en pixels seulement, sans fond perdu ni verso.
+  const ecran = Boolean(format.px);
+  const t = libellesCartes(ecran).modele;
+  const formats = ecran ? FORMATS_ECRAN : FORMATS;
+  const predefini = formats.find(
     (f) => f.largeur_mm === format.largeur_mm && f.hauteur_mm === format.hauteur_mm && f.fond_perdu_mm === format.fond_perdu_mm,
   );
   const dimension = (cle: keyof Format) => (valeur: string | number) =>
@@ -40,10 +43,10 @@ export default function PanneauVisuels({ nom, onNom, format, visuels, avecFondPe
         <Select
           value={predefini?.id ?? PERSONNALISE}
           allowDeselect={false}
-          data={[...FORMATS.map((f) => ({ value: f.id, label: f.libelle })), { value: PERSONNALISE, label: t.formatPersonnalise }]}
+          data={[...formats.map((f) => ({ value: f.id, label: f.libelle })), ...(ecran ? [] : [{ value: PERSONNALISE, label: t.formatPersonnalise }])]}
           onChange={(id) => {
-            const choisi = FORMATS.find((f) => f.id === id);
-            if (choisi) onFormat({ largeur_mm: choisi.largeur_mm, hauteur_mm: choisi.hauteur_mm, fond_perdu_mm: choisi.fond_perdu_mm });
+            const choisi = formats.find((f) => f.id === id);
+            if (choisi) onFormat({ largeur_mm: choisi.largeur_mm, hauteur_mm: choisi.hauteur_mm, fond_perdu_mm: choisi.fond_perdu_mm, px: choisi.px });
           }}
         />
         {!predefini && (
@@ -52,12 +55,14 @@ export default function PanneauVisuels({ nom, onNom, format, visuels, avecFondPe
             <NumberInput label={t.hauteur} min={20} max={300} decimalScale={1} value={format.hauteur_mm} onChange={dimension("hauteur_mm")} />
           </Group>
         )}
-        <NumberInput label={t.fondPerdu} description={t.fondPerduAide} min={0} max={10} step={0.5} decimalScale={1} value={format.fond_perdu_mm} onChange={dimension("fond_perdu_mm")} />
+        {!ecran && (
+          <NumberInput label={t.fondPerdu} description={t.fondPerduAide} min={0} max={10} step={0.5} decimalScale={1} value={format.fond_perdu_mm} onChange={dimension("fond_perdu_mm")} />
+        )}
 
         <Title order={5} mt="xs">
           {t.visuelsTitre}
         </Title>
-        {(["recto", "verso"] as Face[]).map((face) => {
+        {(ecran ? (["recto"] as Face[]) : (["recto", "verso"] as Face[])).map((face) => {
           const visuel = visuels[face];
           return (
             <Stack key={face} gap={6}>
@@ -86,7 +91,7 @@ export default function PanneauVisuels({ nom, onNom, format, visuels, avecFondPe
               )}
               {visuel ? (
                 <List spacing={4} size="xs" center>
-                  {diagnostiquer(visuel, format, avecFondPerdu[face]).map(({ niveau, message }) => {
+                  {(ecran ? diagnostiquerEcran(visuel, format) : diagnostiquer(visuel, format, avecFondPerdu[face])).map(({ niveau, message }) => {
                     const { couleur, icone: Icone } = ICONES[niveau];
                     return (
                       <List.Item

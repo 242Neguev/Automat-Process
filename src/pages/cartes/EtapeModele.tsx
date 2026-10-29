@@ -37,10 +37,10 @@ import { textes } from "../../textes";
 import { signalerErreur } from "../commun/signalerErreur";
 import ApercuCarte from "./ApercuCarte";
 import CoucheEdition, { type Outil, type TexteCliquable } from "./CoucheEdition";
+import { libellesCartes } from "./libelles";
 import PanneauVisuels from "./PanneauVisuels";
 import ProprietesChamp from "./ProprietesChamp";
 
-const t = textes.cartes.modele;
 export type Source = "demo" | "perso";
 type Information = (typeof INFORMATIONS)[number];
 type Visuels = Partial<Record<Face, Visuel>>;
@@ -56,6 +56,8 @@ interface Props {
   visuels: Visuels;
   onVisuels: (modification: (visuels: Visuels) => Visuels) => void;
   polices: string[];
+  /** Le modèle de démonstration (une carte de visite) n'est proposé que pour les cartes. */
+  avecDemo?: boolean;
 }
 
 /** Où le visuel apparaît sur la carte ; rien pour une image, dont on ne lit pas les textes. */
@@ -72,7 +74,8 @@ function avecChamps(m: ModeleCarte, nouveaux: ChampTexte[], transformations?: Re
   return { ...m, champs, transformations: { ...defaut, ...transformations, ...m.transformations } };
 }
 
-export default function EtapeModele({ source, onSource, modele, onModele, visuels, onVisuels, polices }: Props) {
+export default function EtapeModele({ source, onSource, modele, onModele, visuels, onVisuels, polices, avecDemo = true }: Props) {
+  const t = libellesCartes(Boolean(modele.format.px)).modele;
   const [face, setFace] = useState<Face>("recto");
   const [selection, setSelection] = useState<string | null>(null);
   const [outil, setOutil] = useState<Outil>("edition");
@@ -246,18 +249,20 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
 
   return (
     <Stack gap="md">
-      <SegmentedControl
-        w={360}
-        value={source}
-        onChange={(valeur) => {
-          changerOutil("edition");
-          onSource(valeur as Source);
-        }}
-        data={[
-          { value: "perso", label: t.source.perso },
-          { value: "demo", label: t.source.demo },
-        ]}
-      />
+      {avecDemo && (
+        <SegmentedControl
+          w={360}
+          value={source}
+          onChange={(valeur) => {
+            changerOutil("edition");
+            onSource(valeur as Source);
+          }}
+          data={[
+            { value: "perso", label: t.source.perso },
+            { value: "demo", label: t.source.demo },
+          ]}
+        />
+      )}
       <Group align="flex-start" gap="lg" wrap="nowrap">
         <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
           {avecOutils && (

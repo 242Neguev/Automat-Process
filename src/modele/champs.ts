@@ -27,10 +27,12 @@ export function nouvelId(champs: Champ[]): string {
 /** Nouveau champ texte, placé sous les textes existants (ou en haut à gauche de la carte). */
 export function nouveauChampTexte(modele: ModeleCarte, information: (typeof INFORMATIONS)[number]): ChampTexte {
   const { largeur_mm, hauteur_mm } = modele.format;
+  // Tailles prévues pour une carte de visite (85 mm) : proportionnelles sur un grand format (fond Teams…).
+  const facteur = Math.max(1, largeur_mm / 85);
   const textes = modele.champs.filter((c): c is ChampTexte => c.type === "texte");
   const dernier = textes.reduce<ChampTexte | null>((bas, c) => (!bas || c.y_mm > bas.y_mm ? c : bas), null);
-  const taille = information.taille_pt ?? 8;
-  const x = dernier?.x_mm ?? 6;
+  const taille = Math.round((information.taille_pt ?? 8) * facteur * 2) / 2;
+  const x = dernier?.x_mm ?? 6 * facteur;
   const y = dernier ? dernier.y_mm + Math.max(dernier.taille_pt, taille) * MM_PAR_POINT * 1.6 : hauteur_mm * 0.35;
   return {
     id: nouvelId(modele.champs),
@@ -44,7 +46,7 @@ export function nouveauChampTexte(modele: ModeleCarte, information: (typeof INFO
     couleur: dernier?.couleur ?? { rgb: "#22252a" },
     interlettrage_em: 0,
     ancre: "start",
-    largeur_max_mm: arrondir(Math.max(20, largeur_mm - x - 6)),
+    largeur_max_mm: arrondir(Math.max(20 * facteur, largeur_mm - x - 6 * facteur)),
     taille_min_pt: Math.round(taille * 0.75 * 2) / 2,
     lignes_max: information.lignes_max ?? 1,
   };
@@ -52,12 +54,13 @@ export function nouveauChampTexte(modele: ModeleCarte, information: (typeof INFO
 
 /** QR code vCard, en haut à droite, relié aux informations courantes. */
 export function nouveauQr(modele: ModeleCarte): ChampQr {
-  const taille = 18;
+  const facteur = Math.max(1, modele.format.largeur_mm / 85);
+  const taille = arrondir(Math.min(18 * facteur, modele.format.hauteur_mm * 0.3));
   return {
     id: nouvelId(modele.champs),
     type: "qr",
-    x_mm: arrondir(modele.format.largeur_mm - taille - 5),
-    y_mm: 5,
+    x_mm: arrondir(modele.format.largeur_mm - taille - 5 * facteur),
+    y_mm: arrondir(5 * facteur),
     taille_mm: taille,
     couleur: { rgb: "#22252a" },
     vcard: {

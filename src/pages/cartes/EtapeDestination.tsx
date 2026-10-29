@@ -18,16 +18,14 @@ import {
   type ReglagesImpression,
   type Sortie,
 } from "../../moteur";
-import { textes } from "../../textes";
 import IconeGravite from "../commun/IconeGravite";
 import { signalerErreur } from "../commun/signalerErreur";
 import ExportBat from "./ExportBat";
 import ExportNumerique from "./ExportNumerique";
 import ImpressionDirecte from "./ImpressionDirecte";
+import { libellesCartes } from "./libelles";
 import type { Controle } from "./useControle";
 
-const t = textes.cartes.destination;
-const tc = textes.cartes.controle;
 const FEUILLES: Feuille[] = ["A4", "A3", "SRA3"];
 type Mode = "pdf" | "impression" | "numerique" | "bat";
 
@@ -49,7 +47,9 @@ interface Props {
 
 export default function EtapeDestination({ modele, agents, numeriques, controle, onVoirCartes }: Props) {
   // Un badge PVC (sans fond perdu) s'imprime en général directement ; une carte de visite part chez l'imprimeur.
-  const [mode, setMode] = useState<Mode>(modele.format.fond_perdu_mm === 0 ? "impression" : "pdf");
+  const ecran = Boolean(modele.format.px);
+  const { destination: t, controle: tc } = libellesCartes(ecran);
+  const [mode, setMode] = useState<Mode>(ecran ? "numerique" : modele.format.fond_perdu_mm === 0 ? "impression" : "pdf");
   const [sortie, setSortie] = useState<Sortie>("planches");
   const [feuille, setFeuille] = useState<Feuille>("A4");
   const [enCours, setEnCours] = useState(false);
@@ -155,12 +155,14 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
             </Group>
           )
         )}
-        <SegmentedControl
-          fullWidth
-          value={mode}
-          onChange={(valeur) => setMode(valeur as Mode)}
-          data={(["pdf", "impression", "numerique", "bat"] as const).map((value) => ({ value, label: t.modes[value] }))}
-        />
+        {!ecran && (
+          <SegmentedControl
+            fullWidth
+            value={mode}
+            onChange={(valeur) => setMode(valeur as Mode)}
+            data={(["pdf", "impression", "numerique", "bat"] as const).map((value) => ({ value, label: t.modes[value] }))}
+          />
+        )}
 
         {mode === "pdf" ? (
           <>

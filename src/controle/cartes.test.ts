@@ -85,6 +85,13 @@ describe("rapport de contrôle des cartes", () => {
     expect(problemes.find((p) => p.type === "descend")!.message).toContain("21 mm plus bas que prévu");
   });
 
+  it("ne parle pas de zone de sécurité pour un visuel d'écran, qui n'est pas coupé", () => {
+    const ecran = { ...modele, format: { ...modele.format, fond_perdu_mm: 0, px: { largeur: 321, hauteur: 208 } } };
+    const types = analyser(ecran, agents, mesures).get("a2")!.map((p) => p.type);
+    expect(types).not.toContain("hors-zone");
+    expect(types).toContain("deborde");
+  });
+
   it("ne tient compte du QR code que si l'agent en a un", () => {
     expect(rapport.get("a3")!.map((p) => p.message)).toEqual(["« Prénom NOM » est réduit à 9 pt (au lieu de 11 pt) pour tenir."]);
   });

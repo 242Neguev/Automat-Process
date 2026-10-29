@@ -1,9 +1,11 @@
-// Formats de carte, et mise en correspondance d'un visuel importé avec la carte.
+// Formats de carte (et d'écran), et mise en correspondance d'un visuel importé avec la carte.
 
 export interface Format {
   largeur_mm: number;
   hauteur_mm: number;
   fond_perdu_mm: number;
+  /** Format d'écran (fond Teams, bannière…) : taille en pixels ; le document mesure 1 px = 1/96 de pouce. */
+  px?: { largeur: number; hauteur: number };
 }
 
 export interface FormatPredefini extends Format {
@@ -18,6 +20,32 @@ export const FORMATS: FormatPredefini[] = [
   // Les imprimantes à cartes PVC impriment bord à bord : pas de fond perdu.
   { id: "cr80", libelle: "Badge PVC CR80 85,6 × 54 mm", largeur_mm: 85.6, hauteur_mm: 54, fond_perdu_mm: 0 },
 ];
+
+const MM_PAR_PX = 25.4 / 96;
+const ecran = (id: string, libelle: string, largeur: number, hauteur: number): FormatPredefini => ({
+  id,
+  libelle,
+  largeur_mm: Math.round(largeur * MM_PAR_PX * 1000) / 1000,
+  hauteur_mm: Math.round(hauteur * MM_PAR_PX * 1000) / 1000,
+  fond_perdu_mm: 0,
+  px: { largeur, hauteur },
+});
+
+/** Formats d'écran du module « Visuels numériques ». */
+export const FORMATS_ECRAN: FormatPredefini[] = [
+  ecran("teams", "Fond d'écran Teams / Zoom 1920 × 1080 px", 1920, 1080),
+  ecran("linkedin", "Bannière LinkedIn 1584 × 396 px", 1584, 396),
+  ecran("carre", "Image carrée 1080 × 1080 px", 1080, 1080),
+];
+
+/**
+ * Fond Teams ou Zoom : zone que la personne cache, au centre et en bas de l'image (mm). Les
+ * informations se placent autour.
+ */
+export function zonePersonne(format: Format) {
+  if (format.px?.largeur !== 1920 || format.px.hauteur !== 1080) return null;
+  return { x: format.largeur_mm * 0.3, y: format.hauteur_mm * 0.22, largeur: format.largeur_mm * 0.4, hauteur: format.hauteur_mm * 0.78 };
+}
 
 /** Les textes doivent rester à cette distance du bord de coupe (mm) : la coupe n'est jamais parfaite. */
 export const MARGE_SECURITE_MM = 3;
@@ -139,6 +167,28 @@ export function diagnostiquer(
     else messages.push({ niveau: "attention", message: `Image de ${pixels} : environ ${dpi} dpi, trop faible pour l'impression (300 dpi conseillés).` });
     if (format.fond_perdu_mm > 0 && !avecFondPerdu) messages.push({ niveau: "info", message: "Image au format fini : le fond perdu est complété à partir de ses bords." });
     if (recadre(largeurPx / hauteurPx)) messages.push({ niveau: "attention", message: "Les proportions de l'image diffèrent de la carte : elle est recadrée." });
+  }
+  return messages;
+}
+
+/** Messages sur un visuel destiné à l'écran : taille en pixels et proportions. */
+export function diagnostiquerEcran(
+  visuel: { largeurMm?: number | null; hauteurMm?: number | null; largeurPx?: number | null; hauteurPx?: number | null },
+  format: Format,
+): { niveau: Niveau; message: string }[] {
+  const cible = format.px;
+  if (!cible) return [];
+  const messages: { niveau: Niveau; message: string }[] = [];
+  const { largeurPx, hauteurPx, largeurMm, hauteurMm } = visuel;
+  const recadre = (proportions: number) => Math.abs(proportions - cible.largeur / cible.hauteur) / (cible.largeur / cible.hauteur) > 0.03;
+  if (largeurPx && hauteurPx) {
+    const taille = `${largeurPx} × ${hauteurPx} px`;
+    if (largeurPx >= cible.largeur && hauteurPx >= cible.hauteur) messages.push({ niveau: "ok", message: `Image de ${taille} : assez grande pour ce format.` });
+    else messages.push({ niveau: "attention", message: `Image de ${taille}, plus petite que le format (${cible.largeur} × ${cible.hauteur} px) : elle sera agrandie, donc moins nette.` });
+    if (recadre(largeurPx / hauteurPx)) messages.push({ niveau: "attention", message: "Les proportions de l'image diffèrent du format : elle est recadrée." });
+  } else if (largeurMm && hauteurMm) {
+    messages.push({ niveau: "ok", message: "Visuel vectoriel : net à toutes les tailles." });
+    if (recadre(largeurMm / hauteurMm)) messages.push({ niveau: "attention", message: "Les proportions du visuel diffèrent du format : il est recadré." });
   }
   return messages;
 }

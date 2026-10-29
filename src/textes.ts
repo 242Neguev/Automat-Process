@@ -18,7 +18,7 @@ export const textes = {
   modules: {
     cartes: { titre: "Cartes de visite", description: "Imprimées et numériques" },
     signatures: { titre: "Signatures e-mail", description: "Outlook, Gmail" },
-    numerique: { titre: "Visuels numériques", description: "WhatsApp, Teams, vCard" },
+    numerique: { titre: "Visuels numériques", description: "Fonds Teams et Zoom, bannières" },
     word: { titre: "Documents Word", description: "Courriers personnalisés" },
     pdf: { titre: "Outils PDF", description: "Fusionner, séparer" },
     bientot: "Bientôt",
@@ -236,6 +236,60 @@ export const textes = {
       },
     },
   },
+  ecran: {
+    titre: "Visuels numériques",
+    sousTitre: "Un fond d'écran Teams ou Zoom, une bannière… avec le nom de chacun, en images prêtes à l'emploi.",
+    etapes: {
+      modele: { titre: "Modèle", description: "Le visuel" },
+      verification: { titre: "Vérification", description: "Image par image" },
+      destination: { titre: "Destination", description: "Les images" },
+    },
+    nomModele: "Mon visuel",
+    zonePersonne: "Zone cachée par la personne",
+    miroir: "Dans Teams et Zoom, votre propre aperçu montre l'image inversée ; vos interlocuteurs, eux, la voient à l'endroit.",
+    installer: "Teams : Effets d'arrière-plan › Ajouter. Zoom : Paramètres › Arrière-plan et effets › +.",
+    taille: (largeur: number, hauteur: number) => `Images de ${largeur} × ${hauteur} pixels, la taille exacte du format.`,
+    // Textes de l'assistant des cartes qui parlent d'images ici (mêmes clés, voir libellesCartes).
+    modele: {
+      formatTitre: "Format du visuel",
+      recto: "Image de fond",
+      choisirRecto: "Choisir l'image de fond…",
+      aucunVisuel: "Sans image de fond, l'image est blanche : importez le fond créé par le graphiste.",
+      balisesDetectees: (n: number) =>
+        n > 1 ? `${n} informations détectées dans le visuel et placées sur l'image.` : "1 information détectée dans le visuel et placée sur l'image.",
+      ajouterAide: "Cliquez pour l'ajouter, puis faites-la glisser à sa place sur l'image.",
+      aideEditeur: "Faites glisser les informations sur l'image ; la poignée à droite règle leur largeur. Flèches du clavier : déplacement fin.",
+    },
+    controle: {
+      calcul: "Contrôle des images…",
+      toutesCorrectes: "Toutes les images sont correctes.",
+      aCorriger: (n: number) => `${n} image${n > 1 ? "s" : ""} à corriger`,
+      aVerifier: (n: number) => `${n} image${n > 1 ? "s" : ""} à vérifier`,
+      ajustees: (n: number) => `${n} image${n > 1 ? "s" : ""} ajustée${n > 1 ? "s" : ""} automatiquement (texte réduit ou sur plusieurs lignes).`,
+      nbCartes: (n: number) => `${n} image${n > 1 ? "s" : ""}`,
+    },
+    verification: {
+      vues: { carte: "Image par image", mosaique: "Mosaïque" },
+      filtres: { toutes: "Toutes les images", "a-verifier": "Images à vérifier" },
+      aucuneCarte: "Aucune image ne correspond à ce filtre.",
+      casAide: "L'image où chaque information est la plus longue :",
+      rienASignaler: "Rien à signaler sur cette image.",
+      controleImpossible: "Le contrôle des images n'a pas pu être fait",
+    },
+    destination: {
+      titre: "Exporter les images",
+      resume: (n: number) => `${n} image${n > 1 ? "s" : ""}`,
+    },
+    confirmation: {
+      message: (n: number) => (n > 1 ? `${n} images ont un problème grave :` : "1 image a un problème grave :"),
+      voir: "Voir les images",
+    },
+    numerique: {
+      choisirDossier: "Dossier où créer les images",
+      cree: "Images créées",
+      nomDossier: (nom: string) => `Visuels numériques - ${nom}`,
+    },
+  },
   signatures: {
     titre: "Signatures e-mail",
     sousTitre: "Un modèle, une liste d'agents : la signature de chacun, prête à coller dans Outlook ou Gmail.",
@@ -433,11 +487,12 @@ export const textes = {
     ouvrir: "Ouvrir un projet…",
     enregistrer: "Enregistrer le projet…",
     filtre: "Projet Automat-Process",
-    nomParDefaut: { carte: "Cartes de visite", signature: "Signatures e-mail", word: "Courriers" },
+    nomParDefaut: { carte: "Cartes de visite", ecran: "Visuels numériques", signature: "Signatures e-mail", word: "Courriers" },
     enregistre: "Projet enregistré",
     ouvert: "Projet ouvert",
     autreModule: {
       carte: "Ce projet contient des cartes de visite : ouvrez-le depuis le module « Cartes de visite ».",
+      ecran: "Ce projet contient un visuel numérique : ouvrez-le depuis le module « Visuels numériques ».",
       signature: "Ce projet contient des signatures e-mail : ouvrez-le depuis le module « Signatures e-mail ».",
       word: "Ce projet contient des courriers Word : ouvrez-le depuis le module « Documents Word ».",
     },

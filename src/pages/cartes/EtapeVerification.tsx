@@ -26,11 +26,10 @@ import type { DonneesAgent, Face, ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import ApercuCarte from "./ApercuCarte";
 import IconeGravite from "../commun/IconeGravite";
+import { libellesCartes } from "./libelles";
 import MosaiqueCartes from "./MosaiqueCartes";
 import type { Controle } from "./useControle";
 
-const t = textes.cartes.verification;
-const tc = textes.cartes.controle;
 
 /** « toutes », « a-verifier » (erreurs et points d'attention) ou la clé d'un groupe de problèmes. */
 export type Filtre = string;
@@ -45,7 +44,8 @@ interface Props {
 }
 
 /** Résumé du contrôle : nombre de cartes à corriger ou à vérifier, et problèmes cliquables (filtre). */
-function Resume({ controle, groupes, filtre, onFiltre }: { controle: Controle; groupes: Groupe[]; filtre: Filtre; onFiltre: (filtre: Filtre) => void }) {
+function Resume({ ecran, controle, groupes, filtre, onFiltre }: { ecran: boolean; controle: Controle; groupes: Groupe[]; filtre: Filtre; onFiltre: (filtre: Filtre) => void }) {
+  const { verification: t, controle: tc } = libellesCartes(ecran);
   if (controle.enCours) {
     return (
       <Alert color="gray" icon={<Loader size={16} />}>
@@ -97,6 +97,8 @@ function Resume({ controle, groupes, filtre, onFiltre }: { controle: Controle; g
 }
 
 export default function EtapeVerification({ modele, agents, controle, filtre, onFiltre }: Props) {
+  const ecran = Boolean(modele.format.px);
+  const t = libellesCartes(ecran).verification;
   const [choisi, setChoisi] = useState<string | null>(null);
   const [face, setFace] = useState<Face>("recto");
   const [vue, setVue] = useState<Vue>("carte");
@@ -125,7 +127,7 @@ export default function EtapeVerification({ modele, agents, controle, filtre, on
 
   return (
     <Stack gap="md">
-      <Resume controle={controle} groupes={groupes} filtre={filtre} onFiltre={onFiltre} />
+      <Resume ecran={ecran} controle={controle} groupes={groupes} filtre={filtre} onFiltre={onFiltre} />
 
       <Group justify="space-between" wrap="nowrap">
         <Group gap="sm" wrap="nowrap">
