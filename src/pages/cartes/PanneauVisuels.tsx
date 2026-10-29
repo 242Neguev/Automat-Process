@@ -1,7 +1,8 @@
-import { Button, Group, List, NumberInput, Paper, Select, Stack, Switch, Text, ThemeIcon, Title } from "@mantine/core";
+import { Button, Group, List, NumberInput, Paper, Select, Stack, Switch, Text, TextInput, ThemeIcon, Title } from "@mantine/core";
 import { IconAlertTriangle, IconCheck, IconInfoSmall, IconPhoto } from "@tabler/icons-react";
 import { diagnostiquer, FORMATS, type Format, type Niveau } from "../../modele/formats";
-import type { Face, FondImporte } from "../../moteur";
+import type { Visuel } from "../../modele/visuels";
+import type { Face } from "../../moteur";
 import { textes } from "../../textes";
 
 const t = textes.cartes.modele;
@@ -12,10 +13,9 @@ const ICONES: Record<Niveau, { couleur: string; icone: typeof IconCheck }> = {
   attention: { couleur: "orange", icone: IconAlertTriangle },
 };
 
-/** Visuel importé, avec ses dimensions en mm quand on les connaît (PDF, SVG). */
-export type Visuel = FondImporte & { largeurMm: number | null; hauteurMm: number | null };
-
 interface Props {
+  nom: string;
+  onNom: (nom: string) => void;
   format: Format;
   visuels: Partial<Record<Face, Visuel>>;
   avecFondPerdu: Record<Face, boolean>;
@@ -25,7 +25,7 @@ interface Props {
   onRetirer: (face: Face) => void;
 }
 
-export default function PanneauVisuels({ format, visuels, avecFondPerdu, onFormat, onFondPerdu, onImporter, onRetirer }: Props) {
+export default function PanneauVisuels({ nom, onNom, format, visuels, avecFondPerdu, onFormat, onFondPerdu, onImporter, onRetirer }: Props) {
   const predefini = FORMATS.find(
     (f) => f.largeur_mm === format.largeur_mm && f.hauteur_mm === format.hauteur_mm && f.fond_perdu_mm === format.fond_perdu_mm,
   );
@@ -35,6 +35,7 @@ export default function PanneauVisuels({ format, visuels, avecFondPerdu, onForma
   return (
     <Paper withBorder p="md">
       <Stack gap="sm">
+        <TextInput label={t.nomModele} value={nom} onChange={(e) => onNom(e.currentTarget.value)} />
         <Title order={5}>{t.formatTitre}</Title>
         <Select
           value={predefini?.id ?? PERSONNALISE}

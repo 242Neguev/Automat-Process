@@ -1,5 +1,5 @@
 // Construction des agents à rendre : chaque ligne de la liste donne le texte final de chaque champ du modèle.
-import type { ChampQr, ChampTexte, DonneesAgent, ModeleCarte } from "../moteur";
+import type { Champ, ChampQr, ChampTexte, DonneesAgent, ModeleCarte } from "../moteur";
 import type { Correspondances } from "./correspondances";
 import type { LigneListe } from "./liste";
 import { nettoyer } from "./nettoyage";
@@ -8,12 +8,14 @@ import { vcard, type ChampsVCard } from "./vcard";
 const BALISE = /\{\{([^}]+)\}\}/g;
 
 const balisesDe = (texte: string) => [...texte.matchAll(BALISE)].map((m) => m[1].trim());
-const estTexte = (champ: ChampTexte | ChampQr): champ is ChampTexte => champ.type === "texte";
-const estQr = (champ: ChampTexte | ChampQr): champ is ChampQr => champ.type === "qr";
+const estTexte = (champ: Champ): champ is ChampTexte => champ.type === "texte";
+const estQr = (champ: Champ): champ is ChampQr => champ.type === "qr";
 
 /** Balises utilisées par le modèle (textes et vCard), dans l'ordre d'apparition. */
 export function balisesDuModele(modele: ModeleCarte): string[] {
-  const textes = modele.champs.flatMap((champ) => (estTexte(champ) ? [champ.modele] : Object.values(champ.vcard ?? {})));
+  const textes = modele.champs.flatMap((champ): string[] =>
+    estTexte(champ) ? [champ.modele] : estQr(champ) ? Object.values(champ.vcard ?? {}).filter((t): t is string => Boolean(t)) : [],
+  );
   return [...new Set(textes.flatMap(balisesDe))];
 }
 

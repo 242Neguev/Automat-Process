@@ -51,7 +51,18 @@ export interface ChampQr {
   vcard?: Partial<Record<keyof ChampsVCard, string>>;
 }
 
-export type Champ = ChampTexte | ChampQr;
+/** Zone effacée : un aplat posé sur le visuel (texte d'exemple incrusté dans une image). */
+export interface ChampMasque {
+  id: string;
+  type: "masque";
+  x_mm: number;
+  y_mm: number;
+  largeur_mm: number;
+  hauteur_mm: number;
+  couleur: Couleur;
+}
+
+export type Champ = ChampTexte | ChampQr | ChampMasque;
 
 export interface ModeleCarte {
   nom: string;
@@ -73,6 +84,23 @@ export interface DonneesAgent {
   vcard?: string;
 }
 
+/** Ligne de texte d'un visuel (PDF ou SVG), en mm depuis le coin haut-gauche du visuel. */
+export interface TexteVisuel {
+  id: number;
+  texte: string;
+  /** Point d'ancrage, sur la ligne de base. */
+  xMm: number;
+  yMm: number;
+  largeurMm: number;
+  taillePt: number;
+  /** Nom de police (famille, ou nom PostScript pour un PDF : « Arial-BoldMT »). */
+  police: string;
+  couleur: Couleur;
+  graisse?: number;
+  ancre?: "start" | "middle" | "end";
+  interlettrageEm?: number;
+}
+
 /** Visuel importé : chemin virtuel à reprendre dans le modèle et ce qu'on sait de ses dimensions. */
 export interface FondImporte {
   chemin: string;
@@ -84,6 +112,24 @@ export interface FondImporte {
   largeurPx: number | null;
   hauteurPx: number | null;
   texte: string | null;
+  /** PDF : lignes à balises, déjà retirées du visuel. */
+  champs: TexteVisuel[];
+  /** PDF : textes restant dans le visuel. */
+  textes: TexteVisuel[];
+}
+
+/** Zone de la carte finie, en mm. */
+export interface Zone {
+  x_mm: number;
+  y_mm: number;
+  largeur_mm: number;
+  hauteur_mm: number;
+}
+
+export interface ProjetOuvert {
+  modele: ModeleCarte;
+  correspondances: Record<string, string | null>;
+  visuels: Partial<Record<Face, FondImporte & Record<string, unknown>>>;
 }
 
 export const infosMoteur = () => invoke<InfosMoteur>("infos_moteur");
@@ -98,6 +144,18 @@ export const apercuCarte = (modele: ModeleCarte, agent: DonneesAgent, face: Face
 
 export const exporterCartes = (modele: ModeleCarte, agents: DonneesAgent[], sortie: Sortie, feuille: Feuille, chemin: string) =>
   invoke<void>("exporter_cartes", { modele, agents, sortie, feuille, chemin });
+
+/** Couleur du visuel tout autour d'une zone : elle sert à effacer un texte incrusté. */
+export const couleurAutour = (modele: ModeleCarte, zone: Zone) => invoke<string>("couleur_autour", { modele, zone });
+
+/** Retire un texte d'exemple d'un visuel PDF ; renvoie la ligne retirée et les textes restants. */
+export const retirerTextePdf = (chemin: string, id: number) =>
+  invoke<{ texte: TexteVisuel; textes: TexteVisuel[] }>("retirer_texte_pdf", { chemin, id });
+
+export const enregistrerProjet = (chemin: string, modele: ModeleCarte, correspondances: Record<string, string | null>, visuels: unknown) =>
+  invoke<void>("enregistrer_projet", { chemin, modele, correspondances, visuels });
+
+export const ouvrirProjet = (chemin: string) => invoke<ProjetOuvert>("ouvrir_projet", { chemin });
 
 /** Contenu brut d'un fichier de liste choisi par l'utilisateur. */
 export const lireListe = (chemin: string) => invoke<ArrayBuffer>("lire_liste", { chemin });

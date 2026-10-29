@@ -8,9 +8,10 @@ use serde::Serialize;
 use tauri::State;
 use tauri::ipc::Response;
 
-use crate::cartes::{self, DonneesAgent, Face, Feuille, Projet, Sortie};
-use crate::fonds::{FondImporte, Fonds};
+use crate::cartes::{self, DonneesAgent, Face, Feuille, Projet, Sortie, Zone};
+use crate::fonds::{FondImporte, Fonds, TexteRetire};
 use crate::moteur::{ErreurMoteur, Moteur, VERSION_TYPST};
+use crate::projet_fichier::{self, ProjetOuvert};
 
 /// Formats de liste acceptés, et taille maximale d'un fichier (une liste d'agents pèse bien moins).
 const EXTENSIONS_LISTE: [&str; 7] = ["xlsx", "xlsm", "xls", "ods", "csv", "tsv", "txt"];
@@ -158,4 +159,63 @@ pub async fn lire_liste(chemin: String) -> Result<Response, ErreurMoteur> {
     })
     .await
     .map_err(|erreur| ErreurMoteur::simple(format!("Lecture interrompue : {erreur}")))?
+}
+
+/// Couleur du visuel autour d'une zone : elle sert à effacer un texte incrusté sur un fond uni.
+#[tauri::command]
+pub async fn couleur_autour(
+    etat: State<'_, EtatMoteur>,
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+    zone: Zone,
+) -> Result<String, ErreurMoteur> {
+    let projet = Projet {
+        modele,
+        fonds: fonds.fichiers(),
+    };
+    executer(&etat, move |moteur| {
+        cartes::couleur_autour(moteur, &projet, zone)
+    })
+    .await
+}
+
+/// Enregistre le modèle, ses visuels et les correspondances dans un fichier « .automat ».
+#[tauri::command]
+pub async fn enregistrer_projet(
+    fonds: State<'_, Arc<Fonds>>,
+    chemin: String,
+    modele: serde_json::Value,
+    correspondances: serde_json::Value,
+    visuels: serde_json::Value,
+) -> Result<(), ErreurMoteur> {
+    let fonds = Arc::clone(&fonds);
+    tauri::async_runtime::spawn_blocking(move || {
+        projet_fichier::enregistrer(&chemin, &modele, &correspondances, &visuels, &fonds)
+    })
+    .await
+    .map_err(|erreur| ErreurMoteur::simple(format!("Enregistrement interrompu : {erreur}")))?
+}
+
+#[tauri::command]
+pub async fn ouvrir_projet(
+    fonds: State<'_, Arc<Fonds>>,
+    chemin: String,
+) -> Result<ProjetOuvert, ErreurMoteur> {
+    let fonds = Arc::clone(&fonds);
+    tauri::async_runtime::spawn_blocking(move || projet_fichier::ouvrir(&chemin, &fonds))
+        .await
+        .map_err(|erreur| ErreurMoteur::simple(format!("Ouverture interrompue : {erreur}")))?
+}
+
+/// Retire un texte d'exemple d'un visuel PDF ; l'interface en fait un champ au même endroit.
+#[tauri::command]
+pub async fn retirer_texte_pdf(
+    fonds: State<'_, Arc<Fonds>>,
+    chemin: String,
+    id: usize,
+) -> Result<TexteRetire, ErreurMoteur> {
+    let fonds = Arc::clone(&fonds);
+    tauri::async_runtime::spawn_blocking(move || fonds.retirer_texte_pdf(&chemin, id))
+        .await
+        .map_err(|erreur| ErreurMoteur::simple(format!("Traitement interrompu : {erreur}")))?
 }

@@ -47,7 +47,7 @@ Les décisions techniques importantes, déjà validées par le prototype :
 | Hébergement des images de signature | Aucun pour l'instant | MVP : signatures HTML sans image, ou kit Outlook avec images intégrées. Le rendu « image » et les logos dans Gmail attendront un hébergement. |
 | Ordre de la phase 1 | Socle commun et cartes d'abord, signatures ensuite | Les signatures réutiliseront le socle : listes, correspondances, projets |
 | Langues des documents | Français, anglais, arabe, autres | Unicode complet et écriture de droite à gauche dans l'éditeur dès le départ |
-| Éditeur | **Eau sèche**, identifiant `com.eauseche.automatprocess` | Interface aux couleurs d'Eau sèche, logo dans « À propos » ; le produit garde son nom |
+| Éditeur | **Eau sèche** (+242 06 853 26 77 · gneguev@gmail.com), identifiant `com.eauseche.automatprocess` | Interface aux couleurs d'Eau sèche, logo dans « À propos » ; le produit garde son nom |
 | Tests Windows | Installateur produit par GitHub Actions | Rien à installer sur le PC de test |
 | Vrais fichiers de test | Dossier `exemples-reels/`, exclu de Git | Les fichiers confidentiels ne partent jamais sur GitHub |
 

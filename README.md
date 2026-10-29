@@ -1,6 +1,6 @@
 # Automat-Process
 
-*Une solution développée par **Eau sèche**.*
+*Une solution développée par **Eau sèche**. Contact : +242 06 853 26 77 · gneguev@gmail.com*
 
 Application de bureau (Windows) qui produit en série des **documents personnalisés** à partir d'un **modèle** et d'une **liste Excel**. Le premier module, ce sont les cartes de visite imprimées et numériques. Viendront ensuite les signatures e-mail, les visuels numériques, les documents Word et les outils PDF.
 
@@ -21,7 +21,10 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 | **Balises `{{…}}` d'un SVG** (Illustrator, CorelDRAW, Inkscape…) détectées et placées automatiquement, avec leur police, taille et couleur | ✅ |
 | **Éditeur de placement manuel** : ajouter des informations, les déplacer à la souris ou au clavier, régler police, taille, couleur, alignement et mise en forme ; QR code vCard qui réserve sa place | ✅ |
 | **Fond perdu complété** pour un visuel livré au format fini : il est posé tel quel et ses bords sont prolongés, rien n'est rogné | ✅ |
-| Balises dans un PDF, clic sur un texte d'exemple, effacement sur fond uni, enregistrement du projet | Phase 1, incrément 2b |
+| **Balises `{{…}}` d'un PDF** détectées, retirées du visuel et placées automatiquement, avec leur police, taille et couleur (CMJN conservé) | ✅ |
+| **Textes d'exemple remplacés d'un clic** (PDF, SVG) : le texte quitte le visuel et devient une information, au même endroit et au même style | ✅ |
+| **Zones effacées** pour un texte incrusté dans une image (Canva, Photoshop…) : un aplat de la couleur mesurée tout autour le recouvre | ✅ |
+| **Projets `.automat`** : le modèle, ses visuels et les correspondances dans un seul fichier, à rouvrir avec la liste suivante (les données des agents n'y sont jamais copiées) | ✅ |
 | Contrôle avant impression, mosaïque, badges PVC | Phase 1, incrément 3 |
 | Signatures e-mail | Phase 1, incrément 4 |
 
@@ -79,11 +82,16 @@ Pour produire aussi un `.msi`, lancer `scripts\compiler-windows.cmd -Msi` dans u
 src/                     Interface React + TypeScript
   textes.ts              Tous les textes de l'interface (traduction future)
   moteur.ts              Accès typé aux commandes du cœur
+  donnees/               Listes, correspondances, nettoyage, vCard, agents à rendre
+  modele/                Formats, champs, analyse des SVG, visuels
   pages/                 Écrans
 src-tauri/               Cœur Rust (Tauri)
   src/moteur/            Moteur de rendu Typst : compilation, fichiers virtuels, exports PDF/PNG/SVG
   src/commandes.rs       Commandes appelées par l'interface
-  src/demo.rs            Carte de démonstration embarquée
+  src/cartes.rs          Cartes : aperçu, export, couleur autour d'une zone, démonstration embarquée
+  src/fonds.rs           Visuels importés (recto, verso), gardés en mémoire
+  src/pdf_textes.rs      Lignes de texte d'un PDF : lecture, retrait ciblé
+  src/projet_fichier.rs  Fichiers de projet « .automat »
   gabarits/carte.typ     Gabarit graphique des cartes (aperçu, cartes unitaires, planches)
   ressources/demo/       Données et fonds de la démonstration
 docs/                    Analyse de faisabilité, images, PDF d'exemple

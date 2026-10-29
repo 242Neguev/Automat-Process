@@ -125,6 +125,11 @@
 // Carte complète, fond perdu compris (cw × ch).
 #let carte-recto(a) = box(width: cw, height: ch, clip: true, fill: white, {
   place(fond(projet.at("fond_recto", default: none), projet.at("fond_recto_avec_fond_perdu", default: true)))
+  // Zones effacées (texte d'exemple incrusté dans le visuel) : aplats sous les informations.
+  for m in projet.champs.filter(f => f.type == "masque") {
+    place(top + left, dx: fp + m.x_mm * 1mm, dy: fp + m.y_mm * 1mm,
+      rect(width: m.largeur_mm * 1mm, height: m.hauteur_mm * 1mm, fill: couleur(m.couleur), stroke: none))
+  }
   textes-variables(a)
   // Pas de QR code quand l'agent n'a pas de vCard (aucune donnée de contact).
   if a.at("qr", default: none) != none {

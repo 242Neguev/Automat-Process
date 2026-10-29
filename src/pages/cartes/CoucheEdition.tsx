@@ -1,17 +1,31 @@
-import { useRef, type KeyboardEvent, type PointerEvent as PointerEventReact } from "react";
-import { Box } from "@mantine/core";
+import { useRef, useState, type KeyboardEvent, type PointerEvent as PointerEventReact } from "react";
+import { Box, Tooltip } from "@mantine/core";
 import { arrondir, boiteChamp } from "../../modele/champs";
-import type { Champ, ModeleCarte } from "../../moteur";
+import type { Champ, ModeleCarte, Zone } from "../../moteur";
 import { COULEURS } from "../../theme";
 
 type Geste = "deplacer" | "largeur" | "taille";
 
+/** Édition des champs, tracé d'une zone à effacer, ou choix d'un texte d'exemple à remplacer. */
+export type Outil = "edition" | "effacer" | "remplacer";
+
+/** Texte du visuel que l'on peut remplacer, avec son cadre sur la carte finie (mm). */
+export interface TexteCliquable {
+  id: number;
+  texte: string;
+  boite: { x: number; y: number; largeur: number; hauteur: number };
+}
+
 interface Props {
   modele: ModeleCarte;
   selection: string | null;
+  outil: Outil;
+  textesVisuel: TexteCliquable[];
   onSelection: (id: string | null) => void;
   onChamp: (id: string, modifications: Partial<Champ>) => void;
   onSupprimer: (id: string) => void;
+  onZone: (zone: Zone) => void;
+  onTexteVisuel: (id: number) => void;
 }
 
 /** Marge de sécurité : les textes restent à 3 mm au moins du bord de coupe. */
@@ -27,6 +41,7 @@ function appliquerGeste(champ: Champ, geste: Geste, dx: number, dy: number, larg
     return { ...deplace, largeur_max_mm: arrondir(Math.max(10, Math.min(champ.largeur_max_mm, disponible))) };
   }
   if (champ.type === "qr") return { taille_mm: arrondir(Math.max(8, champ.taille_mm + Math.max(dx, dy))) };
+  if (champ.type === "masque") return { largeur_mm: arrondir(Math.max(1, champ.largeur_mm + dx)), hauteur_mm: arrondir(Math.max(1, champ.hauteur_mm + dy)) };
   // La poignée suit le bord droit : un texte centré s'élargit des deux côtés, un texte aligné à droite se décale.
   if (champ.ancre === "end") return { largeur_max_mm: arrondir(Math.max(10, champ.largeur_max_mm + dx)), x_mm: arrondir(champ.x_mm + dx) };
   const facteur = champ.ancre === "middle" ? 2 : 1;
@@ -35,20 +50,35 @@ function appliquerGeste(champ: Champ, geste: Geste, dx: number, dy: number, larg
 
 const PAS_CLAVIER: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
-/** Couche posée sur l'aperçu : chaque information est un cadre que l'on déplace à la souris. */
-export default function CoucheEdition({ modele, selection, onSelection, onChamp, onSupprimer }: Props) {
+const enPourcents = (boite: { x: number; y: number; largeur: number; hauteur: number }, largeur: number, hauteur: number) => ({
+  left: `${(boite.x / largeur) * 100}%`,
+  top: `${(boite.y / hauteur) * 100}%`,
+  width: `${(boite.largeur / largeur) * 100}%`,
+  height: `${(boite.hauteur / hauteur) * 100}%`,
+});
+
+/** Couche posée sur l'aperçu : on y déplace les informations, on y trace les zones à effacer. */
+export default function CoucheEdition({ modele, selection, outil, textesVisuel, onSelection, onChamp, onSupprimer, onZone, onTexteVisuel }: Props) {
   const couche = useRef<HTMLDivElement>(null);
+  const [trace, setTrace] = useState<Zone | null>(null);
   const { largeur_mm, hauteur_mm } = modele.format;
+  // Les zones effacées passent dessous : une information posée par-dessus reste facile à attraper.
+  const champs = [...modele.champs.filter((c) => c.type === "masque"), ...modele.champs.filter((c) => c.type !== "masque")];
+  const mmParPx = () => largeur_mm / (couche.current?.getBoundingClientRect().width || 1);
+  const enMm = (e: { clientX: number; clientY: number }) => {
+    const rect = couche.current!.getBoundingClientRect();
+    return { x: (e.clientX - rect.left) * mmParPx(), y: (e.clientY - rect.top) * mmParPx() };
+  };
 
   function commencer(evenement: PointerEventReact, champ: Champ, geste: Geste) {
     evenement.preventDefault();
     evenement.stopPropagation();
     onSelection(champ.id);
     couche.current?.focus();
-    const mmParPx = largeur_mm / (couche.current?.getBoundingClientRect().width || 1);
+    const echelle = mmParPx();
     const depart = { x: evenement.clientX, y: evenement.clientY };
     const bouger = (e: PointerEvent) =>
-      onChamp(champ.id, appliquerGeste(champ, geste, (e.clientX - depart.x) * mmParPx, (e.clientY - depart.y) * mmParPx, largeur_mm));
+      onChamp(champ.id, appliquerGeste(champ, geste, (e.clientX - depart.x) * echelle, (e.clientY - depart.y) * echelle, largeur_mm));
     const finir = () => {
       window.removeEventListener("pointermove", bouger);
       window.removeEventListener("pointerup", finir);
@@ -57,9 +87,34 @@ export default function CoucheEdition({ modele, selection, onSelection, onChamp,
     window.addEventListener("pointerup", finir);
   }
 
+  /** Outil « effacer » : on trace à la souris le rectangle à recouvrir. */
+  function tracer(evenement: PointerEventReact) {
+    evenement.preventDefault();
+    const depart = enMm(evenement);
+    const zone = (e: PointerEvent) => {
+      const point = enMm(e);
+      return {
+        x_mm: arrondir(Math.min(depart.x, point.x)),
+        y_mm: arrondir(Math.min(depart.y, point.y)),
+        largeur_mm: arrondir(Math.abs(point.x - depart.x)),
+        hauteur_mm: arrondir(Math.abs(point.y - depart.y)),
+      };
+    };
+    const bouger = (e: PointerEvent) => setTrace(zone(e));
+    const finir = (e: PointerEvent) => {
+      window.removeEventListener("pointermove", bouger);
+      window.removeEventListener("pointerup", finir);
+      setTrace(null);
+      const finale = zone(e);
+      if (finale.largeur_mm >= 0.5 && finale.hauteur_mm >= 0.5) onZone(finale);
+    };
+    window.addEventListener("pointermove", bouger);
+    window.addEventListener("pointerup", finir);
+  }
+
   function clavier(evenement: KeyboardEvent) {
     const champ = modele.champs.find((c) => c.id === selection);
-    if (!champ) return;
+    if (!champ || outil !== "edition") return;
     if (evenement.key === "Delete" || evenement.key === "Backspace") {
       evenement.preventDefault();
       onSupprimer(champ.id);
@@ -73,10 +128,18 @@ export default function CoucheEdition({ modele, selection, onSelection, onChamp,
   }
 
   return (
-    <Box ref={couche} tabIndex={0} onKeyDown={clavier} onPointerDown={() => onSelection(null)} pos="absolute" inset={0} style={{ outline: "none", touchAction: "none" }}>
-      {modele.champs.map((champ) => {
-        const boite = boiteChamp(champ);
-        const choisi = champ.id === selection;
+    <Box
+      ref={couche}
+      data-couche
+      tabIndex={0}
+      onKeyDown={clavier}
+      onPointerDown={outil === "effacer" ? tracer : () => onSelection(null)}
+      pos="absolute"
+      inset={0}
+      style={{ outline: "none", touchAction: "none", cursor: outil === "effacer" ? "crosshair" : "default" }}
+    >
+      {champs.map((champ) => {
+        const choisi = champ.id === selection && outil === "edition";
         return (
           <Box
             key={champ.id}
@@ -84,36 +147,71 @@ export default function CoucheEdition({ modele, selection, onSelection, onChamp,
             onPointerDown={(e) => commencer(e, champ, "deplacer")}
             pos="absolute"
             style={{
-              left: `${(boite.x / largeur_mm) * 100}%`,
-              top: `${(boite.y / hauteur_mm) * 100}%`,
-              width: `${(boite.largeur / largeur_mm) * 100}%`,
-              height: `${(boite.hauteur / hauteur_mm) * 100}%`,
+              ...enPourcents(boiteChamp(champ), largeur_mm, hauteur_mm),
               border: choisi ? `1.5px solid ${COULEURS.eau}` : "1px dashed rgba(30, 110, 114, 0.6)",
               background: choisi ? "rgba(30, 110, 114, 0.08)" : "transparent",
               borderRadius: 2,
               cursor: "move",
+              // Pendant le tracé d'une zone ou le choix d'un texte, les champs ne captent pas la souris.
+              pointerEvents: outil === "edition" ? "auto" : "none",
+              opacity: outil === "edition" ? 1 : 0.4,
             }}
           >
             {choisi && (
               <Box
                 data-poignee
-                onPointerDown={(e) => commencer(e, champ, champ.type === "qr" ? "taille" : "largeur")}
+                onPointerDown={(e) => commencer(e, champ, champ.type === "texte" ? "largeur" : "taille")}
                 pos="absolute"
                 style={{
                   right: -6,
-                  ...(champ.type === "qr" ? { bottom: -6 } : { top: "50%", marginTop: -6 }),
+                  ...(champ.type === "texte" ? { top: "50%", marginTop: -6 } : { bottom: -6 }),
                   width: 12,
                   height: 12,
                   background: COULEURS.eau,
                   border: "2px solid white",
                   borderRadius: 3,
-                  cursor: champ.type === "qr" ? "nwse-resize" : "ew-resize",
+                  cursor: champ.type === "texte" ? "ew-resize" : "nwse-resize",
                 }}
               />
             )}
           </Box>
         );
       })}
+
+      {outil === "remplacer" &&
+        textesVisuel.map((texte) => (
+          <Tooltip key={texte.id} label={texte.texte} withArrow>
+            <Box
+              data-texte-visuel={texte.id}
+              role="button"
+              aria-label={texte.texte}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onTexteVisuel(texte.id);
+              }}
+              pos="absolute"
+              style={{
+                ...enPourcents(texte.boite, largeur_mm, hauteur_mm),
+                border: "1.5px dashed #e8590c",
+                background: "rgba(232, 89, 12, 0.08)",
+                borderRadius: 2,
+                cursor: "pointer",
+              }}
+            />
+          </Tooltip>
+        ))}
+
+      {trace && (
+        <Box
+          pos="absolute"
+          style={{
+            ...enPourcents({ x: trace.x_mm, y: trace.y_mm, largeur: trace.largeur_mm, hauteur: trace.hauteur_mm }, largeur_mm, hauteur_mm),
+            border: "1.5px dashed #c92a2a",
+            background: "rgba(201, 42, 42, 0.12)",
+          }}
+        />
+      )}
     </Box>
   );
 }

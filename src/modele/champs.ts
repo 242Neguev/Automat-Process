@@ -1,6 +1,8 @@
 // Création des champs d'un modèle et géométrie utilisée par l'éditeur.
 import type { Transformation } from "../donnees/nettoyage";
-import type { Champ, ChampQr, ChampTexte, ModeleCarte } from "../moteur";
+import type { Champ, ChampQr, ChampTexte, ModeleCarte, TexteVisuel } from "../moteur";
+import { versCarte, type Format } from "./formats";
+import { choisirPolice, graisseDuNom } from "./svg";
 
 const MM_PAR_POINT = 25.4 / 72;
 
@@ -89,6 +91,9 @@ export function boiteChamp(champ: Champ) {
   if (champ.type === "qr") {
     return { x: champ.x_mm, y: champ.y_mm, largeur: champ.taille_mm, hauteur: champ.taille_mm };
   }
+  if (champ.type === "masque") {
+    return { x: champ.x_mm, y: champ.y_mm, largeur: champ.largeur_mm, hauteur: champ.hauteur_mm };
+  }
   const corps = champ.taille_pt * MM_PAR_POINT;
   const decalage = champ.ancre === "middle" ? champ.largeur_max_mm / 2 : champ.ancre === "end" ? champ.largeur_max_mm : 0;
   return {
@@ -123,4 +128,55 @@ export function transformationsParDefaut(balises: string[]): Record<string, Tran
     else if (balise.length > 1 && balise === balise.toLocaleUpperCase("fr") && /\p{L}/u.test(balise)) resultat[balise] = "majuscules";
   }
   return resultat;
+}
+
+/** Où se trouve le visuel par rapport à la carte : dimensions (mm) et fond perdu inclus ou non. */
+export interface PlacementVisuel {
+  largeur: number;
+  hauteur: number;
+  avecFondPerdu: boolean;
+}
+
+/**
+ * Champ créé à partir d'un texte du visuel (balise détectée, ou texte d'exemple remplacé par une
+ * information) : même position, même police, même taille et même couleur.
+ */
+export function champDepuisTexte(
+  texte: TexteVisuel,
+  contenu: string,
+  visuel: PlacementVisuel,
+  format: Format,
+  existants: Champ[],
+  polices: string[],
+): ChampTexte {
+  const { x, y, echelle } = versCarte({ x: texte.xMm, y: texte.yMm }, visuel, format, visuel.avecFondPerdu);
+  const ancre = texte.ancre ?? "start";
+  const marge = 4;
+  const largeur = ancre === "middle" ? 2 * Math.min(x, format.largeur_mm - x) - 2 * marge : ancre === "end" ? x - marge : format.largeur_mm - x - marge;
+  const taille = Math.round(texte.taillePt * echelle * 10) / 10;
+  return {
+    id: nouvelId(existants),
+    type: "texte",
+    modele: contenu,
+    x_mm: arrondir(x),
+    y_mm: arrondir(y),
+    police: choisirPolice(texte.police, polices),
+    graisse: texte.graisse ?? graisseDuNom(texte.police),
+    taille_pt: taille,
+    couleur: texte.couleur,
+    interlettrage_em: texte.interlettrageEm ?? 0,
+    ancre,
+    largeur_max_mm: arrondir(Math.max(15, largeur)),
+    taille_min_pt: Math.round(taille * 0.75 * 2) / 2,
+    lignes_max: 1,
+  };
+}
+
+/** Cadre d'un texte du visuel sur la carte finie (mm), pour le désigner d'un clic. */
+export function boiteTexteVisuel(texte: TexteVisuel, visuel: PlacementVisuel, format: Format) {
+  const { x, y, echelle } = versCarte({ x: texte.xMm, y: texte.yMm }, visuel, format, visuel.avecFondPerdu);
+  const corps = texte.taillePt * echelle * MM_PAR_POINT;
+  const largeur = Math.max(texte.largeurMm * echelle, corps);
+  const gauche = texte.ancre === "middle" ? x - largeur / 2 : texte.ancre === "end" ? x - largeur : x;
+  return { x: gauche, y: y - corps * 0.8, largeur, hauteur: corps * 1.05 };
 }

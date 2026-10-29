@@ -1,0 +1,195 @@
+//! Fichier de projet « .automat » : une archive ZIP qui contient le modèle (format, champs,
+//! réglages), ses visuels et les correspondances avec les colonnes de la liste. Les données des
+//! agents n'y sont jamais copiées : on rouvre le projet et on lui donne la nouvelle liste.
+
+use std::io::{Read, Write};
+
+use serde::Serialize;
+use serde_json::{Value, json};
+use zip::ZipArchive;
+use zip::write::SimpleFileOptions;
+
+use crate::cartes;
+use crate::fonds::Fonds;
+use crate::moteur::ErreurMoteur;
+
+const APPLICATION: &str = "Automat-Process";
+const VERSION_FORMAT: u64 = 1;
+const ENTREE_PROJET: &str = "projet.json";
+const FACES: [&str; 2] = ["recto", "verso"];
+
+/// Ce que l'interface récupère en ouvrant un projet.
+#[derive(Debug, Serialize)]
+pub struct ProjetOuvert {
+    pub modele: Value,
+    pub correspondances: Value,
+    /// Informations des visuels (dimensions, fond perdu…), avec leurs nouveaux chemins virtuels.
+    pub visuels: Value,
+}
+
+fn erreur(contexte: &str) -> impl Fn(&dyn std::fmt::Display) -> ErreurMoteur + '_ {
+    move |cause| ErreurMoteur::simple(format!("{contexte} : {cause}"))
+}
+
+/// Enregistre le modèle, ses visuels et les correspondances dans `chemin`.
+pub fn enregistrer(
+    chemin: &str,
+    modele: &Value,
+    correspondances: &Value,
+    visuels: &Value,
+    fonds: &Fonds,
+) -> Result<(), ErreurMoteur> {
+    let mut modele = modele.clone();
+    let mut visuels = visuels.clone();
+    let mut fichiers = Vec::new();
+    for face in FACES {
+        let cle = format!("fond_{face}");
+        let Some(virtuel) = modele.get(&cle).and_then(Value::as_str).map(str::to_owned) else {
+            continue;
+        };
+        let extension = virtuel.rsplit('.').next().unwrap_or("bin");
+        let interne = format!("fonds/{face}.{extension}");
+        let octets = fonds
+            .contenu(&virtuel)
+            .or_else(|| cartes::fichier_demo(&virtuel))
+            .ok_or_else(|| ErreurMoteur::simple(format!("Visuel introuvable : {virtuel}")))?;
+        fichiers.push((interne.clone(), octets));
+        modele[&cle] = Value::String(interne.clone());
+        if let Some(visuel) = visuels.get_mut(face).filter(|v| v.is_object()) {
+            visuel["chemin"] = Value::String(interne);
+            visuel["texte"] = Value::Null;
+        }
+    }
+    let projet = json!({
+        "application": APPLICATION,
+        "format": VERSION_FORMAT,
+        "document": "carte",
+        "modele": modele,
+        "correspondances": correspondances,
+        "visuels": visuels,
+    });
+
+    let ecriture = erreur("Impossible d'enregistrer le projet");
+    let fichier = std::fs::File::create(chemin).map_err(|e| ecriture(&e))?;
+    let mut archive = zip::ZipWriter::new(fichier);
+    let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let contenu = serde_json::to_vec_pretty(&projet).map_err(|e| ecriture(&e))?;
+    archive
+        .start_file(ENTREE_PROJET, options)
+        .map_err(|e| ecriture(&e))?;
+    archive.write_all(&contenu).map_err(|e| ecriture(&e))?;
+    for (nom, octets) in fichiers {
+        archive.start_file(nom, options).map_err(|e| ecriture(&e))?;
+        archive.write_all(&octets).map_err(|e| ecriture(&e))?;
+    }
+    archive.finish().map_err(|e| ecriture(&e))?;
+    Ok(())
+}
+
+/// Rouvre un projet : ses visuels reprennent place dans la réserve des fonds.
+pub fn ouvrir(chemin: &str, fonds: &Fonds) -> Result<ProjetOuvert, ErreurMoteur> {
+    let lecture = erreur("Impossible d'ouvrir le projet");
+    let fichier = std::fs::File::open(chemin).map_err(|e| lecture(&e))?;
+    let mut archive = ZipArchive::new(fichier)
+        .map_err(|_| ErreurMoteur::simple("Ce fichier n'est pas un projet Automat-Process."))?;
+    let projet: Value =
+        serde_json::from_reader(archive.by_name(ENTREE_PROJET).map_err(|_| {
+            ErreurMoteur::simple("Ce fichier n'est pas un projet Automat-Process.")
+        })?)
+        .map_err(|e| lecture(&e))?;
+    if projet["application"] != APPLICATION {
+        return Err(ErreurMoteur::simple(
+            "Ce fichier n'est pas un projet Automat-Process.",
+        ));
+    }
+    if projet["format"].as_u64().unwrap_or(0) > VERSION_FORMAT {
+        return Err(ErreurMoteur::simple(
+            "Ce projet a été créé par une version plus récente d'Automat-Process : mettez l'application à jour.",
+        ));
+    }
+
+    let mut modele = projet["modele"].clone();
+    let mut visuels = if projet["visuels"].is_object() {
+        projet["visuels"].clone()
+    } else {
+        json!({})
+    };
+    for face in FACES {
+        let cle = format!("fond_{face}");
+        let Some(interne) = modele.get(&cle).and_then(Value::as_str).map(str::to_owned) else {
+            continue;
+        };
+        let mut octets = Vec::new();
+        archive
+            .by_name(&interne)
+            .map_err(|_| {
+                ErreurMoteur::simple(format!("Visuel manquant dans le projet : {interne}"))
+            })?
+            .read_to_end(&mut octets)
+            .map_err(|e| lecture(&e))?;
+        let extension = interne.rsplit('.').next().unwrap_or_default();
+        let nom = visuels[face]["nomFichier"]
+            .as_str()
+            .unwrap_or(&interne)
+            .to_owned();
+        let fond = fonds.ajouter(octets, extension, nom)?;
+        modele[&cle] = Value::String(fond.chemin.clone());
+        if visuels[face].is_object() {
+            // Analyse fraîche : source d'un SVG, textes d'un PDF (pour les remplacer d'un clic).
+            visuels[face]["chemin"] = Value::String(fond.chemin.clone());
+            visuels[face]["texte"] = serde_json::to_value(&fond.texte).map_err(|e| lecture(&e))?;
+            visuels[face]["textes"] =
+                serde_json::to_value(&fond.textes).map_err(|e| lecture(&e))?;
+        } else {
+            visuels[face] = serde_json::to_value(&fond).map_err(|e| lecture(&e))?;
+        }
+    }
+    Ok(ProjetOuvert {
+        modele,
+        correspondances: projet["correspondances"].clone(),
+        visuels,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn chemin_temporaire(nom: &str) -> String {
+        let dossier = std::env::temp_dir().join("automat-process-tests");
+        std::fs::create_dir_all(&dossier).unwrap();
+        dossier.join(nom).to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn enregistre_et_rouvre_un_projet() {
+        let fonds = Fonds::default();
+        let chemin = chemin_temporaire("demo.automat");
+        let mut modele = cartes::modele_demo();
+        modele["nom"] = "Cartes 2026".into();
+        let correspondances = json!({ "Email": "E-mail" });
+        let visuels =
+            json!({ "recto": { "nomFichier": "recto.svg", "largeurMm": 91.0, "texte": "<svg/>" } });
+        enregistrer(&chemin, &modele, &correspondances, &visuels, &fonds).unwrap();
+
+        let ouvert = ouvrir(&chemin, &fonds).unwrap();
+        assert_eq!(ouvert.modele["nom"], "Cartes 2026");
+        assert_eq!(ouvert.correspondances["Email"], "E-mail");
+        let recto = ouvert.modele["fond_recto"].as_str().unwrap();
+        assert!(recto.starts_with("/fonds/") && recto.ends_with(".svg"));
+        assert_eq!(ouvert.visuels["recto"]["chemin"], recto);
+        assert_eq!(ouvert.visuels["recto"]["largeurMm"], 91.0);
+        // Le verso n'avait pas d'informations enregistrées : elles sont recalculées.
+        assert_eq!(ouvert.visuels["verso"]["genre"], "pdf");
+        assert!(fonds.contenu(recto).is_some());
+        assert_eq!(ouvert.modele["champs"], modele["champs"]);
+    }
+
+    #[test]
+    fn refuse_un_fichier_qui_n_est_pas_un_projet() {
+        let chemin = chemin_temporaire("faux.automat");
+        std::fs::write(&chemin, b"pas une archive").unwrap();
+        let erreur = ouvrir(&chemin, &Fonds::default()).unwrap_err();
+        assert!(erreur.message.contains("n'est pas un projet"));
+    }
+}

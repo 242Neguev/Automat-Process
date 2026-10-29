@@ -85,13 +85,31 @@ impl Document {
 
     /// Image PNG d'une page, sans le fond perdu. `pixels_par_point` = 2 donne 144 dpi.
     pub fn png(&self, index: usize, pixels_par_point: f64) -> Result<Vec<u8>, ErreurMoteur> {
+        self.image(index, pixels_par_point)?
+            .encode_png()
+            .map_err(|erreur| ErreurMoteur::simple(format!("Encodage PNG impossible : {erreur}")))
+    }
+
+    /// Pixels d'une page, sans le fond perdu : (largeur, hauteur, RVBA ligne par ligne).
+    pub fn pixels(
+        &self,
+        index: usize,
+        pixels_par_point: f64,
+    ) -> Result<(u32, u32, Vec<u8>), ErreurMoteur> {
+        let image = self.image(index, pixels_par_point)?;
+        Ok((image.width(), image.height(), image.data().to_vec()))
+    }
+
+    fn image(
+        &self,
+        index: usize,
+        pixels_par_point: f64,
+    ) -> Result<tiny_skia::Pixmap, ErreurMoteur> {
         let options = typst_render::RenderOptions {
             pixel_per_pt: Scalar::new(pixels_par_point),
             render_bleed: false,
         };
-        typst_render::render(self.page(index)?, &options)
-            .encode_png()
-            .map_err(|erreur| ErreurMoteur::simple(format!("Encodage PNG impossible : {erreur}")))
+        Ok(typst_render::render(self.page(index)?, &options))
     }
 
     /// SVG d'une page, sans le fond perdu : net à tous les niveaux de zoom, idéal pour l'aperçu.

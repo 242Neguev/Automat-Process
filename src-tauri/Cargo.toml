@@ -2,7 +2,7 @@
 name = "automat-process"
 version = "0.1.0"
 description = "Automat-Process : documents personnalisés à partir d'un modèle et d'une liste"
-authors = ["Eau sèche"]
+authors = ["Eau sèche <gneguev@gmail.com>"]
 edition = "2024"
 
 [lib]
@@ -21,7 +21,12 @@ serde_json = "1"
 # Déjà utilisées par Typst : lecture des dimensions des PDF et des images importés.
 hayro-syntax = "0.7"
 imagesize = "0.14"
+tiny-skia = "0.12"
 qrcode = { version = "0.14", default-features = false }
+# Lecture et retrait ciblé des balises dans les modèles PDF.
+lopdf = { version = "0.46", default-features = false }
+# Fichiers de projet « .automat » (archives ZIP).
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 typst = "=0.15.1"
 typst-layout = "=0.15.1"
 typst-pdf = "=0.15.1"

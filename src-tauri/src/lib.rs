@@ -2,6 +2,8 @@ mod cartes;
 mod commandes;
 mod fonds;
 pub mod moteur;
+mod pdf_textes;
+mod projet_fichier;
 mod qr;
 
 use std::sync::Arc;
@@ -25,6 +27,10 @@ pub fn run() {
             commandes::remplacer_fond,
             commandes::apercu_carte,
             commandes::exporter_cartes,
+            commandes::couleur_autour,
+            commandes::retirer_texte_pdf,
+            commandes::enregistrer_projet,
+            commandes::ouvrir_projet,
             commandes::lire_liste,
         ])
         .run(tauri::generate_context!())

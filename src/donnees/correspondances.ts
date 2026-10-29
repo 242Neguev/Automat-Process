@@ -48,3 +48,16 @@ export function associer(balises: string[], colonnes: string[]): Correspondances
   essayer((balise, colonne) => groupe(balise).includes(colonne));
   return resultat;
 }
+
+/**
+ * Nouvelle association pour une liste, qui garde les choix déjà faits (à la main, ou enregistrés
+ * avec le projet) tant que leur colonne existe dans la liste.
+ */
+export function fusionner(balises: string[], colonnes: string[], precedentes: Correspondances): Correspondances {
+  const resultat = associer(balises, colonnes);
+  for (const balise of balises) {
+    const choisie = precedentes[balise];
+    if (choisie !== undefined && (choisie === null || colonnes.includes(choisie))) resultat[balise] = choisie;
+  }
+  return resultat;
+}

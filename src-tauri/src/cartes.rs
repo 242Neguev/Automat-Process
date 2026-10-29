@@ -75,6 +75,86 @@ pub fn modele_demo() -> serde_json::Value {
     serde_json::from_slice(MODELE_DEMO).expect("modèle de démonstration valide")
 }
 
+/// Visuel du modèle de démonstration (pour enregistrer un projet bâti à partir de lui).
+pub fn fichier_demo(chemin: &str) -> Option<Bytes> {
+    FICHIERS_DEMO.get(chemin).cloned()
+}
+
+/// Zone de la carte finie, en mm depuis son coin haut-gauche.
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct Zone {
+    pub x_mm: f64,
+    pub y_mm: f64,
+    pub largeur_mm: f64,
+    pub hauteur_mm: f64,
+}
+
+/// Couleur du visuel tout autour d'une zone (médiane d'un anneau de 1 mm), mesurée sur le rendu
+/// du visuel seul : c'est la couleur qui « efface » un texte posé sur un fond uni.
+pub fn couleur_autour(
+    moteur: &Moteur,
+    projet: &Projet,
+    zone: Zone,
+) -> Result<String, ErreurMoteur> {
+    let mut visuel_seul = projet.modele.clone();
+    visuel_seul["champs"] = serde_json::Value::Array(Vec::new());
+    let projet = Projet {
+        modele: visuel_seul,
+        fonds: projet.fonds.clone(),
+    };
+    let agent = DonneesAgent {
+        id: "visuel".into(),
+        valeurs: HashMap::new(),
+        vcard: None,
+    };
+    const PIXELS_PAR_POINT: f64 = 3.0;
+    let entrees = [("mode", "apercu"), ("agent", "0"), ("face", "recto")];
+    let document = compiler(moteur, &projet, std::slice::from_ref(&agent), &entrees)?;
+    let (largeur, hauteur, rvba) = document.pixels(0, PIXELS_PAR_POINT)?;
+    let px_par_mm = PIXELS_PAR_POINT * 72.0 / 25.4;
+    let borne = |mm: f64, max: u32| ((mm * px_par_mm).round().max(0.0) as u32).min(max);
+    let anneau = 1.0;
+    let (x0, y0) = (
+        borne(zone.x_mm - anneau, largeur),
+        borne(zone.y_mm - anneau, hauteur),
+    );
+    let (x1, y1) = (
+        borne(zone.x_mm + zone.largeur_mm + anneau, largeur),
+        borne(zone.y_mm + zone.hauteur_mm + anneau, hauteur),
+    );
+    let (ix0, iy0) = (borne(zone.x_mm, largeur), borne(zone.y_mm, hauteur));
+    let (ix1, iy1) = (
+        borne(zone.x_mm + zone.largeur_mm, largeur),
+        borne(zone.y_mm + zone.hauteur_mm, hauteur),
+    );
+    let mut canaux: [Vec<u8>; 3] = Default::default();
+    for y in y0..y1 {
+        for x in x0..x1 {
+            if (ix0..ix1).contains(&x) && (iy0..iy1).contains(&y) {
+                continue;
+            }
+            let i = ((y * largeur + x) * 4) as usize;
+            for (canal, valeurs) in canaux.iter_mut().enumerate() {
+                valeurs.push(rvba[i + canal]);
+            }
+        }
+    }
+    if canaux[0].is_empty() {
+        return Ok("#ffffff".into());
+    }
+    let mediane = |valeurs: &mut Vec<u8>| {
+        valeurs.sort_unstable();
+        valeurs[valeurs.len() / 2]
+    };
+    let [r, v, b] = &mut canaux;
+    Ok(format!(
+        "#{:02x}{:02x}{:02x}",
+        mediane(r),
+        mediane(v),
+        mediane(b)
+    ))
+}
+
 /// Le modèle décrit par l'interface et les visuels importés auxquels il fait référence.
 pub struct Projet {
     pub modele: serde_json::Value,
@@ -260,6 +340,23 @@ mod tests {
         );
         let verso = apercu(&moteur, &projet, &agents[0], Face::Verso).unwrap();
         assert!(verso.starts_with("<svg"));
+    }
+
+    #[test]
+    fn mesure_la_couleur_autour_d_une_zone() {
+        let moteur = Moteur::nouveau();
+        let projet = projet_demo();
+        // Sous le nom (fond blanc) puis dans le bandeau bleu du bas.
+        let zone = |y_mm| Zone {
+            x_mm: 10.0,
+            y_mm,
+            largeur_mm: 30.0,
+            hauteur_mm: 2.0,
+        };
+        let blanc = couleur_autour(&moteur, &projet, zone(20.0)).unwrap();
+        assert_eq!(blanc, "#ffffff");
+        let bleu = couleur_autour(&moteur, &projet, zone(51.0)).unwrap();
+        assert_eq!(bleu, "#1d3557");
     }
 
     /// Visuel au format fini : posé tel quel, fond perdu complété en prolongeant ses bords.

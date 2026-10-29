@@ -1,9 +1,9 @@
 import { Accordion, ActionIcon, Button, ColorInput, Group, NumberInput, Paper, SegmentedControl, Select, Stack, Text, TextInput, Title, Tooltip } from "@mantine/core";
-import { IconTrash, IconX } from "@tabler/icons-react";
+import { IconColorPicker, IconTrash, IconX } from "@tabler/icons-react";
 import type { Transformation } from "../../donnees/nettoyage";
 import type { ChampsVCard } from "../../donnees/vcard";
 import { changerAncre } from "../../modele/champs";
-import type { Champ, ChampQr, ChampTexte, Couleur, ModeleCarte } from "../../moteur";
+import type { Champ, ChampMasque, ChampQr, ChampTexte, Couleur, ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import { COULEURS } from "../../theme";
 
@@ -27,9 +27,11 @@ interface Props {
   onTransformation: (balise: string, transformation: Transformation | null) => void;
   onSupprimer: (id: string) => void;
   onFermer: () => void;
+  /** Mesure la couleur du visuel autour d'une zone effacée. */
+  onMesurerCouleur: (id: string) => void;
 }
 
-export default function ProprietesChamp({ champ, modele, polices, onChamp, onTransformation, onSupprimer, onFermer }: Props) {
+export default function ProprietesChamp({ champ, modele, polices, onChamp, onTransformation, onSupprimer, onFermer, onMesurerCouleur }: Props) {
   const couleursModele = [...new Set(modele.champs.map((c) => enHexa(c.couleur)))];
   const nuancier = [...new Set([COULEURS.encre, COULEURS.eau, "#000000", "#ffffff", ...couleursModele])];
   const couleur = (
@@ -77,6 +79,30 @@ export default function ProprietesChamp({ champ, modele, polices, onChamp, onTra
               onChange={(e) => onChamp(qr.id, { vcard: { ...qr.vcard, [cle]: e.currentTarget.value } })}
             />
           ))}
+          {supprimer}
+        </Stack>
+      </Paper>
+    );
+  }
+
+  if (champ.type === "masque") {
+    const masque: ChampMasque = champ;
+    const dimension = (cle: "largeur_mm" | "hauteur_mm") => (v: string | number) => typeof v === "number" && v > 0 && onChamp(masque.id, { [cle]: v });
+    return (
+      <Paper withBorder p="md">
+        <Stack gap="sm">
+          {entete(t.titreMasque)}
+          <Text size="xs" c="dimmed">
+            {t.masqueAide}
+          </Text>
+          {couleur}
+          <Button variant="light" leftSection={<IconColorPicker size={16} />} onClick={() => onMesurerCouleur(masque.id)}>
+            {t.mesurerCouleur}
+          </Button>
+          <Group grow>
+            <NumberInput label={t.largeurMasque} min={0.5} step={0.5} decimalScale={1} value={masque.largeur_mm} onChange={dimension("largeur_mm")} />
+            <NumberInput label={t.hauteurMasque} min={0.5} step={0.5} decimalScale={1} value={masque.hauteur_mm} onChange={dimension("hauteur_mm")} />
+          </Group>
           {supprimer}
         </Stack>
       </Paper>

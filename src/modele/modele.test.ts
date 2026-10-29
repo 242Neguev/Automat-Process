@@ -91,6 +91,10 @@ describe("polices et mises en forme par défaut", () => {
     expect(choisirPolice('"Arial-BoldMT", Arial', ["Arial", "Georgia"])).toBe("Arial");
     expect(choisirPolice("Montserrat-SemiBold", ["montserrat"])).toBe("montserrat");
     expect(choisirPolice("Inconnue-Bold", ["Arial"])).toBe("Inconnue");
+    // Noms PostScript des PDF : sans espaces, avec des suffixes techniques.
+    expect(choisirPolice("AvenirNext-DemiBold", ["Avenir", "Avenir Next"])).toBe("Avenir Next");
+    expect(choisirPolice("TimesNewRomanPSMT", ["Times", "Times New Roman"])).toBe("Times New Roman");
+    expect(choisirPolice("OpenSans-Bold", ["Arial"])).toBe("Open Sans");
   });
 
   it("propose MAJUSCULES, Nom Propre et minuscules selon la balise", () => {
