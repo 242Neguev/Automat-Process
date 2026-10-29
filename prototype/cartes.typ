@@ -1,0 +1,144 @@
+// Moteur de rendu du prototype : cartes unitaires ou planches imposées (recto/verso + traits de coupe).
+// typst compile cartes.typ --input mode=cartes|planches --input feuille=A4|SRA3
+#let projet = json("build/projet.json")
+#let agents = json("build/agents.json")
+#let mode = sys.inputs.at("mode", default: "cartes")
+
+#let fp = projet.format.fond_perdu_mm * 1mm
+#let cw = projet.format.largeur_mm * 1mm + 2 * fp
+#let ch = projet.format.hauteur_mm * 1mm + 2 * fp
+#let couleur(c) = if "cmyk" in c { cmyk(..c.cmyk.map(v => v * 1%)) } else { rgb(c.rgb) }
+#let REPERAGE = cmyk(100%, 100%, 100%, 100%)
+
+// Texte variable : ligne de base exacte, réduction auto puis passage sur N lignes si autorisé.
+#let K = 1.2 // interlignage
+#let style(f) = (font: f.police, weight: f.graisse, fill: couleur(f.couleur), tracking: f.interlettrage_em * 1em,
+  top-edge: "baseline", bottom-edge: "baseline")
+#let paragraphe(f, valeur, t) = par(leading: K * t, text(size: t, ..style(f), valeur))
+
+// À appeler dans un `context` : renvoie la taille retenue et le nombre de lignes.
+#let ajuster(f, valeur) = {
+  let W = f.largeur_max_mm * 1mm
+  let tmin = f.taille_min_pt * 1pt
+  let largeur(t) = measure(text(size: t, ..style(f), valeur)).width
+  let nb-lignes(t) = int(calc.round(measure(block(width: W, paragraphe(f, valeur, t))).height / (K * t))) + 1
+  let t = f.taille_pt * 1pt
+  while t > tmin and largeur(t) > W { t -= 0.1pt }
+  let lignes = 1
+  let deborde = largeur(t) > W
+  if deborde and f.lignes_max > 1 {
+    t = f.taille_pt * 1pt
+    while t > tmin and nb-lignes(t) > f.lignes_max { t -= 0.1pt }
+    lignes = nb-lignes(t)
+    deborde = lignes > f.lignes_max
+  }
+  (taille: t, lignes: lignes, deborde: deborde)
+}
+
+#let poser(f, valeur, t, y) = {
+  let W = f.largeur_max_mm * 1mm
+  let x = f.x_mm * 1mm
+  let (dx, al) = if f.ancre == "middle" { (x - W / 2, center) } else if f.ancre == "end" { (x - W, right) } else { (x, left) }
+  place(top + left, dx: dx, dy: y, block(width: W, align(al, paragraphe(f, valeur, t))))
+}
+
+// Les lignes d'une même colonne forment un flux : une ligne vide disparaît et les suivantes
+// remontent ; un texte passé sur 2 lignes pousse les suivants vers le bas.
+#let textes-variables(a) = context {
+  let textes = projet.champs.filter(f => f.type == "texte").sorted(key: f => f.y_mm)
+  let y = none
+  let ecart-en-attente = none
+  let precedent = none
+  for f in textes {
+    let v = a.valeurs.at(f.id)
+    let ecart = if precedent == none { 0mm } else { (f.y_mm - precedent.y_mm) * 1mm }
+    precedent = f
+    if v == "" {
+      if ecart-en-attente == none { ecart-en-attente = ecart }
+      continue
+    }
+    let r = ajuster(f, v)
+    y = if y == none { f.y_mm * 1mm } else { y + calc.max(ecart, if ecart-en-attente == none { 0mm } else { ecart-en-attente }) }
+    ecart-en-attente = none
+    [#metadata((agent: a.id, champ: f.modele, taille: calc.round(r.taille / 1pt, digits: 1), origine: f.taille_pt,
+      lignes: r.lignes, deborde: r.deborde)) <controle>]
+    poser(f, v, r.taille, y)
+    y += (r.lignes - 1) * K * r.taille
+  }
+}
+
+// QR code vectoriel en CMJN : un seul tracé fait des segments de modules sombres.
+#let qr(code, taille, fill) = {
+  let m = taille / code.n
+  box(width: taille, height: taille, curve(fill: fill, stroke: none, ..code.runs.map(((x, y, l)) => (
+    curve.move((x * m, y * m)), curve.line(((x + l) * m, y * m)), curve.line(((x + l) * m, (y + 1) * m)),
+    curve.line((x * m, (y + 1) * m)), curve.close(mode: "straight"),
+  )).flatten()))
+}
+
+#let carte-recto(a) = box(width: cw, height: ch, clip: true, {
+  place(image(projet.fond_recto, width: cw, height: ch))
+  textes-variables(a)
+  for f in projet.champs.filter(f => f.type == "qr") {
+    place(top + left, dx: f.x_mm * 1mm, dy: f.y_mm * 1mm, qr(a.qr, f.taille_mm * 1mm, couleur(f.couleur)))
+  }
+})
+
+#let carte-verso() = box(width: cw, height: ch, clip: true, image(projet.fond_verso, width: cw, height: ch))
+
+#let FEUILLES = (A4: (210mm, 297mm), A3: (297mm, 420mm), SRA3: (320mm, 450mm))
+
+#let planches(feuille, marge: 10mm) = {
+  // Choisit l'orientation de la feuille qui loge le plus de cartes.
+  let options = (feuille, feuille.rev()).map(((l, h)) => {
+    let cols = calc.floor((l - 2 * marge) / cw)
+    let rows = calc.floor((h - 2 * marge) / ch)
+    (l: l, h: h, cols: cols, rows: rows, n: cols * rows)
+  })
+  let p = if options.at(1).n > options.at(0).n { options.at(1) } else { options.at(0) }
+  let ox = (p.l - p.cols * cw) / 2
+  let oy = (p.h - p.rows * ch) / 2
+  let s = 0.25pt + REPERAGE
+  let traits = {
+    for c in range(p.cols) {
+      for x in (ox + c * cw + fp, ox + (c + 1) * cw - fp) {
+        place(line(start: (x, oy - 6mm), end: (x, oy - 1mm), stroke: s))
+        place(line(start: (x, oy + p.rows * ch + 1mm), end: (x, oy + p.rows * ch + 6mm), stroke: s))
+      }
+    }
+    for r in range(p.rows) {
+      for y in (oy + r * ch + fp, oy + (r + 1) * ch - fp) {
+        place(line(start: (ox - 6mm, y), end: (ox - 1mm, y), stroke: s))
+        place(line(start: (ox + p.cols * cw + 1mm, y), end: (ox + p.cols * cw + 6mm, y), stroke: s))
+      }
+    }
+  }
+  let lots = agents.chunks(p.n)
+  for (i, lot) in lots.enumerate() {
+    for face in ("RECTO", "VERSO") {
+      page(width: p.l, height: p.h, margin: 0pt, {
+        for (j, a) in lot.enumerate() {
+          let c = calc.rem(j, p.cols)
+          if face == "VERSO" { c = p.cols - 1 - c } // miroir gauche-droite : feuille retournée autour de l'axe vertical
+          let r = calc.quo(j, p.cols)
+          place(dx: ox + c * cw, dy: oy + r * ch, if face == "RECTO" { carte-recto(a) } else { carte-verso() })
+        }
+        traits
+        place(bottom + center, dy: -3mm, text(font: "Arial", size: 6pt, fill: REPERAGE)[
+          Automat-Process · planche #(i + 1)/#lots.len() · #face · #lot.len() cartes ·
+          #projet.format.largeur_mm × #projet.format.hauteur_mm mm + fond perdu #projet.format.fond_perdu_mm mm
+        ])
+      })
+    }
+  }
+}
+
+#if mode == "cartes" {
+  set page(width: cw, height: ch, margin: 0pt)
+  for (i, a) in agents.enumerate() {
+    if i > 0 { pagebreak() }
+    carte-recto(a)
+  }
+} else {
+  planches(FEUILLES.at(sys.inputs.at("feuille", default: "A4")))
+}

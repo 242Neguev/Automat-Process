@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Calque_1" data-name="Calque 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 257.953 172.913">
+  <defs>
+    <style>
+      .cls-1{fill:#fff;}
+      .cls-2{fill:#1d3557;}
+      .cls-3{fill:#e76f51;}
+      .cls-4{font-size:11px;font-family:Arial-BoldMT, Arial;font-weight:700;fill:#1d3557;}
+      .cls-5{font-size:7.5px;font-family:ArialMT, Arial;fill:#e76f51;}
+      .cls-6{letter-spacing:-.01em;}
+      .cls-7{font-size:7px;font-family:ArialMT, Arial;fill:#333;}
+      .cls-8{font-size:6px;font-family:Arial-BoldMT, Arial;font-weight:700;fill:#fff;letter-spacing:.08em;}
+      .cls-9{font-size:9px;font-family:Arial-BoldMT, Arial;font-weight:700;fill:#1d3557;letter-spacing:.05em;}
+    </style>
+  </defs>
+  <rect class="cls-1" width="257.953" height="172.913"/>
+  <rect class="cls-2" y="138.913" width="257.953" height="34"/>
+  <rect class="cls-3" x="31.2" y="135.913" width="60" height="3"/>
+  <circle class="cls-2" cx="40" cy="37" r="9"/>
+  <circle class="cls-3" cx="44" cy="33" r="4"/>
+  <text class="cls-9" transform="translate(54 40.3)">EXEMPLE SA</text>
+  
+  
+  
+  
+  
+  <text class="cls-8" transform="translate(31.2 156.913)">WWW.EXEMPLE.COM  ·  YAOUNDÉ · DOUALA · ABIDJAN</text>
+</svg>

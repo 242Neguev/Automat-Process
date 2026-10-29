@@ -1,0 +1,10 @@
+{
+  "name": "automat-process-prototype",
+  "private": true,
+  "description": "Prototype de faisabilité (jetable) : modèle graphique + Excel -> cartes de visite",
+  "dependencies": {
+    "@xmldom/xmldom": "0.9.12",
+    "qrcode": "1.5.4",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  }
+}

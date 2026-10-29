@@ -1,0 +1,12 @@
+// Simule un modèle exporté en PDF CMJN par le graphiste, balises comprises.
+#let bleu = cmyk(100%, 80%, 30%, 25%)
+#let orange = cmyk(0%, 65%, 75%, 0%)
+#set page(width: 91mm, height: 61mm, margin: 0pt)
+#set text(font: "Arial")
+#place(bottom, rect(width: 100%, height: 12mm, fill: bleu))
+#place(dx: 11mm, dy: 9mm, stack(dir: ltr, spacing: 2mm, circle(radius: 3mm, fill: bleu), align(horizon, text(weight: "bold", size: 9pt, fill: bleu)[EXEMPLE SA])))
+#place(dx: 11mm, dy: 24mm, text(weight: "bold", size: 11pt, fill: bleu)[{{Prénom}} {{NOM}}])
+#place(dx: 11mm, dy: 29mm, text(size: 7.5pt, fill: orange)[{{Fonction}}])
+#place(dx: 11mm, dy: 35mm, text(size: 7pt, fill: cmyk(0%, 0%, 0%, 80%))[Mob. {{Mobile}}])
+#place(dx: 11mm, dy: 39mm, text(size: 7pt, fill: cmyk(0%, 0%, 0%, 80%))[{{Email}}])
+#place(bottom + left, dx: 11mm, dy: -4.5mm, text(size: 6pt, fill: white, tracking: 0.08em)[WWW.EXEMPLE.COM])

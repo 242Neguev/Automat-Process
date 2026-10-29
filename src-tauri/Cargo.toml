@@ -1,0 +1,38 @@
+[package]
+name = "automat-process"
+version = "0.1.0"
+description = "Automat-Process : documents personnalisés à partir d'un modèle et d'une liste"
+authors = ["Eau sèche"]
+edition = "2024"
+
+[lib]
+# Le suffixe `_lib` évite un conflit de nom avec le binaire sous Windows (rust-lang/cargo#8519).
+name = "automat_process_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+typst = "=0.15.1"
+typst-layout = "=0.15.1"
+typst-pdf = "=0.15.1"
+typst-render = "=0.15.1"
+typst-svg = "=0.15.1"
+typst-kit = { version = "=0.15.1", default-features = false, features = ["scan-fonts", "embedded-fonts", "datetime"] }
+
+# Voir https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+# Typst est lent en mode debug non optimisé : on optimise les dépendances même en développement.
+[profile.dev.package."*"]
+opt-level = 2
