@@ -38,7 +38,9 @@ La première compilation Rust est longue (plusieurs minutes) ; les suivantes son
 
 ### Option 1 : GitHub Actions (rien à installer)
 
-1. Envoyer le projet sur GitHub.
+> ⚠️ **Bloquée pour l'instant** : GitHub ne lance pas les builds du dépôt privé tant que la facturation du compte n'est pas régularisée (*Settings > Billing and plans*). Une fois réglée, il suffit de relancer les exécutions depuis l'onglet **Actions**.
+
+1. Ouvrir le dépôt sur GitHub.
 2. Ouvrir l'onglet **Actions**, choisir **Installateur Windows**, puis **Run workflow**.
 3. À la fin de l'exécution (environ 20 à 30 minutes), télécharger les **artefacts** : l'installateur `.exe` (NSIS) et le `.msi`.
 
@@ -46,25 +48,20 @@ Pour publier une version, il suffit d'envoyer un tag : `git tag v0.1.0 && git pu
 
 > Les vérifications tournent sur Windows à chaque envoi sur `main`. Sur un dépôt **privé**, GitHub décompte les minutes Windows double. Pour les économiser, l'installateur n'est construit qu'à la demande ou sur un tag.
 
-### Option 2 : compiler sur un PC Windows
+### Option 2 : compiler sur un PC Windows (un double-clic)
 
-Installer une seule fois les prérequis (PowerShell) :
+1. **Récupérer le projet** de l'une de ces deux façons :
+   - sur la page GitHub du dépôt, cliquer sur **Code**, puis sur **Download ZIP**, et décompresser l'archive ;
+   - ou, avec Git (`winget install --id Git.Git`), lancer `git clone https://github.com/242Neguev/Automat-Process.git`.
+2. **Double-cliquer** sur `scripts\compiler-windows.cmd`. Lors de la première utilisation, le script installe ce qui manque :
+   - Node.js LTS ;
+   - les outils C++ de Visual Studio (plusieurs Go) ;
+   - Rust.
 
-```powershell
-winget install --id Git.Git
-winget install --id OpenJS.NodeJS.LTS
-winget install --id Rustlang.Rustup
-winget install --id Microsoft.VisualStudio.2022.BuildTools --override "--wait --passive --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
-```
+   Windows peut demander d'autoriser ces installations. Compter de 30 à 60 minutes la première fois, quelques minutes ensuite.
+3. À la fin, le dossier contenant l'installateur `.exe` s'ouvre tout seul (`src-tauri\target\release\bundle\nsis\`).
 
-Puis, dans le dossier du projet :
-
-```powershell
-npm ci
-npm run tauri build
-```
-
-Les installateurs sont produits dans `src-tauri\target\release\bundle\nsis\` (`.exe`) et `src-tauri\target\release\bundle\msi\` (`.msi`).
+Pour produire aussi un `.msi`, lancer `scripts\compiler-windows.cmd -Msi` dans un terminal.
 
 > L'exécutable n'est pas encore signé : Windows affiche l'avertissement « Windows a protégé votre ordinateur ». Il faut cliquer sur **Informations complémentaires**, puis sur **Exécuter quand même**. La signature de code est prévue avant la commercialisation.
 
@@ -83,6 +80,7 @@ src-tauri/               Cœur Rust (Tauri)
   ressources/demo/       Données et fonds de la démonstration
 docs/                    Analyse de faisabilité, images, PDF d'exemple
 exemples-reels/          Vrais fichiers de test (contenu exclu de Git, voir son README)
+scripts/                 compiler-windows.cmd : compile l'installateur sur un PC Windows
 prototype/               Prototype de validation (jetable)
 .github/workflows/       Vérifications et installateur Windows
 ```
