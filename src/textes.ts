@@ -423,12 +423,13 @@ export const textes = {
     ouvrir: "Ouvrir un projet…",
     enregistrer: "Enregistrer le projet…",
     filtre: "Projet Automat-Process",
-    nomParDefaut: { carte: "Cartes de visite", signature: "Signatures e-mail" },
+    nomParDefaut: { carte: "Cartes de visite", signature: "Signatures e-mail", word: "Courriers" },
     enregistre: "Projet enregistré",
     ouvert: "Projet ouvert",
     autreModule: {
       carte: "Ce projet contient des cartes de visite : ouvrez-le depuis le module « Cartes de visite ».",
       signature: "Ce projet contient des signatures e-mail : ouvrez-le depuis le module « Signatures e-mail ».",
+      word: "Ce projet contient des courriers Word : ouvrez-le depuis le module « Documents Word ».",
     },
   },
   liste: {

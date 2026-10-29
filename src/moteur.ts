@@ -155,7 +155,7 @@ export interface Zone {
 }
 
 /** Sorte de document d'un projet : chacune s'ouvre dans son module. */
-export type Document = "carte" | "signature";
+export type Document = "carte" | "signature" | "word";
 
 export interface ProjetOuvert {
   document: Document;

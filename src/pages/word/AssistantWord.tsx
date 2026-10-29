@@ -39,6 +39,7 @@ import {
 import { textes } from "../../textes";
 import { apercuTexte, fusionnerCorps, preparerModele, remplirModele, type ModelePrepare } from "../../word/docx";
 import EtapeListe from "../commun/EtapeListe";
+import { BoutonsProjet, choisirProjet, enregistrerSous, projetOuvert } from "../commun/projet";
 import { signalerErreur } from "../commun/signalerErreur";
 import { useListe } from "../commun/useListe";
 import ApercuFidele from "./ApercuFidele";
@@ -53,6 +54,15 @@ interface ModeleWord extends ModelePrepare {
   chemin: string;
   nomFichier: string;
   transformations: Record<string, Transformation>;
+}
+
+/** Ce qu'un projet garde d'un courrier Word (le modèle lui-même voyage dans le projet). */
+interface ProjetWord {
+  chemin: string;
+  nomFichier: string;
+  transformations: Record<string, Transformation>;
+  nommage: string;
+  sorties: { parPersonne: boolean; fusion: boolean; pdfParPersonne: boolean; pdfFusion: boolean };
 }
 
 /** Assistant « Documents Word » : Modèle → Liste → Vérification → Destination. */
@@ -88,6 +98,40 @@ export default function AssistantWord() {
     try {
       const prepare = preparerModele(await lireModeleWord(chemin));
       setModele({ ...prepare, chemin, nomFichier: chemin.split(/[\\/]/).pop() ?? chemin, transformations: transformationsParDefaut(prepare.balises) });
+    } catch (e) {
+      signalerErreur(e);
+    }
+  }
+
+  function enregistrer() {
+    if (!modele) return;
+    const projet: ProjetWord = {
+      chemin: modele.chemin,
+      nomFichier: modele.nomFichier,
+      transformations: modele.transformations,
+      nommage,
+      sorties: { parPersonne, fusion, pdfParPersonne, pdfFusion },
+    };
+    return enregistrerSous("word", modele.nomFichier.replace(/\.(docx|dotx)$/i, ""), projet, correspondances);
+  }
+
+  async function ouvrir() {
+    const projet = await choisirProjet("word");
+    if (!projet) return;
+    try {
+      const enregistre = projet.modele as ProjetWord;
+      const prepare = preparerModele(await lireModeleWord(enregistre.chemin));
+      setModele({ ...prepare, chemin: enregistre.chemin, nomFichier: enregistre.nomFichier, transformations: enregistre.transformations ?? {} });
+      if (enregistre.nommage) setNommage(enregistre.nommage);
+      if (enregistre.sorties) {
+        setParPersonne(enregistre.sorties.parPersonne);
+        setFusion(enregistre.sorties.fusion);
+        setPdfParPersonne(enregistre.sorties.pdfParPersonne);
+        setPdfFusion(enregistre.sorties.pdfFusion);
+      }
+      donnees.restaurer(projet.correspondances, prepare.balises);
+      setEtape(0);
+      projetOuvert(enregistre.nomFichier);
     } catch (e) {
       signalerErreur(e);
     }
@@ -161,10 +205,13 @@ export default function AssistantWord() {
 
   return (
     <Stack gap="lg" maw={1240}>
-      <div>
-        <Title order={2}>{t.titre}</Title>
-        <Text c="dimmed">{t.sousTitre}</Text>
-      </div>
+      <Group justify="space-between" align="flex-start" wrap="nowrap">
+        <div>
+          <Title order={2}>{t.titre}</Title>
+          <Text c="dimmed">{t.sousTitre}</Text>
+        </div>
+        <BoutonsProjet onOuvrir={ouvrir} onEnregistrer={enregistrer} enregistrable={Boolean(modele)} />
+      </Group>
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
         <Stepper.Step label={t.etapes.modele.titre} description={t.etapes.modele.description}>

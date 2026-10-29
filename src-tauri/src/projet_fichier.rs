@@ -9,7 +9,12 @@ use serde_json::{Value, json};
 use zip::ZipArchive;
 use zip::write::SimpleFileOptions;
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use typst::foundations::Bytes;
+
 use crate::cartes;
+use crate::fichiers::{self, Nature};
 use crate::fonds::Fonds;
 use crate::moteur::ErreurMoteur;
 
@@ -18,7 +23,7 @@ const VERSION_FORMAT: u64 = 1;
 const ENTREE_PROJET: &str = "projet.json";
 const FACES: [&str; 2] = ["recto", "verso"];
 /// Sortes de documents : chacune s'ouvre dans son module.
-const DOCUMENTS: [&str; 2] = ["carte", "signature"];
+const DOCUMENTS: [&str; 3] = ["carte", "signature", "word"];
 
 /// Ce que l'interface récupère en ouvrant un projet.
 #[derive(Debug, Serialize)]
@@ -70,6 +75,21 @@ pub fn enregistrer(
             visuel["texte"] = Value::Null;
         }
     }
+    // Courriers Word : le modèle (.docx ou .dotx) voyage avec le projet.
+    if document == "word" {
+        let source = modele["chemin"].as_str().unwrap_or_default().to_owned();
+        let extension = if source.to_lowercase().ends_with(".dotx") {
+            "dotx"
+        } else {
+            "docx"
+        };
+        let interne = format!("modele.{extension}");
+        fichiers.push((
+            interne.clone(),
+            Bytes::new(fichiers::lire(&source, Nature::Word)?),
+        ));
+        modele["chemin"] = Value::String(interne);
+    }
     let projet = json!({
         "application": APPLICATION,
         "format": VERSION_FORMAT,
@@ -94,6 +114,18 @@ pub fn enregistrer(
     }
     archive.finish().map_err(|e| ecriture(&e))?;
     Ok(())
+}
+
+/// Dossier de travail neuf pour un projet rouvert (dans le dossier temporaire du système).
+fn dossier_de_travail() -> std::io::Result<std::path::PathBuf> {
+    static COMPTEUR: AtomicUsize = AtomicUsize::new(0);
+    let numero = COMPTEUR.fetch_add(1, Ordering::Relaxed);
+    let dossier = std::env::temp_dir().join(format!(
+        "automat-process-{}-projet-{numero}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&dossier)?;
+    Ok(dossier)
 }
 
 /// Rouvre un projet : ses visuels reprennent place dans la réserve des fonds.
@@ -153,6 +185,23 @@ pub fn ouvrir(chemin: &str, fonds: &Fonds) -> Result<ProjetOuvert, ErreurMoteur>
         } else {
             visuels[face] = serde_json::to_value(&fond).map_err(|e| lecture(&e))?;
         }
+    }
+    // Courriers Word : le modèle est extrait dans un dossier de travail, d'où il sera relu.
+    if projet["document"] == "word" {
+        let interne = modele["chemin"]
+            .as_str()
+            .unwrap_or("modele.docx")
+            .to_owned();
+        let mut octets = Vec::new();
+        archive
+            .by_name(&interne)
+            .map_err(|_| ErreurMoteur::simple("Le modèle Word manque dans ce projet."))?
+            .read_to_end(&mut octets)
+            .map_err(|e| lecture(&e))?;
+        let dossier = dossier_de_travail().map_err(|e| lecture(&e))?;
+        let extrait = dossier.join(&interne);
+        std::fs::write(&extrait, octets).map_err(|e| lecture(&e))?;
+        modele["chemin"] = Value::String(extrait.to_string_lossy().into_owned());
     }
     Ok(ProjetOuvert {
         // Les premiers projets ne contenaient que des cartes.
@@ -224,6 +273,41 @@ mod tests {
         assert_eq!(ouvert.document, "signature");
         assert_eq!(ouvert.modele, modele);
         assert!(enregistrer(&chemin, "affiche", &modele, &json!({}), &json!({}), &fonds).is_err());
+    }
+
+    #[test]
+    fn enregistre_un_courrier_word_avec_son_modele() {
+        let fonds = Fonds::default();
+        let docx = chemin_temporaire("convocation.docx");
+        let mut octets = Vec::new();
+        {
+            let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut octets));
+            zip.start_file("word/document.xml", SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(b"<w:document>{{NOM}}</w:document>").unwrap();
+            zip.finish().unwrap();
+        }
+        std::fs::write(&docx, &octets).unwrap();
+        let chemin = chemin_temporaire("courrier.automat");
+        let modele =
+            json!({ "chemin": docx, "nomFichier": "convocation.docx", "nommage": "{{NOM}}" });
+        enregistrer(
+            &chemin,
+            "word",
+            &modele,
+            &json!({ "NOM": "Nom" }),
+            &json!({}),
+            &fonds,
+        )
+        .unwrap();
+        std::fs::remove_file(&docx).unwrap(); // le projet se suffit à lui-même
+
+        let ouvert = ouvrir(&chemin, &fonds).unwrap();
+        assert_eq!(ouvert.document, "word");
+        assert_eq!(ouvert.modele["nommage"], "{{NOM}}");
+        let extrait = ouvert.modele["chemin"].as_str().unwrap();
+        assert!(extrait.ends_with("modele.docx"));
+        assert_eq!(std::fs::read(extrait).unwrap(), octets);
     }
 
     #[test]
