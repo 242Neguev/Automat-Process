@@ -7,15 +7,19 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 - 📄 [Analyse de faisabilité, décisions et feuille de route](docs/analyse-faisabilite.md)
 - 🧪 [Prototype de validation](prototype/README.md)
 
-## État actuel : phase 0 (socle)
+## État actuel : phase 1 en cours
 
 | Fonction | État |
 |---|---|
-| Application Tauri 2 + React + TypeScript (interface Mantine, en français) | ✅ |
-| Moteur de rendu **Typst** intégré au cœur Rust : PDF vectoriel, CMJN, polices incorporées, zone de coupe (TrimBox), PNG, SVG | ✅ |
-| Carte de démonstration : aperçu agent par agent (recto/verso), export PDF en cartes unitaires ou en planches A4/A3/SRA3 avec traits de coupe | ✅ |
-| Vérifications automatiques sous Windows et construction de l'installateur `.exe`/`.msi` par GitHub Actions | ✅ |
-| Import de vos modèles et de vos fichiers Excel, placement manuel des textes, signatures e-mail | Phase 1 (MVP) |
+| **Socle (phase 0)** : application Tauri 2 + React + TypeScript (interface Mantine aux couleurs d'Eau sèche) ; moteur **Typst** intégré (PDF vectoriel, CMJN, polices incorporées, zone de coupe, PNG, SVG) ; vérifications et installateur Windows par GitHub Actions | ✅ |
+| **Assistant « Cartes de visite »** en 4 étapes : Modèle, Liste, Vérification, Destination | ✅ |
+| **Import des listes** Excel, CSV ou ODS : valeurs telles qu'Excel les affiche, en-tête trouvé sous un éventuel titre, CSV français (point-virgule, accents) | ✅ |
+| **Correspondances automatiques** entre balises et colonnes, y compris les synonymes (Courriel, GSM, Poste…), modifiables à la main | ✅ |
+| **Nettoyage** (espaces, MAJUSCULES, Nom Propre, minuscules), lignes vides masquées, **QR code vCard** pour chaque agent, écriture de droite à gauche (arabe) | ✅ |
+| Export PDF : cartes unitaires, ou planches A4/A3/SRA3 recto/verso avec traits de coupe | ✅ |
+| Import de vos propres modèles (balises dans un PDF ou un SVG, placement manuel sur une image) | Phase 1, incrément 2 |
+| Contrôle avant impression, mosaïque, badges PVC | Phase 1, incrément 3 |
+| Signatures e-mail | Phase 1, incrément 4 |
 
 ## Développer (Mac ou Windows)
 

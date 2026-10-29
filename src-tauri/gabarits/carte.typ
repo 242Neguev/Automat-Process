@@ -84,8 +84,11 @@
 #let carte-recto(a) = box(width: cw, height: ch, clip: true, {
   place(image(projet.fond_recto, width: cw, height: ch))
   textes-variables(a)
-  for f in projet.champs.filter(f => f.type == "qr") {
-    place(top + left, dx: fp + f.x_mm * 1mm, dy: fp + f.y_mm * 1mm, qr(a.qr, f.taille_mm * 1mm, couleur(f.couleur)))
+  // Pas de QR code quand l'agent n'a pas de vCard (aucune donnée de contact).
+  if a.at("qr", default: none) != none {
+    for f in projet.champs.filter(f => f.type == "qr") {
+      place(top + left, dx: fp + f.x_mm * 1mm, dy: fp + f.y_mm * 1mm, qr(a.qr, f.taille_mm * 1mm, couleur(f.couleur)))
+    }
   }
 })
 #let carte-verso() = box(width: cw, height: ch, clip: true, image(projet.fond_verso, width: cw, height: ch))

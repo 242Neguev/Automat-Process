@@ -1,6 +1,7 @@
+mod cartes;
 mod commandes;
-mod demo;
 pub mod moteur;
+mod qr;
 
 use commandes::EtatMoteur;
 
@@ -13,8 +14,10 @@ pub fn run() {
         .manage(etat)
         .invoke_handler(tauri::generate_handler![
             commandes::infos_moteur,
-            commandes::apercu_demo,
-            commandes::exporter_demo,
+            commandes::modele_demo,
+            commandes::apercu_carte,
+            commandes::exporter_cartes,
+            commandes::lire_liste,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Automat-Process");

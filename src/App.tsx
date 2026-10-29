@@ -3,7 +3,7 @@ import { ActionIcon, AppShell, Badge, Group, Loader, NavLink, Stack, Text, Theme
 import { useDisclosure } from "@mantine/hooks";
 import { IconCpu, IconDeviceMobile, IconFiles, IconFileTypeDocx, IconId, IconInfoCircle, IconMail } from "@tabler/icons-react";
 import APropos from "./APropos";
-import DemoMoteur from "./pages/DemoMoteur";
+import AssistantCartes from "./pages/cartes/AssistantCartes";
 import { infosMoteur, type InfosMoteur } from "./moteur";
 import { textes } from "./textes";
 import { COULEURS } from "./theme";
@@ -78,7 +78,7 @@ export default function App() {
       </AppShell.Navbar>
 
       <AppShell.Main>
-        <DemoMoteur nbAgents={infos?.nbAgentsDemo ?? 0} />
+        <AssistantCartes />
       </AppShell.Main>
 
       <APropos ouvert={aProposOuvert} fermer={aPropos.close} versionTypst={infos?.versionTypst} />

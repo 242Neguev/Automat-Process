@@ -1,120 +1,20 @@
 {
-  "format": {
-    "largeur_mm": 85,
-    "hauteur_mm": 55,
-    "fond_perdu_mm": 3
-  },
+  "nom": "Carte de démonstration (EXEMPLE SA)",
+  "format": { "largeur_mm": 85, "hauteur_mm": 55, "fond_perdu_mm": 3 },
   "fond_recto": "/demo/recto-fond.svg",
   "fond_verso": "/demo/verso.pdf",
+  "transformations": { "Prénom": "nom-propre", "NOM": "majuscules", "Email": "minuscules" },
   "champs": [
+    { "id": "c1", "type": "texte", "modele": "{{Prénom}} {{NOM}}", "x_mm": 8.01, "y_mm": 23.81, "police": "Arial", "graisse": 700, "taille_pt": 11, "couleur": { "cmyk": [100, 80, 30, 25] }, "interlettrage_em": 0, "ancre": "start", "largeur_max_mm": 52, "taille_min_pt": 8, "lignes_max": 1 },
+    { "id": "c2", "type": "texte", "modele": "{{Fonction}}", "x_mm": 8.01, "y_mm": 28.04, "police": "Arial", "graisse": 400, "taille_pt": 7.5, "couleur": { "rgb": "#e76f51" }, "interlettrage_em": 0, "ancre": "start", "largeur_max_mm": 52, "taille_min_pt": 6, "lignes_max": 2 },
+    { "id": "c3", "type": "texte", "modele": "Mob. {{Mobile}}", "x_mm": 8.01, "y_mm": 33.69, "police": "Arial", "graisse": 400, "taille_pt": 7, "couleur": { "rgb": "#333" }, "interlettrage_em": 0, "ancre": "start", "largeur_max_mm": 52, "taille_min_pt": 5.25, "lignes_max": 1 },
+    { "id": "c4", "type": "texte", "modele": "Tél. {{Fixe}}", "x_mm": 8.01, "y_mm": 36.86, "police": "Arial", "graisse": 400, "taille_pt": 7, "couleur": { "rgb": "#333" }, "interlettrage_em": 0, "ancre": "start", "largeur_max_mm": 52, "taille_min_pt": 5.25, "lignes_max": 1 },
+    { "id": "c5", "type": "texte", "modele": "{{Email}}", "x_mm": 8.01, "y_mm": 40.04, "police": "Arial", "graisse": 400, "taille_pt": 7, "couleur": { "rgb": "#333" }, "interlettrage_em": 0, "ancre": "start", "largeur_max_mm": 52, "taille_min_pt": 5.5, "lignes_max": 1 },
     {
-      "id": "c1",
-      "type": "texte",
-      "modele": "{{Prénom}} {{NOM}}",
-      "x_mm": 8.01,
-      "y_mm": 23.81,
-      "police": "Arial",
-      "graisse": 700,
-      "taille_pt": 11,
-      "couleur": {
-        "cmyk": [
-          100,
-          80,
-          30,
-          25
-        ]
-      },
-      "interlettrage_em": 0,
-      "ancre": "start",
-      "largeur_max_mm": 52,
-      "taille_min_pt": 8,
-      "lignes_max": 1
-    },
-    {
-      "id": "c2",
-      "type": "texte",
-      "modele": "{{Fonction}}",
-      "x_mm": 8.01,
-      "y_mm": 28.04,
-      "police": "Arial",
-      "graisse": 400,
-      "taille_pt": 7.5,
-      "couleur": {
-        "rgb": "#e76f51"
-      },
-      "interlettrage_em": 0,
-      "ancre": "start",
-      "largeur_max_mm": 52,
-      "taille_min_pt": 6,
-      "lignes_max": 2
-    },
-    {
-      "id": "c3",
-      "type": "texte",
-      "modele": "Mob. {{Mobile}}",
-      "x_mm": 8.01,
-      "y_mm": 33.69,
-      "police": "Arial",
-      "graisse": 400,
-      "taille_pt": 7,
-      "couleur": {
-        "rgb": "#333"
-      },
-      "interlettrage_em": 0,
-      "ancre": "start",
-      "largeur_max_mm": 52,
-      "taille_min_pt": 5.25,
-      "lignes_max": 1
-    },
-    {
-      "id": "c4",
-      "type": "texte",
-      "modele": "Tél. {{Fixe}}",
-      "x_mm": 8.01,
-      "y_mm": 36.86,
-      "police": "Arial",
-      "graisse": 400,
-      "taille_pt": 7,
-      "couleur": {
-        "rgb": "#333"
-      },
-      "interlettrage_em": 0,
-      "ancre": "start",
-      "largeur_max_mm": 52,
-      "taille_min_pt": 5.25,
-      "lignes_max": 1
-    },
-    {
-      "id": "c5",
-      "type": "texte",
-      "modele": "{{Email}}",
-      "x_mm": 8.01,
-      "y_mm": 40.04,
-      "police": "Arial",
-      "graisse": 400,
-      "taille_pt": 7,
-      "couleur": {
-        "rgb": "#333"
-      },
-      "interlettrage_em": 0,
-      "ancre": "start",
-      "largeur_max_mm": 52,
-      "taille_min_pt": 5.5,
-      "lignes_max": 1
-    },
-    {
-      "id": "qr",
-      "type": "qr",
-      "x_mm": 63,
-      "y_mm": 12.5,
-      "taille_mm": 19,
-      "couleur": {
-        "cmyk": [
-          100,
-          80,
-          30,
-          25
-        ]
+      "id": "qr", "type": "qr", "x_mm": 63, "y_mm": 12.5, "taille_mm": 19, "couleur": { "cmyk": [100, 80, 30, 25] },
+      "vcard": {
+        "prenom": "{{Prénom}}", "nom": "{{NOM}}", "fonction": "{{Fonction}}", "organisation": "EXEMPLE SA",
+        "mobile": "{{Mobile}}", "fixe": "{{Fixe}}", "email": "{{Email}}", "site": "https://www.exemple.com"
       }
     }
   ]

@@ -30,6 +30,8 @@ jobs:
       - run: npm ci
       - name: Interface (TypeScript + Vite)
         run: npm run build
+      - name: Interface (tests)
+        run: npm test
       - name: Cœur (mise en forme)
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - name: Cœur (lints Clippy)
