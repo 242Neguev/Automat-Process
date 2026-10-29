@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChampTexte, DonneesAgent, MesureTexte, ModeleCarte } from "../moteur";
-import { analyser, casLesPlusLongs, compter, libelleChamp, regrouper } from "./cartes";
+import { analyser, cartesDuBat, casLesPlusLongs, compter, libelleChamp, regrouper } from "./cartes";
 
 const texte = (id: string, modele: string, y_mm: number): ChampTexte => ({
   id,
@@ -102,5 +102,13 @@ describe("rapport de contrôle des cartes", () => {
       { champ: "c2", libelle: "Fonction", agent: "a2" },
       { champ: "c3", libelle: "Email", agent: "a1" },
     ]);
+  });
+
+  it("choisit les cartes du bon à tirer", () => {
+    const ids = (choix: "cas" | "premiere" | "toutes", m = mesures) => cartesDuBat(choix, modele, agents, m).map((a) => a.id);
+    expect(ids("cas")).toEqual(["a1", "a2"]); // la première, et a2 qui a les cas les plus longs
+    expect(ids("premiere")).toEqual(["a1"]);
+    expect(ids("toutes")).toEqual(["a1", "a2", "a3"]);
+    expect(ids("cas", null as never)).toEqual(["a1"]); // sans contrôle : la première seulement
   });
 });

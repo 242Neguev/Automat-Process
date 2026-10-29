@@ -44,6 +44,9 @@ pub struct DonneesAgent {
     pub vcard: Option<String>,
     #[serde(default)]
     pub liens: HashMap<String, String>,
+    /// Nom de l'agent, pour le bon à tirer.
+    #[serde(default)]
+    pub libelle: Option<String>,
 }
 
 /// Un agent tel que le lit le gabarit dans /agents.json.
@@ -53,6 +56,7 @@ struct AgentGabarit<'a> {
     valeurs: &'a HashMap<String, String>,
     qr: Option<CodeQr>,
     liens: &'a HashMap<String, String>,
+    libelle: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -132,6 +136,7 @@ pub fn couleur_autour(
         valeurs: HashMap::new(),
         vcard: None,
         liens: HashMap::new(),
+        libelle: None,
     };
     const PIXELS_PAR_POINT: f64 = 3.0;
     let entrees = [("mode", "apercu"), ("agent", "0"), ("face", "recto")];
@@ -366,6 +371,21 @@ pub fn exporter_numerique(
     fichiers::ecrire(dossier, sous_dossier, &fichiers)
 }
 
+/// Bon à tirer : une page A4 par carte, à faire valider avant l'impression.
+pub fn bon_a_tirer(
+    moteur: &Moteur,
+    projet: &Projet,
+    agents: &[DonneesAgent],
+    titre: &str,
+    date: &str,
+) -> Result<Vec<u8>, ErreurMoteur> {
+    if agents.is_empty() {
+        return Err(ErreurMoteur::simple("Aucune carte à faire valider."));
+    }
+    let entrees = [("mode", "bat"), ("titre", titre), ("date", date)];
+    compiler(moteur, projet, agents, &entrees)?.pdf()
+}
+
 /// Impression directe des cartes sur une imprimante Windows : recto, et verso au dos si demandé.
 pub fn imprimer(
     moteur: &Moteur,
@@ -415,6 +435,7 @@ fn compiler(
                 valeurs: &agent.valeurs,
                 qr: vcard.map(qr::encoder).transpose()?,
                 liens: &agent.liens,
+                libelle: agent.libelle.as_deref(),
             })
         })
         .collect::<Result<Vec<_>, ErreurMoteur>>()?;
@@ -450,6 +471,7 @@ mod tests {
             vcard: avec_qr
                 .then(|| "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Aïssatou DIALLO\r\nEND:VCARD".into()),
             liens: HashMap::new(),
+            libelle: None,
         }
     }
 
@@ -639,6 +661,27 @@ mod tests {
         // Lien cliquable, et pas de zone de coupe : c'est une carte pour l'écran.
         assert!(contient(b"mailto:a.diallo@exemple.com"));
         assert!(!contient(b"/TrimBox"));
+    }
+
+    #[test]
+    fn bon_a_tirer_une_page_par_carte() {
+        let moteur = Moteur::nouveau();
+        let mut premiere = agent(0, true);
+        premiere.libelle = Some("Aïssatou DIALLO".into());
+        let agents = [premiere, agent(1, true)];
+        let pdf = bon_a_tirer(
+            &moteur,
+            &projet_demo(),
+            &agents,
+            "Cartes 2026",
+            "29 octobre 2026",
+        )
+        .unwrap();
+        let document = lopdf::Document::load_mem(&pdf).unwrap();
+        assert_eq!(document.get_pages().len(), 2);
+        let texte = document.extract_text(&[1]).unwrap();
+        assert!(texte.contains("Aïssatou DIALLO") && texte.contains("Cartes 2026"));
+        assert!(bon_a_tirer(&moteur, &projet_demo(), &[], "", "").is_err());
     }
 
     #[test]

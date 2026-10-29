@@ -172,6 +172,30 @@ pub async fn vignettes_cartes(
     .await
 }
 
+/// Bon à tirer des cartes données, enregistré dans `chemin`.
+#[tauri::command]
+pub async fn exporter_bat(
+    etat: State<'_, EtatMoteur>,
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+    agents: Vec<DonneesAgent>,
+    titre: String,
+    date: String,
+    chemin: String,
+) -> Result<(), ErreurMoteur> {
+    let projet = Projet {
+        modele,
+        fonds: fonds.fichiers(),
+    };
+    executer(&etat, move |moteur| {
+        let pdf = cartes::bon_a_tirer(moteur, &projet, &agents, &titre, &date)?;
+        std::fs::write(&chemin, pdf).map_err(|erreur| {
+            ErreurMoteur::simple(format!("Impossible d'enregistrer « {chemin} » : {erreur}"))
+        })
+    })
+    .await
+}
+
 /// Cartes numériques (images ou PDF cliquables, fiches contact) dans un nouveau dossier ; renvoie son chemin.
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]

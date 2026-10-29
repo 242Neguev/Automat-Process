@@ -1,8 +1,8 @@
 // Gabarit « carte » : aperçu d'une carte, cartes unitaires avec fond perdu, planches imposées, vignettes
 // de la mosaïque, ou mesures de contrôle seules.
 // Fichiers virtuels : /projet.json (format, fonds, champs) et /agents.json (valeurs de chaque agent).
-// Entrées (sys.inputs) : mode = apercu | cartes | planches | mosaique | ecran | controle ; agent et face
-// (aperçu) ; feuille = A4 | A3 | SRA3.
+// Entrées (sys.inputs) : mode = apercu | cartes | planches | mosaique | ecran | controle | bat ; agent et
+// face (aperçu) ; feuille = A4 | A3 | SRA3 ; titre et date (BAT).
 // Les positions des champs sont en mm depuis le coin haut-gauche de la carte finie (hors fond perdu).
 #let projet = json("/projet.json")
 #let agents = json("/agents.json")
@@ -162,6 +162,52 @@
 
 #let FEUILLES = (A4: (210mm, 297mm), A3: (297mm, 420mm), SRA3: (320mm, 450mm))
 
+// Bon à tirer : une page A4 par carte à faire valider. Recto et verso en taille réelle (fond perdu
+// visible, coupe en pointillés), recto agrandi pour la relecture, filigrane et encadré de validation.
+#let ROUGE-BAT = rgb("#b42318")
+#let avec-coupe(carte, legende) = stack(spacing: 2mm,
+  box(width: cw, height: ch, {
+    place(carte)
+    place(dx: fp, dy: fp, rect(width: largeur, height: hauteur, stroke: (paint: ROUGE-BAT, thickness: 0.4pt, dash: "dashed")))
+  }),
+  text(8pt, fill: luma(90))[#legende])
+#let case = box(width: 3.2mm, height: 3.2mm, stroke: 0.5pt, baseline: 0.5mm)
+#let bat() = {
+  let filigrane = place(center + horizon, rotate(-32deg,
+    text(86pt, weight: "bold", fill: ROUGE-BAT.transparentize(86%))[BON À TIRER]))
+  set text(font: ("Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"), size: 9pt)
+  for a in agents {
+    page(paper: "a4", margin: 14mm, foreground: filigrane, {
+      grid(columns: (1fr, auto), align: (left, right),
+        text(15pt, weight: "bold", fill: ROUGE-BAT)[BON À TIRER],
+        text(9pt)[#entree("date", "")])
+      v(1mm)
+      text(11pt, weight: "bold")[#entree("titre", "")]
+      linebreak()
+      [Carte de #a.at("libelle", default: a.id) · format #projet.format.largeur_mm × #projet.format.hauteur_mm mm · fond perdu #projet.format.fond_perdu_mm mm (pointillés : ligne de coupe)]
+      v(6mm)
+      grid(columns: 2, column-gutter: 8mm,
+        avec-coupe(carte-recto(a), [Recto, taille réelle]),
+        if avec-verso { avec-coupe(carte-verso(), [Verso, taille réelle]) })
+      v(6mm)
+      // Agrandi jusqu'à 200 %, dans la place laissée par la page (largeur utile, environ 11 cm de haut).
+      let echelle = calc.min(2.0, 182mm / cw, 110mm / ch)
+      stack(spacing: 2mm, scale(echelle * 100%, reflow: true, carte-recto(a)),
+        text(8pt, fill: luma(90))[Recto agrandi à #calc.round(echelle * 100) %, pour la relecture])
+      v(1fr)
+      block(width: 100%, stroke: 0.5pt + luma(120), inset: 4mm, radius: 2mm, {
+        text(10pt, weight: "bold")[Validation]
+        v(2mm)
+        [#case Bon pour accord #h(12mm) #case Bon pour accord après corrections #h(12mm) #case Refusé]
+        v(5mm)
+        [Corrections : #box(width: 1fr, repeat[.])]
+        v(5mm)
+        [Date : #box(width: 45mm, repeat[.]) #h(10mm) Nom et signature : #box(width: 1fr, repeat[.])]
+      })
+    })
+  }
+}
+
 #let planches(feuille, marge: 10mm) = {
   // Orientation de la feuille qui loge le plus de cartes.
   let options = (feuille, feuille.rev()).map(((l, h)) => {
@@ -226,6 +272,8 @@
     ecran(carte-recto(a))
     if avec-verso and entree("verso", "oui") == "oui" { ecran(carte-verso()) }
   }
+} else if mode == "bat" {
+  bat()
 } else if mode == "controle" {
   // Les textes seuls (ni visuel ni QR code) : seules comptent les mesures <controle>.
   for a in agents { page(width: cw, height: ch, margin: 0pt, textes-variables(a)) }

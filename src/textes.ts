@@ -175,7 +175,17 @@ export const textes = {
       nomFichier: { cartes: "cartes.pdf", planches: "planches.pdf" },
       filtrePdf: "Document PDF",
       enregistre: "PDF enregistré",
-      modes: { pdf: "Imprimeur (PDF)", impression: "Impression directe", numerique: "Numérique" },
+      modes: { pdf: "Imprimeur", impression: "Impression directe", numerique: "Numérique", bat: "BAT" },
+      bat: {
+        detail:
+          "Le bon à tirer, à faire valider avant l'impression : une page A4 par carte, recto et verso en taille réelle (fond perdu et ligne de coupe visibles), recto agrandi, filigrane « BON À TIRER » et encadré à signer.",
+        cartes: "Cartes du bon à tirer",
+        choix: { cas: "La première et les cas les plus longs", premiere: "La première carte", toutes: "Toutes les cartes" },
+        nombre: (n: number) => `${n} carte${n > 1 ? "s" : ""}, donc ${n} page${n > 1 ? "s" : ""}`,
+        creer: "Créer le bon à tirer…",
+        nomFichier: (nom: string) => `BAT - ${nom}.pdf`,
+        cree: "Bon à tirer enregistré",
+      },
       numerique: {
         format: "Format",
         formats: { png: "Image PNG", jpg: "Image JPG", pdf: "PDF cliquable" },

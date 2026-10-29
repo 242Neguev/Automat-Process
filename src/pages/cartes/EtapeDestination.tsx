@@ -7,6 +7,7 @@ import { compter, graviteCarte, regrouper } from "../../controle/cartes";
 import { libelleAgent } from "../../donnees/agents";
 import { nomsUniques } from "../../donnees/noms";
 import {
+  exporterBat,
   exporterCartes,
   exporterNumerique,
   imprimerCartes,
@@ -20,6 +21,7 @@ import {
 import { textes } from "../../textes";
 import IconeGravite from "../commun/IconeGravite";
 import { signalerErreur } from "../commun/signalerErreur";
+import ExportBat from "./ExportBat";
 import ExportNumerique from "./ExportNumerique";
 import ImpressionDirecte from "./ImpressionDirecte";
 import type { Controle } from "./useControle";
@@ -27,7 +29,7 @@ import type { Controle } from "./useControle";
 const t = textes.cartes.destination;
 const tc = textes.cartes.controle;
 const FEUILLES: Feuille[] = ["A4", "A3", "SRA3"];
-type Mode = "pdf" | "impression" | "numerique";
+type Mode = "pdf" | "impression" | "numerique" | "bat";
 
 /** Ce qu'il faut en plus pour les cartes numériques : liens cliquables et fiche contact de chaque agent. */
 export interface Numerique {
@@ -105,6 +107,22 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
     }
   }
 
+  /** Bon à tirer : pas de confirmation, il sert justement à faire vérifier les cartes. */
+  async function exporterBon(cartes: DonneesAgent[]) {
+    const chemin = await save({ defaultPath: t.bat.nomFichier(modele.nom), filters: [{ name: t.filtrePdf, extensions: ["pdf"] }] });
+    if (!chemin) return;
+    setEnCours(true);
+    try {
+      const date = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+      await exporterBat(modele, cartes.map((agent) => ({ ...agent, libelle: libelleAgent(agent) })), modele.nom, date, chemin);
+      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.bat.cree, message: chemin });
+    } catch (e) {
+      signalerErreur(e);
+    } finally {
+      setEnCours(false);
+    }
+  }
+
   const groupesGraves =
     rapport && aConfirmer
       ? regrouper(rapport)
@@ -141,7 +159,7 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
           fullWidth
           value={mode}
           onChange={(valeur) => setMode(valeur as Mode)}
-          data={(["pdf", "impression", "numerique"] as const).map((value) => ({ value, label: t.modes[value] }))}
+          data={(["pdf", "impression", "numerique", "bat"] as const).map((value) => ({ value, label: t.modes[value] }))}
         />
 
         {mode === "pdf" ? (
@@ -172,6 +190,8 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
               {t.enregistrer}
             </Button>
           </>
+        ) : mode === "bat" ? (
+          <ExportBat modele={modele} agents={agents} mesures={controle.mesures} enCours={enCours || controle.enCours} onCreer={exporterBon} />
         ) : mode === "numerique" ? (
           <ExportNumerique modele={modele} enCours={enCours || controle.enCours} onExporter={(options, fiches) => avecConfirmation(agents, () => exporterNumeriques(options, fiches))} />
         ) : (

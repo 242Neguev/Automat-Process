@@ -84,6 +84,8 @@ export interface DonneesAgent {
   vcard?: string;
   /** Cartes numériques : lien de certains champs (tel:, mailto:, https:), cliquable dans le PDF. */
   liens?: Record<string, string>;
+  /** Nom de l'agent, affiché sur le bon à tirer. */
+  libelle?: string;
 }
 
 export interface OptionsNumerique {
@@ -177,6 +179,10 @@ export const apercuCarte = (modele: ModeleCarte, agent: DonneesAgent, face: Face
 
 export const exporterCartes = (modele: ModeleCarte, agents: DonneesAgent[], sortie: Sortie, feuille: Feuille, chemin: string) =>
   invoke<void>("exporter_cartes", { modele, agents, sortie, feuille, chemin });
+
+/** Bon à tirer des cartes données (une page A4 par carte), enregistré dans `chemin`. */
+export const exporterBat = (modele: ModeleCarte, agents: DonneesAgent[], titre: string, date: string, chemin: string) =>
+  invoke<void>("exporter_bat", { modele, agents, titre, date, chemin });
 
 /**
  * Cartes numériques dans le nouveau dossier `sousDossier` de `dossier` (chemin renvoyé) : une image

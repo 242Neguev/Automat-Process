@@ -147,3 +147,16 @@ export function casLesPlusLongs(modele: ModeleCarte, mesures: MesureTexte[]): { 
       return [{ champ: champ.id, libelle: libelleChamp(champ), agent: siennes.reduce(plusDifficile).agent }];
     });
 }
+
+export type ChoixBat = "cas" | "premiere" | "toutes";
+
+/**
+ * Cartes du bon à tirer : toutes, la première, ou la première et les cas les plus longs (celles qui
+ * mettent la mise en page à l'épreuve), dans l'ordre de la liste.
+ */
+export function cartesDuBat(choix: ChoixBat, modele: ModeleCarte, agents: DonneesAgent[], mesures: MesureTexte[] | null): DonneesAgent[] {
+  if (choix === "toutes") return agents;
+  if (choix === "premiere" || !mesures) return agents.slice(0, 1);
+  const retenus = new Set([agents[0]?.id, ...casLesPlusLongs(modele, mesures).map((cas) => cas.agent)]);
+  return agents.filter((agent) => retenus.has(agent.id));
+}

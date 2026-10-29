@@ -33,6 +33,7 @@ pub fn run() {
             commandes::apercu_carte,
             commandes::exporter_cartes,
             commandes::exporter_numerique,
+            commandes::exporter_bat,
             commandes::controler_cartes,
             commandes::vignettes_cartes,
             commandes::imprimantes,
