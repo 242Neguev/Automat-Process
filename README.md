@@ -6,6 +6,7 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 
 - 📄 [Analyse de faisabilité, décisions et feuille de route](docs/analyse-faisabilite.md)
 - 🧪 [Prototype de validation](prototype/README.md)
+- 🪟 [Fiche de test sous Windows](docs/test-windows/README.md)
 
 ## État actuel
 
