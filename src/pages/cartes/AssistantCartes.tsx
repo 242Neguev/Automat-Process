@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Group, Stack, Stepper, Text, Title } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
-import { IconCheck, IconDeviceFloppy, IconFolderOpen } from "@tabler/icons-react";
-import { open, save } from "@tauri-apps/plugin-dialog";
-import { balisesDuModele, construireAgent, valeursDeLigne } from "../../donnees/agents";
+import { balisesDuModele, construireAgent, ficheContact, liensAgent, valeursDeLigne } from "../../donnees/agents";
 import { FORMATS } from "../../modele/formats";
 import { pourEnregistrer, preparerVisuel, type Visuel } from "../../modele/visuels";
-import { enregistrerProjet, famillesPolices, modeleDemo, ouvrirProjet, type Face, type ModeleCarte } from "../../moteur";
+import { famillesPolices, modeleDemo, type Face, type ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import EtapeListe from "../commun/EtapeListe";
+import { BoutonsProjet, choisirProjet, enregistrerSous, projetOuvert } from "../commun/projet";
 import { signalerErreur } from "../commun/signalerErreur";
 import { useListe } from "../commun/useListe";
 import EtapeDestination from "./EtapeDestination";
@@ -17,7 +15,6 @@ import EtapeVerification, { type Filtre } from "./EtapeVerification";
 import { useControle } from "./useControle";
 
 const t = textes.cartes;
-const FILTRE_PROJET = [{ name: t.projet.filtre, extensions: ["automat"] }];
 
 const { largeur_mm, hauteur_mm, fond_perdu_mm } = FORMATS[0];
 const MODELE_VIERGE: ModeleCarte = { nom: t.modele.nomPerso, format: { largeur_mm, hauteur_mm, fond_perdu_mm }, fond_recto: null, fond_verso: null, transformations: {}, champs: [] };
@@ -49,6 +46,14 @@ export default function AssistantCartes() {
     () => (modele && liste ? liste.lignes.map((ligne) => construireAgent(modele, ligne, correspondances)) : []),
     [modele, liste, correspondances],
   );
+  // Cartes numériques : liens cliquables et fiche contact, calculés seulement à l'étape Destination.
+  const numeriques = useMemo(() => {
+    if (etape < 3 || !modele || !liste) return [];
+    return liste.lignes.map((ligne) => {
+      const valeurs = valeursDeLigne(modele, ligne, correspondances);
+      return { liens: liensAgent(modele, valeurs), fiche: ficheContact(modele, valeurs) };
+    });
+  }, [etape, modele, liste, correspondances]);
   // Le contrôle des cartes sert à la vérification et à l'export.
   const controle = useControle(modele, agents, etape >= 2);
   const exemple = useMemo(
@@ -57,40 +62,28 @@ export default function AssistantCartes() {
   );
 
   /** Enregistre le modèle, ses visuels et les correspondances (jamais les données des agents). */
-  async function enregistrer() {
+  function enregistrer() {
     if (!modele) return;
-    const nom = modele.nom.replace(/[\\/:*?"<>|]/g, "-").trim() || t.projet.nomParDefaut;
-    const chemin = await save({ defaultPath: `${nom}.automat`, filters: FILTRE_PROJET });
-    if (!chemin) return;
-    try {
-      const infos = Object.fromEntries(Object.entries(source === "perso" ? visuels : {}).map(([face, visuel]) => [face, pourEnregistrer(visuel)]));
-      await enregistrerProjet(chemin, modele, correspondances, infos);
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.projet.enregistre, message: chemin });
-    } catch (e) {
-      signalerErreur(e);
-    }
+    const infos = Object.fromEntries(Object.entries(source === "perso" ? visuels : {}).map(([face, visuel]) => [face, pourEnregistrer(visuel)]));
+    return enregistrerSous("carte", modele.nom, modele, correspondances, infos);
   }
 
   async function ouvrirFichierProjet() {
-    const chemin = await open({ multiple: false, directory: false, filters: FILTRE_PROJET });
-    if (typeof chemin !== "string") return;
-    try {
-      const projet = await ouvrirProjet(chemin);
-      const ouverts: Partial<Record<Face, Visuel>> = {};
-      for (const face of ["recto", "verso"] as Face[]) {
-        const fond = projet.visuels[face];
-        if (fond) ouverts[face] = preparerVisuel(fond, polices).visuel;
-      }
-      setModeles((m) => ({ ...m, perso: projet.modele }));
-      setVisuels(ouverts);
-      donnees.restaurer(projet.correspondances, balisesDuModele(projet.modele));
-      setSource("perso");
-      setEtape(0);
-      setOuvertures((n) => n + 1);
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.projet.ouvert, message: projet.modele.nom });
-    } catch (e) {
-      signalerErreur(e);
+    const projet = await choisirProjet("carte");
+    if (!projet) return;
+    const modeleOuvert = projet.modele as ModeleCarte;
+    const ouverts: Partial<Record<Face, Visuel>> = {};
+    for (const face of ["recto", "verso"] as Face[]) {
+      const fond = projet.visuels[face];
+      if (fond) ouverts[face] = preparerVisuel(fond, polices).visuel;
     }
+    setModeles((m) => ({ ...m, perso: modeleOuvert }));
+    setVisuels(ouverts);
+    donnees.restaurer(projet.correspondances, balisesDuModele(modeleOuvert));
+    setSource("perso");
+    setEtape(0);
+    setOuvertures((n) => n + 1);
+    projetOuvert(modeleOuvert.nom);
   }
 
   // Une zone effacée seule ne suffit pas : il faut au moins une information ou un QR code.
@@ -103,14 +96,7 @@ export default function AssistantCartes() {
           <Title order={2}>{t.titre}</Title>
           <Text c="dimmed">{t.sousTitre}</Text>
         </div>
-        <Group gap="xs" wrap="nowrap">
-          <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={ouvrirFichierProjet}>
-            {t.projet.ouvrir}
-          </Button>
-          <Button variant="default" leftSection={<IconDeviceFloppy size={16} />} disabled={!modele} onClick={enregistrer}>
-            {t.projet.enregistrer}
-          </Button>
-        </Group>
+        <BoutonsProjet onOuvrir={ouvrirFichierProjet} onEnregistrer={enregistrer} enregistrable={Boolean(modele)} />
       </Group>
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
@@ -150,6 +136,7 @@ export default function AssistantCartes() {
             <EtapeDestination
               modele={modele}
               agents={agents}
+              numeriques={numeriques}
               controle={controle}
               onVoirCartes={() => {
                 setFiltre("a-verifier");

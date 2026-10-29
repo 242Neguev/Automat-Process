@@ -2,37 +2,50 @@ import { useState } from "react";
 import { Badge, Button, Group, List, Loader, Modal, Paper, SegmentedControl, Select, Stack, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconCheck, IconFileTypePdf } from "@tabler/icons-react";
-import { save } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { compter, graviteCarte, regrouper } from "../../controle/cartes";
+import { libelleAgent } from "../../donnees/agents";
+import { nomsUniques } from "../../donnees/noms";
 import {
   exporterCartes,
+  exporterNumerique,
   imprimerCartes,
   type DonneesAgent,
   type Feuille,
   type ModeleCarte,
+  type OptionsNumerique,
   type ReglagesImpression,
   type Sortie,
 } from "../../moteur";
 import { textes } from "../../textes";
 import IconeGravite from "../commun/IconeGravite";
 import { signalerErreur } from "../commun/signalerErreur";
+import ExportNumerique from "./ExportNumerique";
 import ImpressionDirecte from "./ImpressionDirecte";
 import type { Controle } from "./useControle";
 
 const t = textes.cartes.destination;
 const tc = textes.cartes.controle;
 const FEUILLES: Feuille[] = ["A4", "A3", "SRA3"];
-type Mode = "pdf" | "impression";
+type Mode = "pdf" | "impression" | "numerique";
+
+/** Ce qu'il faut en plus pour les cartes numériques : liens cliquables et fiche contact de chaque agent. */
+export interface Numerique {
+  liens: Record<string, string>;
+  fiche: string;
+}
 
 interface Props {
   modele: ModeleCarte;
   agents: DonneesAgent[];
+  /** Pour chaque agent (même ordre), ses liens et sa fiche contact. */
+  numeriques: Numerique[];
   controle: Controle;
   /** Retour à la vérification, sur les cartes à corriger. */
   onVoirCartes: () => void;
 }
 
-export default function EtapeDestination({ modele, agents, controle, onVoirCartes }: Props) {
+export default function EtapeDestination({ modele, agents, numeriques, controle, onVoirCartes }: Props) {
   // Un badge PVC (sans fond perdu) s'imprime en général directement ; une carte de visite part chez l'imprimeur.
   const [mode, setMode] = useState<Mode>(modele.format.fond_perdu_mm === 0 ? "impression" : "pdf");
   const [sortie, setSortie] = useState<Sortie>("planches");
@@ -68,6 +81,23 @@ export default function EtapeDestination({ modele, agents, controle, onVoirCarte
     try {
       await imprimerCartes(modele, cartes, imprimante, reglages);
       notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.impression.envoyee(imprimante), message: t.impression.nbCartes(cartes.length) });
+    } catch (e) {
+      signalerErreur(e);
+    } finally {
+      setEnCours(false);
+    }
+  }
+
+  async function exporterNumeriques(options: OptionsNumerique, avecFiches: boolean) {
+    const dossier = await open({ directory: true, multiple: false, title: t.numerique.choisirDossier });
+    if (typeof dossier !== "string") return;
+    setEnCours(true);
+    try {
+      const avecLiens = agents.map((agent, i) => ({ ...agent, liens: numeriques[i]?.liens ?? {} }));
+      const fiches = avecFiches ? numeriques.map((n) => n.fiche) : [];
+      const noms = nomsUniques(agents.map(libelleAgent));
+      const chemin = await exporterNumerique(modele, avecLiens, noms, fiches, options, dossier, t.numerique.nomDossier(modele.nom));
+      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.numerique.cree, message: chemin, autoClose: 10000 });
     } catch (e) {
       signalerErreur(e);
     } finally {
@@ -111,7 +141,7 @@ export default function EtapeDestination({ modele, agents, controle, onVoirCarte
           fullWidth
           value={mode}
           onChange={(valeur) => setMode(valeur as Mode)}
-          data={(["pdf", "impression"] as const).map((value) => ({ value, label: t.modes[value] }))}
+          data={(["pdf", "impression", "numerique"] as const).map((value) => ({ value, label: t.modes[value] }))}
         />
 
         {mode === "pdf" ? (
@@ -142,6 +172,8 @@ export default function EtapeDestination({ modele, agents, controle, onVoirCarte
               {t.enregistrer}
             </Button>
           </>
+        ) : mode === "numerique" ? (
+          <ExportNumerique modele={modele} enCours={enCours || controle.enCours} onExporter={(options, fiches) => avecConfirmation(agents, () => exporterNumeriques(options, fiches))} />
         ) : (
           <ImpressionDirecte
             modele={modele}
@@ -152,7 +184,7 @@ export default function EtapeDestination({ modele, agents, controle, onVoirCarte
         )}
       </Stack>
 
-      <Modal opened={aConfirmer !== null} onClose={() => setAConfirmer(null)} title={t.confirmation.titre[mode]} centered>
+      <Modal opened={aConfirmer !== null} onClose={() => setAConfirmer(null)} title={t.confirmation.titre[mode === "impression" ? "impression" : "pdf"]} centered>
         <Stack gap="sm">
           <Text>{t.confirmation.message(aConfirmer?.cartes.length ?? 0)}</Text>
           <List spacing={4} size="sm" center>
@@ -182,7 +214,7 @@ export default function EtapeDestination({ modele, agents, controle, onVoirCarte
                 setAConfirmer(null);
               }}
             >
-              {mode === "pdf" ? t.confirmation.exporter : t.confirmation.imprimer}
+              {mode === "impression" ? t.confirmation.imprimer : t.confirmation.exporter}
             </Button>
           </Group>
         </Stack>

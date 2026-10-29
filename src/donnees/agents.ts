@@ -1,7 +1,7 @@
 // Construction des agents à rendre : chaque ligne de la liste donne le texte final de chaque champ du modèle.
 import type { Champ, ChampQr, ChampTexte, DonneesAgent, ModeleCarte } from "../moteur";
 import { textes } from "../textes";
-import type { Correspondances } from "./correspondances";
+import { nature, type Correspondances, type Nature } from "./correspondances";
 import type { LigneListe } from "./liste";
 import { nettoyer, type Transformation } from "./nettoyage";
 import { vcard, type ChampsVCard } from "./vcard";
@@ -67,3 +67,51 @@ export function agentBalises(modele: ModeleCarte): DonneesAgent {
 
 /** Nom d'un agent pour les listes : le premier texte non vide de sa carte (en général son nom). */
 export const libelleAgent = (agent: DonneesAgent) => Object.values(agent.valeurs).find(Boolean) ?? textes.cartes.verification.sansNom;
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const TELEPHONES: Nature[] = ["mobile", "fixe", "telephone"];
+const versUrl = (adresse: string) => (/^https?:\/\//i.test(adresse) ? adresse : `https://${adresse}`);
+
+/**
+ * Lien de chaque champ texte d'une carte numérique, d'après ses balises : tel: pour un numéro,
+ * mailto: pour un e-mail, https: pour un site (aussi pour un texte fixe « www.exemple.com »).
+ */
+export function liensAgent(modele: ModeleCarte, valeurs: Record<string, string>): Record<string, string> {
+  const liens: Record<string, string> = {};
+  for (const champ of modele.champs.filter(estTexte)) {
+    const balises = balisesDe(champ.modele);
+    for (const balise of balises) {
+      const valeur = (valeurs[balise] ?? "").trim();
+      const genre = nature(balise);
+      const numero = valeur.replace(/[^\d+]/g, "");
+      if (!valeur) continue;
+      if (genre === "email" || EMAIL.test(valeur)) liens[champ.id] = `mailto:${valeur}`;
+      else if (TELEPHONES.includes(genre as Nature) && numero.replace(/\D/g, "").length >= 6) liens[champ.id] = `tel:${numero}`;
+      else if (/^(https?:\/\/|www\.)/i.test(valeur)) liens[champ.id] = versUrl(valeur);
+      if (liens[champ.id]) break;
+    }
+    const adresse = balises.length === 0 ? champ.modele.match(/(https?:\/\/|www\.)\S+/i)?.[0] : undefined;
+    if (adresse) liens[champ.id] = versUrl(adresse);
+  }
+  return liens;
+}
+
+/**
+ * Fiche contact (vCard) d'un agent : celle du QR code du modèle s'il en a un, sinon d'après la
+ * nature des balises (prénom, nom, fonction, téléphones, e-mail). Vide sans coordonnées.
+ */
+export function ficheContact(modele: ModeleCarte, valeurs: Record<string, string>): string {
+  const qr = modele.champs.filter(estQr).find((champ) => champ.vcard);
+  if (qr?.vcard) {
+    return vcard(Object.fromEntries(Object.entries(qr.vcard).map(([cle, texte]) => [cle, remplir(texte ?? "", valeurs)])) as ChampsVCard);
+  }
+  const premiere = (natures: Nature[]) => Object.entries(valeurs).find(([balise, valeur]) => valeur && natures.includes(nature(balise) as Nature))?.[1];
+  return vcard({
+    prenom: premiere(["prenom"]),
+    nom: premiere(["nom"]),
+    fonction: premiere(["fonction"]),
+    mobile: premiere(["mobile"]),
+    fixe: premiere(["fixe", "telephone"]),
+    email: premiere(["email"]),
+  });
+}

@@ -5,6 +5,7 @@ import { valeursExemple } from "../../signatures/agents";
 import { balisesSignature, modeleParDefaut, type ModeleSignature } from "../../signatures/modele";
 import { textes } from "../../textes";
 import EtapeListe from "../commun/EtapeListe";
+import { BoutonsProjet, choisirProjet, enregistrerSous, projetOuvert } from "../commun/projet";
 import { useListe } from "../commun/useListe";
 import EtapeDestinationSignatures from "./EtapeDestinationSignatures";
 import EtapeModeleSignature from "./EtapeModeleSignature";
@@ -16,6 +17,8 @@ const t = textes.signatures;
 export default function AssistantSignatures() {
   const [etape, setEtape] = useState(0);
   const [modele, setModele] = useState<ModeleSignature>(modeleParDefaut);
+  // Change à chaque projet ouvert : l'étape Modèle repart d'un état neuf.
+  const [ouvertures, setOuvertures] = useState(0);
   const balises = useMemo(() => balisesSignature(modele), [modele]);
   const donnees = useListe(balises);
   const { liste, correspondances } = donnees;
@@ -25,18 +28,34 @@ export default function AssistantSignatures() {
   );
   const apercu = agents[0]?.valeurs ?? valeursExemple(modele);
   const modelePret = modele.source === "html" ? Boolean(modele.html) && balises.length > 0 : balises.length > 0;
+
+  async function ouvrir() {
+    const projet = await choisirProjet("signature");
+    if (!projet) return;
+    // Un projet enregistré par une version précédente reçoit les réglages ajoutés depuis.
+    const ouvert: ModeleSignature = { ...modeleParDefaut(), ...(projet.modele as Partial<ModeleSignature>) };
+    setModele(ouvert);
+    donnees.restaurer(projet.correspondances, balisesSignature(ouvert));
+    setEtape(0);
+    setOuvertures((n) => n + 1);
+    projetOuvert(ouvert.nom);
+  }
+
   const etapePrete = [modelePret, agents.length > 0 && Object.values(correspondances).some(Boolean), agents.length > 0, false];
 
   return (
     <Stack gap="lg" maw={1240}>
-      <div>
-        <Title order={2}>{t.titre}</Title>
-        <Text c="dimmed">{t.sousTitre}</Text>
-      </div>
+      <Group justify="space-between" align="flex-start" wrap="nowrap">
+        <div>
+          <Title order={2}>{t.titre}</Title>
+          <Text c="dimmed">{t.sousTitre}</Text>
+        </div>
+        <BoutonsProjet onOuvrir={ouvrir} onEnregistrer={() => enregistrerSous("signature", modele.nom, modele, correspondances)} />
+      </Group>
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
         <Stepper.Step label={t.etapes.modele.titre} description={t.etapes.modele.description}>
-          <EtapeModeleSignature modele={modele} onModele={setModele} valeurs={apercu} depuisListe={agents.length > 0} />
+          <EtapeModeleSignature key={ouvertures} modele={modele} onModele={setModele} valeurs={apercu} depuisListe={agents.length > 0} />
         </Stepper.Step>
         <Stepper.Step label={t.etapes.liste.titre} description={t.etapes.liste.description}>
           <EtapeListe

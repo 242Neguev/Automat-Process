@@ -8,6 +8,7 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 use typst::foundations::Bytes;
 
+use crate::fichiers::{self, FichierAEcrire};
 use crate::impression;
 use crate::moteur::{Document, ErreurMoteur, Fichiers, Moteur};
 use crate::qr::{self, CodeQr};
@@ -33,13 +34,16 @@ static FICHIERS_DEMO: LazyLock<Fichiers> = LazyLock::new(|| {
     .collect()
 });
 
-/// Un agent tel que l'envoie l'interface : valeur de chaque champ texte du modèle, et vCard du QR code.
+/// Un agent tel que l'envoie l'interface : valeur de chaque champ texte du modèle, vCard du QR code
+/// et, pour les cartes numériques, lien de certains champs (tel:, mailto:, https:).
 #[derive(Debug, Deserialize)]
 pub struct DonneesAgent {
     pub id: String,
     pub valeurs: HashMap<String, String>,
     #[serde(default)]
     pub vcard: Option<String>,
+    #[serde(default)]
+    pub liens: HashMap<String, String>,
 }
 
 /// Un agent tel que le lit le gabarit dans /agents.json.
@@ -48,6 +52,7 @@ struct AgentGabarit<'a> {
     id: &'a str,
     valeurs: &'a HashMap<String, String>,
     qr: Option<CodeQr>,
+    liens: &'a HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -63,6 +68,24 @@ pub enum Face {
 pub enum Sortie {
     Cartes,
     Planches,
+}
+
+/// Format des cartes numériques (WhatsApp, e-mail, réseaux).
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FormatNumerique {
+    Png,
+    Jpg,
+    Pdf,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OptionsNumerique {
+    pub format: FormatNumerique,
+    /// Largeur des images, en pixels.
+    pub largeur_px: u32,
+    pub verso: bool,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -108,6 +131,7 @@ pub fn couleur_autour(
         id: "visuel".into(),
         valeurs: HashMap::new(),
         vcard: None,
+        liens: HashMap::new(),
     };
     const PIXELS_PAR_POINT: f64 = 3.0;
     let entrees = [("mode", "apercu"), ("agent", "0"), ("face", "recto")];
@@ -239,20 +263,107 @@ pub fn vignettes(
     let document = compiler(moteur, projet, agents, &[("mode", "mosaique")])?;
     let mut sortie = Vec::new();
     for page in 0..document.nb_pages() {
-        let (largeur, hauteur, rvba) = document.pixels(page, pixels_par_point)?;
-        // Les cartes sont opaques (fond blanc) : le canal alpha peut être ignoré.
-        let rvb: Vec<u8> = rvba
-            .chunks_exact(4)
-            .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
-            .collect();
-        let mut jpeg = Vec::new();
-        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 85)
-            .encode(&rvb, largeur, hauteur, image::ExtendedColorType::Rgb8)
-            .map_err(|erreur| ErreurMoteur::simple(format!("Vignette impossible : {erreur}")))?;
+        let jpeg = jpeg(&document, page, pixels_par_point, 85)?;
         sortie.extend_from_slice(&(jpeg.len() as u32).to_be_bytes());
         sortie.extend_from_slice(&jpeg);
     }
     Ok(sortie)
+}
+
+/// Page en JPEG ; les cartes sont opaques (fond blanc), le canal alpha peut être ignoré.
+fn jpeg(
+    document: &Document,
+    page: usize,
+    pixels_par_point: f64,
+    qualite: u8,
+) -> Result<Vec<u8>, ErreurMoteur> {
+    let (largeur, hauteur, rvba) = document.pixels(page, pixels_par_point)?;
+    let rvb: Vec<u8> = rvba
+        .chunks_exact(4)
+        .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+        .collect();
+    let mut sortie = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut sortie, qualite)
+        .encode(&rvb, largeur, hauteur, image::ExtendedColorType::Rgb8)
+        .map_err(|erreur| ErreurMoteur::simple(format!("Image JPEG impossible : {erreur}")))?;
+    Ok(sortie)
+}
+
+fn avec_verso(projet: &Projet) -> bool {
+    projet.modele["fond_verso"]
+        .as_str()
+        .is_some_and(|chemin| !chemin.is_empty())
+}
+
+/// Cartes numériques, dans un nouveau dossier dont le chemin est renvoyé : une image PNG ou JPG
+/// par agent (le verso, le même pour tous, une seule fois), ou un PDF par agent avec ses liens
+/// cliquables ; plus sa fiche contact (.vcf) quand elle n'est pas vide. `noms` donne le nom de
+/// fichier de chaque agent, sans extension.
+#[allow(clippy::too_many_arguments)]
+pub fn exporter_numerique(
+    moteur: &Moteur,
+    projet: &Projet,
+    agents: &[DonneesAgent],
+    noms: &[String],
+    fiches: &[String],
+    options: OptionsNumerique,
+    dossier: &str,
+    sous_dossier: &str,
+) -> Result<String, ErreurMoteur> {
+    if agents.is_empty() || noms.len() != agents.len() {
+        return Err(ErreurMoteur::simple("La liste ne contient aucun agent."));
+    }
+    let verso = options.verso && avec_verso(projet);
+    let fichier = |nom: String, octets: Vec<u8>| FichierAEcrire {
+        nom,
+        texte: None,
+        octets: Some(octets),
+    };
+    let mut fichiers = Vec::new();
+    if options.format == FormatNumerique::Pdf {
+        let entrees = [
+            ("mode", "ecran"),
+            ("verso", if verso { "oui" } else { "non" }),
+        ];
+        for (agent, nom) in agents.iter().zip(noms) {
+            let pdf = compiler(moteur, projet, std::slice::from_ref(agent), &entrees)?.pdf()?;
+            fichiers.push(fichier(format!("{nom}.pdf"), pdf));
+        }
+    } else {
+        let largeur_pt = projet.modele["format"]["largeur_mm"]
+            .as_f64()
+            .unwrap_or(85.0)
+            / MM_PAR_POINT;
+        let pixels_par_point = f64::from(options.largeur_px.clamp(200, 4000)) / largeur_pt;
+        let image = |document: &Document, page: usize| match options.format {
+            FormatNumerique::Jpg => jpeg(document, page, pixels_par_point, 90),
+            _ => document.png(page, pixels_par_point),
+        };
+        let extension = if options.format == FormatNumerique::Jpg {
+            "jpg"
+        } else {
+            "png"
+        };
+        let rectos = compiler(moteur, projet, agents, &[("mode", "mosaique")])?;
+        for (page, nom) in noms.iter().enumerate() {
+            fichiers.push(fichier(format!("{nom}.{extension}"), image(&rectos, page)?));
+        }
+        if verso {
+            let entrees = [("mode", "apercu"), ("agent", "0"), ("face", "verso")];
+            let document = compiler(moteur, projet, &agents[..1], &entrees)?;
+            fichiers.push(fichier(format!("_Verso.{extension}"), image(&document, 0)?));
+        }
+    }
+    for (fiche, nom) in fiches.iter().zip(noms) {
+        if !fiche.is_empty() {
+            fichiers.push(FichierAEcrire {
+                nom: format!("{nom}.vcf"),
+                texte: Some(fiche.clone()),
+                octets: None,
+            });
+        }
+    }
+    fichiers::ecrire(dossier, sous_dossier, &fichiers)
 }
 
 /// Impression directe des cartes sur une imprimante Windows : recto, et verso au dos si demandé.
@@ -267,10 +378,7 @@ pub fn imprimer(
         return Err(ErreurMoteur::simple("Aucune carte à imprimer."));
     }
     let document = compiler(moteur, projet, agents, &[("mode", "cartes")])?;
-    let avec_verso = projet.modele["fond_verso"]
-        .as_str()
-        .is_some_and(|chemin| !chemin.is_empty());
-    let faces = impression::faces(agents.len(), avec_verso, reglages);
+    let faces = impression::faces(agents.len(), avec_verso(projet), reglages);
     let format = &projet.modele["format"];
     let taille_mm = (
         format["largeur_mm"].as_f64().unwrap_or(85.6),
@@ -306,6 +414,7 @@ fn compiler(
                 id: &agent.id,
                 valeurs: &agent.valeurs,
                 qr: vcard.map(qr::encoder).transpose()?,
+                liens: &agent.liens,
             })
         })
         .collect::<Result<Vec<_>, ErreurMoteur>>()?;
@@ -340,6 +449,7 @@ mod tests {
                 .collect(),
             vcard: avec_qr
                 .then(|| "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Aïssatou DIALLO\r\nEND:VCARD".into()),
+            liens: HashMap::new(),
         }
     }
 
@@ -473,6 +583,62 @@ mod tests {
         let descente =
             nombre(&mesure("ligne 2", "c3"), "base") - nombre(&mesure("ligne 1", "c3"), "base");
         assert!(descente > 2.0, "descente de {descente} mm");
+    }
+
+    #[test]
+    fn cartes_numeriques_images_pdf_et_fiches() {
+        let moteur = Moteur::nouveau();
+        let projet = projet_demo();
+        let mut avec_liens = agent(0, true);
+        avec_liens
+            .liens
+            .insert("c5".into(), "mailto:a.diallo@exemple.com".into());
+        let agents = [avec_liens, agent(1, true)];
+        let noms = ["Aïssatou DIALLO".to_string(), "Jean DUPONT".to_string()];
+        let fiches = ["BEGIN:VCARD\r\nEND:VCARD".to_string(), String::new()];
+        let dossier = std::env::temp_dir()
+            .join("automat-process-tests")
+            .join("numerique");
+        let _ = std::fs::remove_dir_all(&dossier);
+        let options = |format| OptionsNumerique {
+            format,
+            largeur_px: 600,
+            verso: true,
+        };
+        let png = exporter_numerique(
+            &moteur,
+            &projet,
+            &agents,
+            &noms,
+            &fiches,
+            options(FormatNumerique::Png),
+            dossier.to_str().unwrap(),
+            "png",
+        )
+        .unwrap();
+        let png = std::path::Path::new(&png);
+        let image = std::fs::read(png.join("Aïssatou DIALLO.png")).unwrap();
+        assert_eq!(imagesize::blob_size(&image).unwrap().width, 600);
+        assert!(png.join("_Verso.png").exists());
+        assert!(png.join("Aïssatou DIALLO.vcf").exists());
+        assert!(!png.join("Jean DUPONT.vcf").exists());
+
+        let pdf = exporter_numerique(
+            &moteur,
+            &projet,
+            &agents,
+            &noms,
+            &fiches,
+            options(FormatNumerique::Pdf),
+            dossier.to_str().unwrap(),
+            "pdf",
+        )
+        .unwrap();
+        let pdf = std::fs::read(std::path::Path::new(&pdf).join("Aïssatou DIALLO.pdf")).unwrap();
+        let contient = |motif: &[u8]| pdf.windows(motif.len()).any(|fenetre| fenetre == motif);
+        // Lien cliquable, et pas de zone de coupe : c'est une carte pour l'écran.
+        assert!(contient(b"mailto:a.diallo@exemple.com"));
+        assert!(!contient(b"/TrimBox"));
     }
 
     #[test]

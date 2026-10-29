@@ -82,6 +82,15 @@ export interface DonneesAgent {
   id: string;
   valeurs: Record<string, string>;
   vcard?: string;
+  /** Cartes numériques : lien de certains champs (tel:, mailto:, https:), cliquable dans le PDF. */
+  liens?: Record<string, string>;
+}
+
+export interface OptionsNumerique {
+  format: "png" | "jpg" | "pdf";
+  /** Largeur des images, en pixels. */
+  largeurPx: number;
+  verso: boolean;
 }
 
 /** Ligne de texte d'un visuel (PDF ou SVG), en mm depuis le coin haut-gauche du visuel. */
@@ -145,8 +154,13 @@ export interface Zone {
   hauteur_mm: number;
 }
 
+/** Sorte de document d'un projet : chacune s'ouvre dans son module. */
+export type Document = "carte" | "signature";
+
 export interface ProjetOuvert {
-  modele: ModeleCarte;
+  document: Document;
+  /** Modèle de carte (ModeleCarte) ou de signature, selon `document`. */
+  modele: unknown;
   correspondances: Record<string, string | null>;
   visuels: Partial<Record<Face, FondImporte & Record<string, unknown>>>;
 }
@@ -163,6 +177,20 @@ export const apercuCarte = (modele: ModeleCarte, agent: DonneesAgent, face: Face
 
 export const exporterCartes = (modele: ModeleCarte, agents: DonneesAgent[], sortie: Sortie, feuille: Feuille, chemin: string) =>
   invoke<void>("exporter_cartes", { modele, agents, sortie, feuille, chemin });
+
+/**
+ * Cartes numériques dans le nouveau dossier `sousDossier` de `dossier` (chemin renvoyé) : une image
+ * ou un PDF cliquable par agent, nommé d'après `noms`, et sa fiche contact quand `fiches` la donne.
+ */
+export const exporterNumerique = (
+  modele: ModeleCarte,
+  agents: DonneesAgent[],
+  noms: string[],
+  fiches: string[],
+  options: OptionsNumerique,
+  dossier: string,
+  sousDossier: string,
+) => invoke<string>("exporter_numerique", { modele, agents, noms, fiches, options, dossier, sousDossier });
 
 /** Mesures de mise en page de chaque texte de chaque agent, pour le rapport de contrôle. */
 export const controlerCartes = (modele: ModeleCarte, agents: DonneesAgent[]) => invoke<MesureTexte[]>("controler_cartes", { modele, agents });
@@ -209,8 +237,8 @@ export const couleurAutour = (modele: ModeleCarte, zone: Zone) => invoke<string>
 export const retirerTextePdf = (chemin: string, id: number) =>
   invoke<{ texte: TexteVisuel; textes: TexteVisuel[] }>("retirer_texte_pdf", { chemin, id });
 
-export const enregistrerProjet = (chemin: string, modele: ModeleCarte, correspondances: Record<string, string | null>, visuels: unknown) =>
-  invoke<void>("enregistrer_projet", { chemin, modele, correspondances, visuels });
+export const enregistrerProjet = (chemin: string, document: Document, modele: unknown, correspondances: Record<string, string | null>, visuels: unknown) =>
+  invoke<void>("enregistrer_projet", { chemin, document, modele, correspondances, visuels });
 
 export const ouvrirProjet = (chemin: string) => invoke<ProjetOuvert>("ouvrir_projet", { chemin });
 

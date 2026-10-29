@@ -24,10 +24,11 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 | **Balises `{{…}}` d'un PDF** détectées, retirées du visuel et placées automatiquement, avec leur police, taille et couleur (CMJN conservé) | ✅ |
 | **Textes d'exemple remplacés d'un clic** (PDF, SVG) : le texte quitte le visuel et devient une information, au même endroit et au même style | ✅ |
 | **Zones effacées** pour un texte incrusté dans une image (Canva, Photoshop…) : un aplat de la couleur mesurée tout autour le recouvre | ✅ |
-| **Projets `.automat`** : le modèle, ses visuels et les correspondances dans un seul fichier, à rouvrir avec la liste suivante (les données des agents n'y sont jamais copiées) | ✅ |
+| **Projets `.automat`** (cartes et signatures) : le modèle, ses visuels et les correspondances dans un seul fichier, à rouvrir avec la liste suivante (les données des agents n'y sont jamais copiées) | ✅ |
 | **Contrôle des cartes** après mise en page : texte trop long même réduit, texte sur le QR code, hors de la zone de sécurité (affichée dans l'éditeur), textes qui se chevauchent ou descendent plus bas que prévu ; résumé cliquable, filtre « cartes à vérifier », confirmation avant export | ✅ |
 | **Mosaïque** de toutes les cartes et bouton **« cas le plus long »** (la carte où chaque information est la plus difficile à loger) | ✅ |
 | **Contrôle des données de la liste** : e-mails et numéros mal formés, agents en double, informations vides, colonne vide, avec les lignes à corriger dans le fichier | ✅ |
+| **Cartes numériques** : une image PNG ou JPG par agent (WhatsApp, LinkedIn, e-mail), ou un PDF par agent avec téléphone, e-mail et site cliquables ; fiche contact .vcf de chacun | ✅ |
 | **Impression directe** (badges PVC sur Evolis, Zebra, Magicard… ou toute imprimante installée) : choix de l'imprimante, d'une carte ou de toutes, recto verso, verso retourné, exemplaires ; carte rendue à la résolution de l'imprimante, à sa taille réelle | ✅ (à tester sous Windows) |
 | **Signatures e-mail** : trois mises en page compatibles Outlook et Gmail (classique, logo à gauche, bandeau) ou **signature existante** avec balises (fichier .htm d'Outlook, images locales intégrées) ; police sûre, couleurs, logo intégré ; aperçu clair et sombre ; taille contrôlée (limite de Gmail) | ✅ |
 | **Pages à envoyer aux agents** : sa signature à copier (version Gmail sans logo, code HTML pour Thunderbird, texte pour le téléphone) et le mode d'emploi d'Outlook et de Gmail ; une page récapitule tout le monde | ✅ (collage à essayer dans Outlook) |

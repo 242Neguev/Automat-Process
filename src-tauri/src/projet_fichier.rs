@@ -1,6 +1,6 @@
-//! Fichier de projet « .automat » : une archive ZIP qui contient le modèle (format, champs,
-//! réglages), ses visuels et les correspondances avec les colonnes de la liste. Les données des
-//! agents n'y sont jamais copiées : on rouvre le projet et on lui donne la nouvelle liste.
+//! Fichier de projet « .automat » : une archive ZIP qui contient le modèle (carte de visite ou
+//! signature e-mail), ses visuels et les correspondances avec les colonnes de la liste. Les données
+//! des agents n'y sont jamais copiées : on rouvre le projet et on lui donne la nouvelle liste.
 
 use std::io::{Read, Write};
 
@@ -17,10 +17,14 @@ const APPLICATION: &str = "Automat-Process";
 const VERSION_FORMAT: u64 = 1;
 const ENTREE_PROJET: &str = "projet.json";
 const FACES: [&str; 2] = ["recto", "verso"];
+/// Sortes de documents : chacune s'ouvre dans son module.
+const DOCUMENTS: [&str; 2] = ["carte", "signature"];
 
 /// Ce que l'interface récupère en ouvrant un projet.
 #[derive(Debug, Serialize)]
 pub struct ProjetOuvert {
+    /// « carte » ou « signature ».
+    pub document: String,
     pub modele: Value,
     pub correspondances: Value,
     /// Informations des visuels (dimensions, fond perdu…), avec leurs nouveaux chemins virtuels.
@@ -34,11 +38,17 @@ fn erreur(contexte: &str) -> impl Fn(&dyn std::fmt::Display) -> ErreurMoteur + '
 /// Enregistre le modèle, ses visuels et les correspondances dans `chemin`.
 pub fn enregistrer(
     chemin: &str,
+    document: &str,
     modele: &Value,
     correspondances: &Value,
     visuels: &Value,
     fonds: &Fonds,
 ) -> Result<(), ErreurMoteur> {
+    if !DOCUMENTS.contains(&document) {
+        return Err(ErreurMoteur::simple(format!(
+            "Sorte de document inconnue : {document}"
+        )));
+    }
     let mut modele = modele.clone();
     let mut visuels = visuels.clone();
     let mut fichiers = Vec::new();
@@ -63,7 +73,7 @@ pub fn enregistrer(
     let projet = json!({
         "application": APPLICATION,
         "format": VERSION_FORMAT,
-        "document": "carte",
+        "document": document,
         "modele": modele,
         "correspondances": correspondances,
         "visuels": visuels,
@@ -145,6 +155,8 @@ pub fn ouvrir(chemin: &str, fonds: &Fonds) -> Result<ProjetOuvert, ErreurMoteur>
         }
     }
     Ok(ProjetOuvert {
+        // Les premiers projets ne contenaient que des cartes.
+        document: projet["document"].as_str().unwrap_or("carte").to_owned(),
         modele,
         correspondances: projet["correspondances"].clone(),
         visuels,
@@ -170,9 +182,18 @@ mod tests {
         let correspondances = json!({ "Email": "E-mail" });
         let visuels =
             json!({ "recto": { "nomFichier": "recto.svg", "largeurMm": 91.0, "texte": "<svg/>" } });
-        enregistrer(&chemin, &modele, &correspondances, &visuels, &fonds).unwrap();
+        enregistrer(
+            &chemin,
+            "carte",
+            &modele,
+            &correspondances,
+            &visuels,
+            &fonds,
+        )
+        .unwrap();
 
         let ouvert = ouvrir(&chemin, &fonds).unwrap();
+        assert_eq!(ouvert.document, "carte");
         assert_eq!(ouvert.modele["nom"], "Cartes 2026");
         assert_eq!(ouvert.correspondances["Email"], "E-mail");
         let recto = ouvert.modele["fond_recto"].as_str().unwrap();
@@ -183,6 +204,26 @@ mod tests {
         assert_eq!(ouvert.visuels["verso"]["genre"], "pdf");
         assert!(fonds.contenu(recto).is_some());
         assert_eq!(ouvert.modele["champs"], modele["champs"]);
+    }
+
+    #[test]
+    fn enregistre_une_signature() {
+        let fonds = Fonds::default();
+        let chemin = chemin_temporaire("signature.automat");
+        let modele = json!({ "nom": "Équipe", "source": "mise-en-page", "lignes": [{ "role": "nom", "modele": "{{NOM}}" }] });
+        enregistrer(
+            &chemin,
+            "signature",
+            &modele,
+            &json!({ "NOM": "Nom" }),
+            &json!({}),
+            &fonds,
+        )
+        .unwrap();
+        let ouvert = ouvrir(&chemin, &fonds).unwrap();
+        assert_eq!(ouvert.document, "signature");
+        assert_eq!(ouvert.modele, modele);
+        assert!(enregistrer(&chemin, "affiche", &modele, &json!({}), &json!({}), &fonds).is_err());
     }
 
     #[test]

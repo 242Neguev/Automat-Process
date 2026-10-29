@@ -1,8 +1,8 @@
 // Gabarit « carte » : aperçu d'une carte, cartes unitaires avec fond perdu, planches imposées, vignettes
 // de la mosaïque, ou mesures de contrôle seules.
 // Fichiers virtuels : /projet.json (format, fonds, champs) et /agents.json (valeurs de chaque agent).
-// Entrées (sys.inputs) : mode = apercu | cartes | planches | mosaique | controle ; agent et face (aperçu) ;
-// feuille = A4 | A3 | SRA3.
+// Entrées (sys.inputs) : mode = apercu | cartes | planches | mosaique | ecran | controle ; agent et face
+// (aperçu) ; feuille = A4 | A3 | SRA3.
 // Les positions des champs sont en mm depuis le coin haut-gauche de la carte finie (hors fond perdu).
 #let projet = json("/projet.json")
 #let agents = json("/agents.json")
@@ -55,11 +55,13 @@
     haut: mm(y - encre("bounds", "baseline")), bas: mm(derniere + encre("baseline", "bounds")), base: mm(derniere))
 }
 
-#let poser(f, valeur, t, y) = {
+// Un texte avec un lien (téléphone, e-mail, site : cartes numériques) est cliquable dans le PDF.
+#let poser(f, valeur, t, y, lien: none) = {
   let W = f.largeur_max_mm * 1mm
   let x = f.x_mm * 1mm
   let (dx, al) = if f.ancre == "middle" { (x - W / 2, center) } else if f.ancre == "end" { (x - W, right) } else { (x, left) }
-  place(top + left, dx: fp + dx, dy: fp + y, block(width: W, align(al, paragraphe(f, valeur, t))))
+  let contenu = align(al, paragraphe(f, valeur, t))
+  place(top + left, dx: fp + dx, dy: fp + y, block(width: W, if lien == none { contenu } else { link(lien, contenu) }))
 }
 
 // Les textes forment un flux vertical : une ligne vide disparaît et les suivantes remontent ;
@@ -81,7 +83,7 @@
     y = if y == none { f.y_mm * 1mm } else { y + calc.max(ecart, if ecart-en-attente == none { 0mm } else { ecart-en-attente }) }
     ecart-en-attente = none
     [#metadata(mesures(a, f, v, r, y)) <controle>]
-    poser(f, v, r.taille, y)
+    poser(f, v, r.taille, y, lien: a.at("liens", default: (:)).at(f.id, default: none))
     y += (r.lignes - 1) * K * r.taille
   }
 }
@@ -126,12 +128,12 @@
 
 // Visuel de la carte, sans déformation (« cover »). S'il contient déjà le fond perdu, il couvre toute
 // la carte. S'il est au format fini, il est posé tel quel dans la zone de coupe (rien n'est rogné) et
-// son fond perdu est complété en prolongeant ses bords (inutile pour l'aperçu, qui ne montre pas le
-// fond perdu). Sans visuel : carte blanche.
+// son fond perdu est complété en prolongeant ses bords, seulement pour l'impression : l'aperçu, la
+// mosaïque et les cartes numériques ne montrent pas le fond perdu. Sans visuel : carte blanche.
 #let fond(chemin, avec-fond-perdu) = if chemin in (none, "") { [] } else if avec-fond-perdu {
   image(chemin, width: cw, height: ch, fit: "cover")
 } else {
-  if fp > 0mm and mode != "apercu" { prolonger-bords(chemin) }
+  if fp > 0mm and mode in ("cartes", "planches") { prolonger-bords(chemin) }
   place(dx: fp, dy: fp, image(chemin, width: largeur, height: hauteur, fit: "cover"))
 }
 #let fond-verso = projet.at("fond_verso", default: none)
@@ -217,6 +219,13 @@
   planches(FEUILLES.at(entree("feuille", "A4")))
 } else if mode == "mosaique" {
   for a in agents { page-carte(carte-recto(a)) }
+} else if mode == "ecran" {
+  // Carte numérique : format fini, sans fond perdu ni repères, liens cliquables.
+  let ecran(contenu) = page(width: largeur, height: hauteur, margin: 0pt, place(dx: -fp, dy: -fp, contenu))
+  for a in agents {
+    ecran(carte-recto(a))
+    if avec-verso and entree("verso", "oui") == "oui" { ecran(carte-verso()) }
+  }
 } else if mode == "controle" {
   // Les textes seuls (ni visuel ni QR code) : seules comptent les mesures <controle>.
   for a in agents { page(width: cw, height: ch, margin: 0pt, textes-variables(a)) }

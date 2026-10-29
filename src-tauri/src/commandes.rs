@@ -7,7 +7,7 @@ use serde::Serialize;
 use tauri::State;
 use tauri::ipc::Response;
 
-use crate::cartes::{self, DonneesAgent, Face, Feuille, Projet, Sortie, Zone};
+use crate::cartes::{self, DonneesAgent, Face, Feuille, OptionsNumerique, Projet, Sortie, Zone};
 use crate::fichiers::{self, FichierAEcrire, Nature};
 use crate::fonds::{FondImporte, Fonds, TexteRetire};
 use crate::impression::{self, Imprimante, Reglages};
@@ -167,6 +167,39 @@ pub async fn vignettes_cartes(
     .await
 }
 
+/// Cartes numériques (images ou PDF cliquables, fiches contact) dans un nouveau dossier ; renvoie son chemin.
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub async fn exporter_numerique(
+    etat: State<'_, EtatMoteur>,
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+    agents: Vec<DonneesAgent>,
+    noms: Vec<String>,
+    fiches: Vec<String>,
+    options: OptionsNumerique,
+    dossier: String,
+    sous_dossier: String,
+) -> Result<String, ErreurMoteur> {
+    let projet = Projet {
+        modele,
+        fonds: fonds.fichiers(),
+    };
+    executer(&etat, move |moteur| {
+        cartes::exporter_numerique(
+            moteur,
+            &projet,
+            &agents,
+            &noms,
+            &fiches,
+            options,
+            &dossier,
+            &sous_dossier,
+        )
+    })
+    .await
+}
+
 /// Imprimantes installées, pour l'impression directe des badges (sous Windows ; liste vide ailleurs).
 #[tauri::command]
 pub async fn imprimantes() -> Result<Vec<Imprimante>, ErreurMoteur> {
@@ -242,18 +275,26 @@ pub async fn couleur_autour(
     .await
 }
 
-/// Enregistre le modèle, ses visuels et les correspondances dans un fichier « .automat ».
+/// Enregistre le modèle (carte ou signature), ses visuels et les correspondances dans un « .automat ».
 #[tauri::command]
 pub async fn enregistrer_projet(
     fonds: State<'_, Arc<Fonds>>,
     chemin: String,
+    document: String,
     modele: serde_json::Value,
     correspondances: serde_json::Value,
     visuels: serde_json::Value,
 ) -> Result<(), ErreurMoteur> {
     let fonds = Arc::clone(&fonds);
     tauri::async_runtime::spawn_blocking(move || {
-        projet_fichier::enregistrer(&chemin, &modele, &correspondances, &visuels, &fonds)
+        projet_fichier::enregistrer(
+            &chemin,
+            &document,
+            &modele,
+            &correspondances,
+            &visuels,
+            &fonds,
+        )
     })
     .await
     .map_err(|erreur| ErreurMoteur::simple(format!("Enregistrement interrompu : {erreur}")))?

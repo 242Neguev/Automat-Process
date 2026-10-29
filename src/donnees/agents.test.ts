@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import modeleDemo from "../../src-tauri/ressources/demo/projet.json";
 import type { ModeleCarte } from "../moteur";
-import { agentBalises, balisesDuModele, construireAgent, remplir } from "./agents";
+import { agentBalises, balisesDuModele, construireAgent, ficheContact, liensAgent, remplir } from "./agents";
 import { associer } from "./correspondances";
 import { nettoyer } from "./nettoyage";
 import { vcard } from "./vcard";
@@ -82,5 +82,25 @@ describe("vCard", () => {
   it("échappe les caractères réservés et reste vide sans donnée de contact", () => {
     expect(vcard({ nom: "Dupont, Jean" })).toContain("FN:Dupont\\, Jean");
     expect(vcard({ organisation: "EXEMPLE SA" })).toBe("");
+  });
+});
+
+describe("cartes numériques", () => {
+  const valeurs = { Prénom: "Aïssatou", NOM: "DIALLO", Fonction: "Comptable", Mobile: "+237 612 34 56 78", Fixe: "", Email: "a.diallo@exemple.com" };
+
+  it("rend cliquables le téléphone, l'e-mail et un site écrit en dur", () => {
+    const avecSite: ModeleCarte = {
+      ...modele,
+      champs: [...modele.champs, { ...(modele.champs[0] as Extract<ModeleCarte["champs"][number], { type: "texte" }>), id: "site", modele: "www.exemple.cm" }],
+    };
+    expect(liensAgent(avecSite, valeurs)).toEqual({ c3: "tel:+237612345678", c5: "mailto:a.diallo@exemple.com", site: "https://www.exemple.cm" });
+  });
+
+  it("donne une fiche contact, même sans QR code dans le modèle", () => {
+    const fiche = ficheContact({ ...modele, champs: modele.champs.filter((c) => c.type !== "qr") }, valeurs);
+    expect(fiche).toContain("FN:Aïssatou DIALLO");
+    expect(fiche).toContain("TITLE:Comptable");
+    expect(fiche).toContain("TEL;TYPE=CELL:+237612345678");
+    expect(ficheContact(modele, { Prénom: "", NOM: "" })).toBe("");
   });
 });

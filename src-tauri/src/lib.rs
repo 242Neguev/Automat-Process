@@ -29,6 +29,7 @@ pub fn run() {
             commandes::remplacer_fond,
             commandes::apercu_carte,
             commandes::exporter_cartes,
+            commandes::exporter_numerique,
             commandes::controler_cartes,
             commandes::vignettes_cartes,
             commandes::imprimantes,

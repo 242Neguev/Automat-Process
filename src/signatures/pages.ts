@@ -1,6 +1,7 @@
 // Pages remises aux agents : leur signature, des boutons pour la copier et le mode d'emploi de
 // chaque messagerie. Une page récapitule tous les agents. Les pages sont autonomes (aucun fichier
 // externe, aucune connexion) : on peut les envoyer par e-mail ou les déposer sur un partage.
+import { nomsUniques } from "../donnees/noms";
 import { echapper } from "./html";
 
 export interface PageAgent {
@@ -116,13 +117,5 @@ ${lignes}
   );
 }
 
-/** Nom de fichier de la page d'un agent, unique dans le dossier. */
-export function nomsDeFichiers(noms: string[]): string[] {
-  const deja = new Map<string, number>();
-  return noms.map((nom) => {
-    const base = nom.replace(/[\\/:*?"<>|]/g, "-").replace(/\s+/g, " ").trim().slice(0, 80) || "Agent";
-    const n = (deja.get(base.toLowerCase()) ?? 0) + 1;
-    deja.set(base.toLowerCase(), n);
-    return n === 1 ? `${base}.html` : `${base} (${n}).html`;
-  });
-}
+/** Nom de fichier de la page de chaque agent, unique dans le dossier. */
+export const nomsDeFichiers = (noms: string[]) => nomsUniques(noms).map((nom) => `${nom}.html`);
