@@ -80,9 +80,51 @@
   )).flatten()))
 }
 
+// Fond perdu d'un visuel au format fini : les 0,25 mm du bord sont étirés sur toute la largeur du fond
+// perdu, sur les quatre côtés et dans les angles. La couleur du bord continue donc à l'identique : une
+// coupe légèrement décalée ne laisse apparaître ni filet blanc ni motif parasite.
+#let prolonger-bords(chemin) = {
+  let bord = 0.25mm
+  let k = fp / bord
+  // Les bandes passent 0,2 mm sous le visuel : aucune jonction, donc aucun filet à l'impression.
+  let c = 0.2mm
+  // Sur chaque axe : bande d'avant (gauche ou haut, étirée), milieu (à l'échelle 1) ou d'après (étirée).
+  let segments(taille) = (
+    (pos: 0mm, long: fp + c, etire: true, apres: false),
+    (pos: fp, long: taille, etire: false, apres: false),
+    (pos: fp + taille - c, long: fp + c, etire: true, apres: true),
+  )
+  for sx in segments(largeur) {
+    for sy in segments(hauteur) {
+      if sx.etire or sy.etire {
+        let w = if sx.etire { largeur * k } else { largeur }
+        let h = if sy.etire { hauteur * k } else { hauteur }
+        // Pour une bande d'après, le bord du visuel (taille - bord) doit tomber au début de la bande, après c.
+        let dx = if sx.apres { c - (largeur - bord) * k } else { 0mm }
+        let dy = if sy.apres { c - (hauteur - bord) * k } else { 0mm }
+        place(dx: sx.pos, dy: sy.pos, box(width: sx.long, height: sy.long, clip: true,
+          place(dx: dx, dy: dy, image(chemin, width: w, height: h, fit: "stretch"))))
+      }
+    }
+  }
+}
+
+// Visuel de la carte, sans déformation (« cover »). S'il contient déjà le fond perdu, il couvre toute
+// la carte. S'il est au format fini, il est posé tel quel dans la zone de coupe (rien n'est rogné) et
+// son fond perdu est complété en prolongeant ses bords (inutile pour l'aperçu, qui ne montre pas le
+// fond perdu). Sans visuel : carte blanche.
+#let fond(chemin, avec-fond-perdu) = if chemin in (none, "") { [] } else if avec-fond-perdu {
+  image(chemin, width: cw, height: ch, fit: "cover")
+} else {
+  if fp > 0mm and mode != "apercu" { prolonger-bords(chemin) }
+  place(dx: fp, dy: fp, image(chemin, width: largeur, height: hauteur, fit: "cover"))
+}
+#let fond-verso = projet.at("fond_verso", default: none)
+#let avec-verso = fond-verso not in (none, "")
+
 // Carte complète, fond perdu compris (cw × ch).
-#let carte-recto(a) = box(width: cw, height: ch, clip: true, {
-  place(image(projet.fond_recto, width: cw, height: ch))
+#let carte-recto(a) = box(width: cw, height: ch, clip: true, fill: white, {
+  place(fond(projet.at("fond_recto", default: none), projet.at("fond_recto_avec_fond_perdu", default: true)))
   textes-variables(a)
   // Pas de QR code quand l'agent n'a pas de vCard (aucune donnée de contact).
   if a.at("qr", default: none) != none {
@@ -91,7 +133,7 @@
     }
   }
 })
-#let carte-verso() = box(width: cw, height: ch, clip: true, image(projet.fond_verso, width: cw, height: ch))
+#let carte-verso() = box(width: cw, height: ch, clip: true, fill: white, fond(fond-verso, projet.at("fond_verso_avec_fond_perdu", default: true)))
 
 // Page au format fini avec fond perdu natif : le PDF reçoit une TrimBox (zone de coupe) pour l'imprimeur.
 #let page-carte(contenu) = page(width: largeur, height: hauteur, margin: 0pt, bleed: fp, background: contenu)[]
@@ -125,7 +167,7 @@
   }
   let lots = agents.chunks(p.n)
   for (i, lot) in lots.enumerate() {
-    for face in ("RECTO", "VERSO") {
+    for face in (if avec-verso { ("RECTO", "VERSO") } else { ("RECTO",) }) {
       page(width: p.l, height: p.h, margin: 0pt, {
         for (j, a) in lot.enumerate() {
           let c = calc.rem(j, p.cols)
@@ -149,7 +191,7 @@
 } else if mode == "cartes" {
   for a in agents {
     page-carte(carte-recto(a))
-    page-carte(carte-verso())
+    if avec-verso { page-carte(carte-verso()) }
   }
 } else if mode == "planches" {
   planches(FEUILLES.at(entree("feuille", "A4")))

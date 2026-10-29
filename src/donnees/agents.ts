@@ -53,10 +53,11 @@ export function construireAgent(modele: ModeleCarte, ligne: LigneListe, correspo
   };
 }
 
-/** Exemple d'agent montrant les balises elles-mêmes, pour présenter le modèle. */
+/** Exemple d'agent montrant les balises elles-mêmes (et un QR code d'exemple), pour présenter le modèle. */
 export function agentBalises(modele: ModeleCarte): DonneesAgent {
   return {
     id: "modèle",
     valeurs: Object.fromEntries(modele.champs.filter(estTexte).map((champ) => [champ.id, champ.modele])),
+    vcard: modele.champs.some(estQr) ? vcard({ prenom: "Prénom", nom: "NOM", email: "prenom.nom@exemple.com" }) : undefined,
   };
 }

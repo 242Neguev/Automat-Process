@@ -18,6 +18,9 @@ tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Déjà utilisées par Typst : lecture des dimensions des PDF et des images importés.
+hayro-syntax = "0.7"
+imagesize = "0.14"
 qrcode = { version = "0.14", default-features = false }
 typst = "=0.15.1"
 typst-layout = "=0.15.1"

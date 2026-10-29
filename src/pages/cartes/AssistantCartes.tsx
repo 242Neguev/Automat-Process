@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Button, Group, Loader, Stack, Stepper, Text, Title } from "@mantine/core";
+import { Button, Group, Stack, Stepper, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -8,15 +8,20 @@ import urlListeExemple from "../../assets/exemple-agents.xlsx?url";
 import { balisesDuModele, construireAgent, valeursDeLigne } from "../../donnees/agents";
 import { associer, type Correspondances } from "../../donnees/correspondances";
 import { lireFeuille, ouvrirClasseur } from "../../donnees/liste";
-import { enErreurMoteur, lireListe, modeleDemo, type ModeleCarte } from "../../moteur";
+import { FORMATS } from "../../modele/formats";
+import { enErreurMoteur, famillesPolices, lireListe, modeleDemo, type Face, type ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import EtapeDestination from "./EtapeDestination";
 import EtapeListe from "./EtapeListe";
-import EtapeModele from "./EtapeModele";
+import EtapeModele, { type Source } from "./EtapeModele";
 import EtapeVerification from "./EtapeVerification";
+import type { Visuel } from "./PanneauVisuels";
 
 const t = textes.cartes;
 const EXTENSIONS_LISTE = ["xlsx", "xlsm", "xls", "ods", "csv", "tsv", "txt"];
+
+const { largeur_mm, hauteur_mm, fond_perdu_mm } = FORMATS[0];
+const MODELE_VIERGE: ModeleCarte = { nom: t.modele.nomPerso, format: { largeur_mm, hauteur_mm, fond_perdu_mm }, fond_recto: null, fond_verso: null, transformations: {}, champs: [] };
 
 function signalerErreur(e: unknown) {
   const { message, details } = enErreurMoteur(e);
@@ -26,24 +31,40 @@ function signalerErreur(e: unknown) {
 /** Assistant « Cartes de visite » : Modèle → Liste → Vérification → Destination. */
 export default function AssistantCartes() {
   const [etape, setEtape] = useState(0);
-  const [modele, setModele] = useState<ModeleCarte | null>(null);
+  const [source, setSource] = useState<Source>("perso");
+  const [modeles, setModeles] = useState<Record<Source, ModeleCarte | null>>({ perso: MODELE_VIERGE, demo: null });
+  const [visuels, setVisuels] = useState<Partial<Record<Face, Visuel>>>({});
+  const [polices, setPolices] = useState<string[]>([]);
   const [classeur, setClasseur] = useState<{ nomFichier: string; contenu: WorkBook } | null>(null);
   const [feuille, setFeuille] = useState<string | null>(null);
   const [correspondances, setCorrespondances] = useState<Correspondances>({});
+  const modele = modeles[source];
 
   useEffect(() => {
-    modeleDemo().then(setModele, signalerErreur);
+    famillesPolices().then(setPolices, signalerErreur);
   }, []);
+  useEffect(() => {
+    if (source === "demo" && !modeles.demo) modeleDemo().then((demo) => setModeles((m) => ({ ...m, demo })), signalerErreur);
+  }, [source, modeles.demo]);
 
   const balises = useMemo(() => (modele ? balisesDuModele(modele) : []), [modele]);
+  const cleBalises = balises.join("\u0000");
   const liste = useMemo(
     () => (classeur && feuille ? lireFeuille(classeur.contenu, classeur.nomFichier, feuille) : null),
     [classeur, feuille],
   );
-  // Chaque nouvelle liste (ou feuille) est associée automatiquement aux balises du modèle.
+  // Associe automatiquement les balises aux colonnes, en gardant les choix faits à la main.
   useEffect(() => {
-    if (liste) setCorrespondances(associer(balises, liste.colonnes));
-  }, [liste, balises]);
+    if (!liste) return;
+    setCorrespondances((precedentes) => {
+      const resultat = associer(balises, liste.colonnes);
+      for (const balise of balises) {
+        const choisie = precedentes[balise];
+        if (choisie !== undefined && (choisie === null || liste.colonnes.includes(choisie))) resultat[balise] = choisie;
+      }
+      return resultat;
+    });
+  }, [liste, cleBalises]); // `cleBalises` résume `balises`
 
   const agents = useMemo(
     () => (modele && liste ? liste.lignes.map((ligne) => construireAgent(modele, ligne, correspondances)) : []),
@@ -83,14 +104,10 @@ export default function AssistantCartes() {
     }
   }
 
-  if (!modele) {
-    return <Loader />;
-  }
-
-  const etapePrete = [true, agents.length > 0 && Object.values(correspondances).some(Boolean), agents.length > 0, false];
+  const etapePrete = [modele !== null && modele.champs.length > 0, agents.length > 0 && Object.values(correspondances).some(Boolean), agents.length > 0, false];
 
   return (
-    <Stack gap="lg" maw={1180}>
+    <Stack gap="lg" maw={1240}>
       <div>
         <Title order={2}>{t.titre}</Title>
         <Text c="dimmed">{t.sousTitre}</Text>
@@ -98,7 +115,17 @@ export default function AssistantCartes() {
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
         <Stepper.Step label={t.etapes.modele.titre} description={t.etapes.modele.description}>
-          <EtapeModele modele={modele} />
+          {modele && (
+            <EtapeModele
+              source={source}
+              onSource={setSource}
+              modele={modele}
+              onModele={(modification) => setModeles((m) => ({ ...m, [source]: m[source] ? modification(m[source]) : m[source] }))}
+              visuels={source === "perso" ? visuels : {}}
+              onVisuels={setVisuels}
+              polices={polices}
+            />
+          )}
         </Stepper.Step>
         <Stepper.Step label={t.etapes.liste.titre} description={t.etapes.liste.description}>
           <EtapeListe
@@ -114,10 +141,10 @@ export default function AssistantCartes() {
           />
         </Stepper.Step>
         <Stepper.Step label={t.etapes.verification.titre} description={t.etapes.verification.description}>
-          <EtapeVerification agents={agents} />
+          {modele && <EtapeVerification modele={modele} agents={agents} />}
         </Stepper.Step>
         <Stepper.Step label={t.etapes.destination.titre} description={t.etapes.destination.description}>
-          <EtapeDestination agents={agents} />
+          {modele && <EtapeDestination modele={modele} agents={agents} />}
         </Stepper.Step>
       </Stepper>
 

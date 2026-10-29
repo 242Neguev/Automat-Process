@@ -3,13 +3,13 @@ import { Badge, Button, Group, Paper, SegmentedControl, Select, Stack, Text, Tit
 import { notifications } from "@mantine/notifications";
 import { IconAlertTriangle, IconCheck, IconFileTypePdf } from "@tabler/icons-react";
 import { save } from "@tauri-apps/plugin-dialog";
-import { enErreurMoteur, exporterCartes, type DonneesAgent, type Feuille, type Sortie } from "../../moteur";
+import { enErreurMoteur, exporterCartes, type DonneesAgent, type Feuille, type ModeleCarte, type Sortie } from "../../moteur";
 import { textes } from "../../textes";
 
 const t = textes.cartes.destination;
 const FEUILLES: Feuille[] = ["A4", "A3", "SRA3"];
 
-export default function EtapeDestination({ agents }: { agents: DonneesAgent[] }) {
+export default function EtapeDestination({ modele, agents }: { modele: ModeleCarte; agents: DonneesAgent[] }) {
   const [sortie, setSortie] = useState<Sortie>("planches");
   const [feuille, setFeuille] = useState<Feuille>("A4");
   const [enCours, setEnCours] = useState(false);
@@ -19,7 +19,7 @@ export default function EtapeDestination({ agents }: { agents: DonneesAgent[] })
     if (!chemin) return;
     setEnCours(true);
     try {
-      await exporterCartes(agents, sortie, feuille, chemin);
+      await exporterCartes(modele, agents, sortie, feuille, chemin);
       notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.enregistre, message: chemin });
     } catch (e) {
       const { message, details } = enErreurMoteur(e);

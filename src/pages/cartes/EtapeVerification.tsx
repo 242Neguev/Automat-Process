@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActionIcon, Group, NavLink, Paper, ScrollArea, SegmentedControl, Stack, Text, Title, Tooltip } from "@mantine/core";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
-import type { DonneesAgent, Face } from "../../moteur";
+import type { DonneesAgent, Face, ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import ApercuCarte from "./ApercuCarte";
 
@@ -10,7 +10,7 @@ const t = textes.cartes.verification;
 /** Libellé d'un agent dans la liste : le premier texte non vide de sa carte (en général son nom). */
 const libelle = (agent: DonneesAgent) => Object.values(agent.valeurs).find(Boolean) ?? t.sansNom;
 
-export default function EtapeVerification({ agents }: { agents: DonneesAgent[] }) {
+export default function EtapeVerification({ modele, agents }: { modele: ModeleCarte; agents: DonneesAgent[] }) {
   const [index, setIndex] = useState(0);
   const [face, setFace] = useState<Face>("recto");
   const courant = Math.min(index, agents.length - 1);
@@ -18,7 +18,7 @@ export default function EtapeVerification({ agents }: { agents: DonneesAgent[] }
   return (
     <Group align="flex-start" gap="lg" wrap="nowrap">
       <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
-        <ApercuCarte agent={agents[courant] ?? null} face={face} />
+        <ApercuCarte modele={modele} agent={agents[courant] ?? null} face={modele.fond_verso ? face : "recto"} />
         <Group justify="space-between">
           <Group gap="xs">
             <Tooltip label={t.precedent}>
@@ -41,14 +41,16 @@ export default function EtapeVerification({ agents }: { agents: DonneesAgent[] }
               </ActionIcon>
             </Tooltip>
           </Group>
-          <SegmentedControl
-            value={face}
-            onChange={(valeur) => setFace(valeur as Face)}
-            data={[
-              { value: "recto", label: textes.cartes.recto },
-              { value: "verso", label: textes.cartes.verso },
-            ]}
-          />
+          {modele.fond_verso && (
+            <SegmentedControl
+              value={face}
+              onChange={(valeur) => setFace(valeur as Face)}
+              data={[
+                { value: "recto", label: textes.cartes.recto },
+                { value: "verso", label: textes.cartes.verso },
+              ]}
+            />
+          )}
         </Group>
       </Stack>
 

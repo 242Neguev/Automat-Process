@@ -1,6 +1,6 @@
-//! Rendu des cartes de visite à partir des données d'agents préparées par l'interface
-//! (valeurs déjà associées aux colonnes de la liste et nettoyées, texte de la vCard).
-//! En attendant l'import de modèles (phase 1, incrément 2), le modèle est celui de démonstration.
+//! Rendu des cartes de visite. L'interface fournit le modèle (format, fonds, champs) et les
+//! données des agents (valeurs déjà associées aux colonnes, nettoyées, texte de la vCard) ;
+//! les visuels importés par l'utilisateur sont servis depuis la réserve des fonds.
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -14,10 +14,9 @@ use crate::qr::{self, CodeQr};
 const GABARIT_CARTE: &str = include_str!("../gabarits/carte.typ");
 const MODELE_DEMO: &[u8] = include_bytes!("../ressources/demo/projet.json");
 
-/// Description et fonds du modèle de démonstration.
-static FICHIERS_MODELE: LazyLock<Fichiers> = LazyLock::new(|| {
+/// Fonds du modèle de démonstration, toujours disponibles.
+static FICHIERS_DEMO: LazyLock<Fichiers> = LazyLock::new(|| {
     [
-        ("/projet.json", MODELE_DEMO),
         (
             "/demo/recto-fond.svg",
             &include_bytes!("../ressources/demo/recto-fond.svg")[..],
@@ -76,19 +75,31 @@ pub fn modele_demo() -> serde_json::Value {
     serde_json::from_slice(MODELE_DEMO).expect("modèle de démonstration valide")
 }
 
+/// Le modèle décrit par l'interface et les visuels importés auxquels il fait référence.
+pub struct Projet {
+    pub modele: serde_json::Value,
+    pub fonds: Fichiers,
+}
+
 /// Aperçu SVG d'une face de la carte d'un agent (carte finie, sans le fond perdu).
-pub fn apercu(moteur: &Moteur, agent: &DonneesAgent, face: Face) -> Result<String, ErreurMoteur> {
+pub fn apercu(
+    moteur: &Moteur,
+    projet: &Projet,
+    agent: &DonneesAgent,
+    face: Face,
+) -> Result<String, ErreurMoteur> {
     let face = match face {
         Face::Recto => "recto",
         Face::Verso => "verso",
     };
     let entrees = [("mode", "apercu"), ("agent", "0"), ("face", face)];
-    compiler(moteur, std::slice::from_ref(agent), &entrees)?.svg(0)
+    compiler(moteur, projet, std::slice::from_ref(agent), &entrees)?.svg(0)
 }
 
 /// PDF prêt pour l'impression : cartes unitaires (recto puis verso) ou planches recto/verso.
 pub fn exporter(
     moteur: &Moteur,
+    projet: &Projet,
     agents: &[DonneesAgent],
     sortie: Sortie,
     feuille: Feuille,
@@ -105,11 +116,18 @@ pub fn exporter(
         Feuille::A3 => "A3",
         Feuille::SRA3 => "SRA3",
     };
-    compiler(moteur, agents, &[("mode", mode), ("feuille", feuille)])?.pdf()
+    compiler(
+        moteur,
+        projet,
+        agents,
+        &[("mode", mode), ("feuille", feuille)],
+    )?
+    .pdf()
 }
 
 fn compiler(
     moteur: &Moteur,
+    projet: &Projet,
     agents: &[DonneesAgent],
     entrees: &[(&str, &str)],
 ) -> Result<Document, ErreurMoteur> {
@@ -124,11 +142,14 @@ fn compiler(
             })
         })
         .collect::<Result<Vec<_>, ErreurMoteur>>()?;
-    let json = serde_json::to_vec(&agents).map_err(|erreur| {
-        ErreurMoteur::simple(format!("Données des agents illisibles : {erreur}"))
-    })?;
-    let mut fichiers = FICHIERS_MODELE.clone();
-    fichiers.insert("/agents.json".into(), Bytes::new(json));
+    let illisible =
+        |erreur: serde_json::Error| ErreurMoteur::simple(format!("Données illisibles : {erreur}"));
+    let mut fichiers = FICHIERS_DEMO.clone();
+    fichiers.extend(projet.fonds.iter().map(|(c, o)| (c.clone(), o.clone())));
+    let modele = serde_json::to_vec(&projet.modele).map_err(illisible)?;
+    fichiers.insert("/projet.json".into(), Bytes::new(modele));
+    let agents = serde_json::to_vec(&agents).map_err(illisible)?;
+    fichiers.insert("/agents.json".into(), Bytes::new(agents));
     moteur.compiler(GABARIT_CARTE, &fichiers, entrees)
 }
 
@@ -155,6 +176,34 @@ mod tests {
         }
     }
 
+    fn projet_demo() -> Projet {
+        Projet {
+            modele: modele_demo(),
+            fonds: Fichiers::new(),
+        }
+    }
+
+    /// Modèle de l'utilisateur : visuel importé en PNG, sans verso, un seul champ.
+    fn projet_importe() -> Projet {
+        let modele = serde_json::json!({
+            "nom": "Mon modèle",
+            "format": { "largeur_mm": 85, "hauteur_mm": 55, "fond_perdu_mm": 3 },
+            "fond_recto": "/fonds/1.png",
+            "fond_verso": null,
+            "champs": [{
+                "id": "c1", "type": "texte", "modele": "{{Prénom}} {{NOM}}", "x_mm": 6, "y_mm": 20,
+                "police": "Arial", "graisse": 700, "taille_pt": 11, "couleur": { "rgb": "#22252a" },
+                "interlettrage_em": 0, "ancre": "start", "largeur_max_mm": 50, "taille_min_pt": 8,
+                "lignes_max": 1
+            }]
+        });
+        let png = Bytes::new(&include_bytes!("../icons/128x128.png")[..]);
+        Projet {
+            modele,
+            fonds: Fichiers::from([("/fonds/1.png".to_string(), png)]),
+        }
+    }
+
     #[test]
     fn le_modele_de_demo_decrit_ses_champs() {
         let modele = modele_demo();
@@ -165,38 +214,70 @@ mod tests {
     #[test]
     fn apercu_recto_verso_avec_ou_sans_qr() {
         let moteur = Moteur::nouveau();
-        assert!(
-            apercu(&moteur, &agent(0, true), Face::Recto)
-                .unwrap()
-                .starts_with("<svg")
-        );
-        assert!(
-            apercu(&moteur, &agent(0, false), Face::Recto)
-                .unwrap()
-                .starts_with("<svg")
-        );
-        assert!(
-            apercu(&moteur, &agent(0, true), Face::Verso)
-                .unwrap()
-                .starts_with("<svg")
-        );
+        let projet = projet_demo();
+        for (avec_qr, face) in [
+            (true, Face::Recto),
+            (false, Face::Recto),
+            (true, Face::Verso),
+        ] {
+            let svg = apercu(&moteur, &projet, &agent(0, avec_qr), face).unwrap();
+            assert!(svg.starts_with("<svg"));
+        }
     }
 
     #[test]
     fn export_cartes_et_planches() {
         let moteur = Moteur::nouveau();
+        let projet = projet_demo();
         let agents: Vec<_> = (0..3).map(|n| agent(n, true)).collect();
-        let entrees = [("mode", "cartes")];
-        let cartes = compiler(&moteur, &agents, &entrees).unwrap();
+        let cartes = compiler(&moteur, &projet, &agents, &[("mode", "cartes")]).unwrap();
         assert_eq!(cartes.nb_pages(), 6);
         let pdf = cartes.pdf().unwrap();
         assert!(
             pdf.windows(b"/TrimBox".len())
                 .any(|fenetre| fenetre == b"/TrimBox")
         );
-        let planches = compiler(&moteur, &agents, &[("mode", "planches"), ("feuille", "A4")]);
+        let entrees = [("mode", "planches"), ("feuille", "A4")];
+        let planches = compiler(&moteur, &projet, &agents, &entrees);
         assert_eq!(planches.unwrap().nb_pages(), 2);
-        assert!(exporter(&moteur, &[], Sortie::Cartes, Feuille::A4).is_err());
+        assert!(exporter(&moteur, &projet, &[], Sortie::Cartes, Feuille::A4).is_err());
+    }
+
+    #[test]
+    fn modele_importe_sans_verso() {
+        let moteur = Moteur::nouveau();
+        let projet = projet_importe();
+        let agents: Vec<_> = (0..3).map(|n| agent(n, false)).collect();
+        // Sans verso : une page par carte, et seulement des planches recto.
+        let cartes = compiler(&moteur, &projet, &agents, &[("mode", "cartes")]).unwrap();
+        assert_eq!(cartes.nb_pages(), 3);
+        let entrees = [("mode", "planches"), ("feuille", "A4")];
+        assert_eq!(
+            compiler(&moteur, &projet, &agents, &entrees)
+                .unwrap()
+                .nb_pages(),
+            1
+        );
+        let verso = apercu(&moteur, &projet, &agents[0], Face::Verso).unwrap();
+        assert!(verso.starts_with("<svg"));
+    }
+
+    /// Visuel au format fini : posé tel quel, fond perdu complété en prolongeant ses bords.
+    #[test]
+    fn visuel_au_format_fini() {
+        let moteur = Moteur::nouveau();
+        let mut projet = projet_importe();
+        projet.modele["fond_recto_avec_fond_perdu"] = false.into();
+        let agents = [agent(0, true)];
+        for entrees in [
+            &[("mode", "cartes")][..],
+            &[("mode", "planches"), ("feuille", "SRA3")],
+        ] {
+            let document = compiler(&moteur, &projet, &agents, entrees).unwrap();
+            assert!(document.pdf().unwrap().starts_with(b"%PDF"));
+        }
+        let svg = apercu(&moteur, &projet, &agents[0], Face::Recto).unwrap();
+        assert!(svg.starts_with("<svg"));
     }
 
     /// Les valeurs envoyées par l'interface (src/moteur.ts) doivent rester désérialisables.

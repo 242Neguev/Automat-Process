@@ -8,7 +8,8 @@ use serde::Serialize;
 use tauri::State;
 use tauri::ipc::Response;
 
-use crate::cartes::{self, DonneesAgent, Face, Feuille, Sortie};
+use crate::cartes::{self, DonneesAgent, Face, Feuille, Projet, Sortie};
+use crate::fonds::{FondImporte, Fonds};
 use crate::moteur::{ErreurMoteur, Moteur, VERSION_TYPST};
 
 /// Formats de liste acceptés, et taille maximale d'un fichier (une liste d'agents pèse bien moins).
@@ -57,30 +58,73 @@ pub async fn infos_moteur(etat: State<'_, EtatMoteur>) -> Result<InfosMoteur, Er
     .await
 }
 
+/// Familles de polices installées, pour choisir celle d'un champ.
+#[tauri::command]
+pub async fn familles_polices(etat: State<'_, EtatMoteur>) -> Result<Vec<String>, ErreurMoteur> {
+    executer(&etat, |moteur| Ok(moteur.familles())).await
+}
+
 #[tauri::command]
 pub fn modele_demo() -> serde_json::Value {
     cartes::modele_demo()
 }
 
+/// Importe un visuel de carte (PDF, SVG, PNG, JPG) choisi par l'utilisateur.
+#[tauri::command]
+pub async fn importer_fond(
+    fonds: State<'_, Arc<Fonds>>,
+    chemin: String,
+) -> Result<FondImporte, ErreurMoteur> {
+    let fonds = Arc::clone(&fonds);
+    tauri::async_runtime::spawn_blocking(move || fonds.importer(&chemin))
+        .await
+        .map_err(|erreur| ErreurMoteur::simple(format!("Import interrompu : {erreur}")))?
+}
+
+/// Remplace un SVG importé par sa version sans balises, préparée par l'interface.
+#[tauri::command]
+pub fn remplacer_fond(
+    fonds: State<'_, Arc<Fonds>>,
+    chemin: String,
+    svg: String,
+) -> Result<(), ErreurMoteur> {
+    fonds.remplacer_svg(&chemin, svg)
+}
+
 #[tauri::command]
 pub async fn apercu_carte(
     etat: State<'_, EtatMoteur>,
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
     agent: DonneesAgent,
     face: Face,
 ) -> Result<String, ErreurMoteur> {
-    executer(&etat, move |moteur| cartes::apercu(moteur, &agent, face)).await
+    let projet = Projet {
+        modele,
+        fonds: fonds.fichiers(),
+    };
+    executer(&etat, move |moteur| {
+        cartes::apercu(moteur, &projet, &agent, face)
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn exporter_cartes(
     etat: State<'_, EtatMoteur>,
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
     agents: Vec<DonneesAgent>,
     sortie: Sortie,
     feuille: Feuille,
     chemin: String,
 ) -> Result<(), ErreurMoteur> {
+    let projet = Projet {
+        modele,
+        fonds: fonds.fichiers(),
+    };
     executer(&etat, move |moteur| {
-        let pdf = cartes::exporter(moteur, &agents, sortie, feuille)?;
+        let pdf = cartes::exporter(moteur, &projet, &agents, sortie, feuille)?;
         std::fs::write(&chemin, pdf).map_err(|erreur| {
             ErreurMoteur::simple(format!("Impossible d'enregistrer « {chemin} » : {erreur}"))
         })

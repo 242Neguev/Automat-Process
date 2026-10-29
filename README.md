@@ -17,7 +17,11 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 | **Correspondances automatiques** entre balises et colonnes, y compris les synonymes (Courriel, GSM, Poste…), modifiables à la main | ✅ |
 | **Nettoyage** (espaces, MAJUSCULES, Nom Propre, minuscules), lignes vides masquées, **QR code vCard** pour chaque agent, écriture de droite à gauche (arabe) | ✅ |
 | Export PDF : cartes unitaires, ou planches A4/A3/SRA3 recto/verso avec traits de coupe | ✅ |
-| Import de vos propres modèles (balises dans un PDF ou un SVG, placement manuel sur une image) | Phase 1, incrément 2 |
+| **Vos modèles** : visuel PDF, SVG, PNG ou JPG pour le recto et le verso ; format (dont badge PVC) et fond perdu ; diagnostic du visuel (fond perdu, résolution, proportions) | ✅ |
+| **Balises `{{…}}` d'un SVG** (Illustrator, CorelDRAW, Inkscape…) détectées et placées automatiquement, avec leur police, taille et couleur | ✅ |
+| **Éditeur de placement manuel** : ajouter des informations, les déplacer à la souris ou au clavier, régler police, taille, couleur, alignement et mise en forme ; QR code vCard qui réserve sa place | ✅ |
+| **Fond perdu complété** pour un visuel livré au format fini : il est posé tel quel et ses bords sont prolongés, rien n'est rogné | ✅ |
+| Balises dans un PDF, clic sur un texte d'exemple, effacement sur fond uni, enregistrement du projet | Phase 1, incrément 2b |
 | Contrôle avant impression, mosaïque, badges PVC | Phase 1, incrément 3 |
 | Signatures e-mail | Phase 1, incrément 4 |
 
