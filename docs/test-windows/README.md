@@ -33,7 +33,7 @@ Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par
    - « Windows a protégé votre ordinateur » : cliquer sur **Informations complémentaires**, puis sur **Exécuter quand même**.
    - L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
 
-**Attendu** : l'application démarre. En bas à gauche, « Moteur Typst 0.15.1 · N polices », avec N supérieur à 100. Le bouton ⓘ, en haut à droite, affiche Eau sèche et ses coordonnées. Les cinq modules du menu sont disponibles.
+**Attendu** : l'application démarre. En bas à gauche, « Moteur Typst 0.15.1 · N polices », avec N supérieur à 100. Le bouton ⓘ, en haut à droite, affiche Eau sèche et ses coordonnées. Les quatre modules du menu sont disponibles.
 
 À noter aussi : le temps de compilation, et si l'antivirus a réagi.
 

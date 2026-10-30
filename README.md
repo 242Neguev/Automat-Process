@@ -2,7 +2,9 @@
 
 *Une solution développée par **Eau sèche**. Contact : +242 06 853 26 77 · gneguev@gmail.com*
 
-Application de bureau (Windows) qui produit en série des **documents personnalisés** à partir d'un **modèle** et d'une **liste Excel**. Cinq modules : cartes de visite imprimées et numériques, signatures e-mail, visuels numériques (fonds Teams et Zoom, bannières), courriers Word et outils PDF.
+Application de bureau (Windows) qui produit en série des **documents personnalisés** à partir d'un **modèle** et d'une **liste Excel**. Quatre modules : cartes de visite imprimées et numériques, signatures e-mail, visuels numériques (fonds Teams et Zoom, bannières) et courriers Word.
+
+Les outils PDF (fusionner, séparer, organiser, protéger, diffuser) forment depuis le 30 octobre 2026 une application séparée, [Automat-PDF](https://github.com/242Neguev/Automat-PDF), car ils servent un autre usage.
 
 - 📄 [Analyse de faisabilité, décisions et feuille de route](docs/analyse-faisabilite.md)
 - 🧪 [Prototype de validation](prototype/README.md)
@@ -10,7 +12,7 @@ Application de bureau (Windows) qui produit en série des **documents personnali
 
 ## État actuel
 
-Les cinq modules sont disponibles. Ce qui dépend de Windows (impression directe, conversion par Word, Outlook) reste à essayer sur un poste Windows.
+Les quatre modules sont disponibles. Ce qui dépend de Windows (impression directe, conversion par Word, Outlook) reste à essayer sur un poste Windows.
 
 | Fonction | État |
 |---|---|
@@ -35,7 +37,6 @@ Les cinq modules sont disponibles. Ce qui dépend de Windows (impression directe
 | **Cartes numériques** : une image PNG ou JPG par agent (WhatsApp, LinkedIn, e-mail), ou un PDF par agent avec téléphone, e-mail et site cliquables ; fiche contact .vcf de chacun | ✅ |
 | **Visuels numériques** : fond d'écran Teams ou Zoom (1920 × 1080 px), bannière LinkedIn ou image carrée, avec les informations de chacun ; zone cachée par la personne affichée dans l'éditeur ; une image PNG ou JPG par agent, à la taille exacte du format | ✅ |
 | **Impression directe** (badges PVC sur Evolis, Zebra, Magicard… ou toute imprimante installée) : choix de l'imprimante, d'une carte ou de toutes, recto verso, verso retourné, exemplaires ; carte rendue à la résolution de l'imprimante, à sa taille réelle | ✅ (à tester sous Windows) |
-| **Outils PDF** : fusionner plusieurs PDF dans l'ordre voulu ; séparer un PDF par page ou toutes les N pages, fichiers nommés d'après une liste (`{{Prénom}} {{NOM}}`) ; pages recopiées telles quelles, CMJN compris | ✅ |
 | **Courriers Word** : modèle `.docx` ou `.dotx` avec balises `{{…}}` ou **champs de publipostage existants** (convertis), balises coupées par Word recollées ; aperçu du texte de chaque courrier ; un `.docx` par personne et un **document fusionné** (une section par courrier, pages numérotées à partir de 1) ; lignes vides retirées, valeurs sur plusieurs lignes gardées | ✅ |
 | **PDF des courriers** : un PDF par personne et un PDF fusionné, produits par Microsoft Word piloté sans s'afficher (sinon LibreOffice) ; **aperçu fidèle** du courrier affiché | ✅ (à essayer avec Word sous Windows) |
 | **Signatures e-mail** : trois mises en page compatibles Outlook et Gmail (classique, logo à gauche, bandeau) ou **signature existante** avec balises (fichier .htm d'Outlook, images locales intégrées) ; police sûre, couleurs, logo intégré ; aperçu clair et sombre ; taille contrôlée (limite de Gmail) | ✅ |
@@ -101,7 +102,7 @@ src/                     Interface React + TypeScript
   word/                  Courriers Word : préparation du modèle, remplissage, document fusionné
   donnees/               Listes, correspondances, nettoyage, vCard, agents à rendre
   modele/                Formats, champs, analyse des SVG, visuels
-  pages/                 Écrans (cartes/, qui sert aussi aux visuels numériques, signatures/, word/, pdf/, et commun/ : étape Liste partagée)
+  pages/                 Écrans (cartes/, qui sert aussi aux visuels numériques, signatures/, word/, et commun/ : étape Liste partagée)
 src-tauri/               Cœur Rust (Tauri)
   src/moteur/            Moteur de rendu Typst : compilation, fichiers virtuels, exports PDF/PNG/SVG
   src/commandes.rs       Commandes appelées par l'interface
@@ -111,7 +112,7 @@ src-tauri/               Cœur Rust (Tauri)
   src/projet_fichier.rs  Fichiers de projet « .automat »
   src/impression.rs      Impression directe par le pilote Windows (badges PVC)
   src/fichiers.rs        Lecture contrôlée des fichiers choisis, écriture des dossiers de résultats
-  src/outils_pdf.rs      Fusion et séparation de PDF (pages recopiées telles quelles)
+  src/outils_pdf.rs      PDF des courriers : fusion (pages recopiées telles quelles) et aperçu fidèle
   src/word.rs            Modèles Word : lecture des parties à remplir, écriture des courriers
   src/conversion.rs      Courriers en PDF : Microsoft Word (script PowerShell), sinon LibreOffice
   scripts/word-en-pdf.ps1  Pilotage de Word pour la conversion en PDF

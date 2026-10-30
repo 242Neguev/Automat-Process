@@ -1,5 +1,5 @@
-//! Outils PDF : fusionner plusieurs PDF, séparer un PDF en fichiers de N pages. Les pages sont
-//! recopiées telles quelles (contenu, polices, images, couleurs CMJN) : rien n'est recalculé.
+//! PDF des courriers Word : fusion en un seul PDF (pages recopiées telles quelles, polices et
+//! couleurs comprises) et aperçu fidèle. Les outils PDF complets sont dans l'application Automat-PDF.
 
 use std::collections::BTreeMap;
 
@@ -134,20 +134,6 @@ pub fn fusionner(sources: &[(String, Vec<u8>)]) -> Result<Vec<u8>, ErreurMoteur>
     assembler(objets, &pages, max_id)
 }
 
-/// Un PDF par groupe de `pages_par_fichier` pages (le dernier peut être plus court).
-pub fn separer(
-    octets: &[u8],
-    nom: &str,
-    pages_par_fichier: usize,
-) -> Result<Vec<Vec<u8>>, ErreurMoteur> {
-    let document = charger(octets, nom)?;
-    let pages: Vec<ObjectId> = document.get_pages().into_values().collect();
-    pages
-        .chunks(pages_par_fichier.max(1))
-        .map(|groupe| assembler(document.objects.clone(), groupe, document.max_id))
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -226,20 +212,6 @@ mod tests {
             )
         );
         assert_eq!(nombre_de_pages(&fusion, "fusion.pdf").unwrap(), 5);
-    }
-
-    #[test]
-    fn separe_par_groupes_de_pages() {
-        let parties = separer(&pdf_herite(5, "P"), "p.pdf", 2).unwrap();
-        let resultats: Vec<_> = parties
-            .iter()
-            .map(|partie| pages_et_textes(partie))
-            .collect();
-        assert_eq!(resultats[0], (2, vec!["P 1".into(), "P 2".into()]));
-        assert_eq!(resultats[2], (1, vec!["P 5".into()]));
-        assert_eq!(resultats.len(), 3);
-        // Une partie ne garde pas les pages des autres.
-        assert!(parties[2].len() < parties[0].len());
     }
 
     #[test]

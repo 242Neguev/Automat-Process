@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { ActionIcon, AppShell, Badge, Box, Group, Loader, NavLink, Stack, Text, ThemeIcon, Title, Tooltip } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { IconCpu, IconDeviceMobile, IconFiles, IconFileTypeDocx, IconId, IconInfoCircle, IconMail } from "@tabler/icons-react";
+import { IconCpu, IconDeviceMobile, IconFileTypeDocx, IconId, IconInfoCircle, IconMail } from "@tabler/icons-react";
 import APropos from "./APropos";
 import AssistantCartes from "./pages/cartes/AssistantCartes";
-import OutilsPdf from "./pages/pdf/OutilsPdf";
 import AssistantWord from "./pages/word/AssistantWord";
 import AssistantSignatures from "./pages/signatures/AssistantSignatures";
 import { infosMoteur, type InfosMoteur } from "./moteur";
@@ -16,7 +15,6 @@ const MODULES = [
   { cle: "signatures", icone: IconMail, disponible: true },
   { cle: "numerique", icone: IconDeviceMobile, disponible: true },
   { cle: "word", icone: IconFileTypeDocx, disponible: true },
-  { cle: "pdf", icone: IconFiles, disponible: true },
 ] as const;
 type Module = (typeof MODULES)[number]["cle"];
 
@@ -96,9 +94,6 @@ export default function App() {
         </Box>
         <Box display={module === "word" ? undefined : "none"}>
           <AssistantWord />
-        </Box>
-        <Box display={module === "pdf" ? undefined : "none"}>
-          <OutilsPdf />
         </Box>
       </AppShell.Main>
 

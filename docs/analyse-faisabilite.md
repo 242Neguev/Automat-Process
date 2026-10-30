@@ -260,7 +260,7 @@ Le modèle de signature peut être :
   - un `.docx` par personne, nommé automatiquement ;
   - **un PDF par personne**, via Microsoft Word installé sur le PC, piloté automatiquement pour un rendu identique à Word (sans Word : LibreOffice s'il est présent, sinon `.docx` seulement) ;
   - **un document fusionné** en `.docx` ou en PDF, pour imprimer en lot.
-- **Outils PDF** : **fusionner** plusieurs PDF et **séparer** un PDF par page ou par personne, avec nommage automatique. Le test a confirmé que les pages sont copiées telles quelles, CMJN compris.
+- **Outils PDF** : **fusionner** plusieurs PDF et **séparer** un PDF par page ou par personne, avec nommage automatique. Le test a confirmé que les pages sont copiées telles quelles, CMJN compris. *Mise à jour du 30 octobre 2026 : les outils PDF forment désormais une application séparée, [Automat-PDF](https://github.com/242Neguev/Automat-PDF) ; Automat-Process ne garde que la fusion des PDF des courriers.*
 - **Piège** : Word découpe souvent le texte en morceaux, ce qui coupe une balise (`{{No` puis `m}}`). On recolle les morceaux, selon le même principe que pour le SVG (validé). La mise en forme de la balise (gras, couleur) est appliquée à la valeur.
 - **Plus tard** : photos et QR codes dans Word, tableaux répétés (une ligne par élément).
 

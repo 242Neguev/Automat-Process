@@ -216,15 +216,8 @@ export async function vignettesCartes(modele: ModeleCarte, agents: DonneesAgent[
   return images;
 }
 
-/** Nombre de pages d'un PDF. */
-export const infosPdf = (chemin: string) => invoke<number>("infos_pdf", { chemin });
-
-/** Fusionne des PDF, dans l'ordre donné, dans le fichier `sortie`. */
+/** Fusionne des PDF (les PDF des courriers), dans l'ordre donné, dans le fichier `sortie`. */
 export const fusionnerPdf = (chemins: string[], sortie: string) => invoke<void>("fusionner_pdf", { chemins, sortie });
-
-/** Sépare un PDF en fichiers de `pagesParFichier` pages, nommés d'après `noms` ; renvoie le dossier créé. */
-export const separerPdf = (chemin: string, pagesParFichier: number, noms: string[], dossier: string, sousDossier: string) =>
-  invoke<string>("separer_pdf", { chemin, pagesParFichier, noms, dossier, sousDossier });
 
 /** Parties XML à remplir d'un modèle Word (chemin dans l'archive → XML). */
 export const lireModeleWord = (chemin: string) => invoke<Record<string, string>>("lire_modele_word", { chemin });

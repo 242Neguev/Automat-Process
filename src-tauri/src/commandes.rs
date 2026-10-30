@@ -247,16 +247,7 @@ async fn en_arriere_plan<T: Send + 'static>(
         })?
 }
 
-/// Nombre de pages d'un PDF choisi par l'utilisateur.
-#[tauri::command]
-pub async fn infos_pdf(chemin: String) -> Result<usize, ErreurMoteur> {
-    en_arriere_plan(move || {
-        outils_pdf::nombre_de_pages(&fichiers::lire(&chemin, Nature::Pdf)?, &nom_de(&chemin))
-    })
-    .await
-}
-
-/// Fusionne des PDF, dans l'ordre donné, dans le fichier `sortie`.
+/// Fusionne des PDF (les PDF des courriers Word), dans l'ordre donné, dans le fichier `sortie`.
 #[tauri::command]
 pub async fn fusionner_pdf(chemins: Vec<String>, sortie: String) -> Result<(), ErreurMoteur> {
     en_arriere_plan(move || {
@@ -268,49 +259,6 @@ pub async fn fusionner_pdf(chemins: Vec<String>, sortie: String) -> Result<(), E
         std::fs::write(&sortie, pdf).map_err(|erreur| {
             ErreurMoteur::simple(format!("Impossible d'enregistrer « {sortie} » : {erreur}"))
         })
-    })
-    .await
-}
-
-/// Sépare un PDF en fichiers de `pages_par_fichier` pages, dans un nouveau dossier (chemin renvoyé).
-/// Chaque fichier prend le nom donné par `noms`, sinon celui du PDF suivi d'un numéro.
-#[tauri::command]
-pub async fn separer_pdf(
-    chemin: String,
-    pages_par_fichier: usize,
-    noms: Vec<String>,
-    dossier: String,
-    sous_dossier: String,
-) -> Result<String, ErreurMoteur> {
-    en_arriere_plan(move || {
-        let nom = nom_de(&chemin);
-        let parties = outils_pdf::separer(
-            &fichiers::lire(&chemin, Nature::Pdf)?,
-            &nom,
-            pages_par_fichier,
-        )?;
-        let base = nom
-            .strip_suffix(".pdf")
-            .or_else(|| nom.strip_suffix(".PDF"))
-            .unwrap_or(&nom);
-        let chiffres = parties.len().to_string().len().max(3);
-        let a_ecrire: Vec<FichierAEcrire> = parties
-            .into_iter()
-            .enumerate()
-            .map(|(i, octets)| {
-                let nom = noms
-                    .get(i)
-                    .filter(|nom| !nom.trim().is_empty())
-                    .cloned()
-                    .unwrap_or_else(|| format!("{base} - {:0chiffres$}", i + 1));
-                FichierAEcrire {
-                    nom: format!("{nom}.pdf"),
-                    texte: None,
-                    octets: Some(octets),
-                }
-            })
-            .collect();
-        fichiers::ecrire(&dossier, &sous_dossier, &a_ecrire)
     })
     .await
 }
