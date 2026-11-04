@@ -45,6 +45,7 @@ pub fn run() {
             commandes::lire_liste,
             commandes::lire_fichier,
             commandes::ecrire_fichiers,
+            commandes::enregistrer_classeur,
             commandes::fusionner_pdf,
             commandes::lire_modele_word,
             commandes::ecrire_courriers,

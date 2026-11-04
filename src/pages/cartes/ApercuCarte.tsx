@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Alert, Box, Loader, LoadingOverlay, Paper, Text } from "@mantine/core";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { apercuCarte, enErreurMoteur, type DonneesAgent, type ErreurMoteur, type Face, type ModeleCarte } from "../../moteur";
@@ -48,6 +48,31 @@ export function useApercu(modele: ModeleCarte | null, agent: DonneesAgent | null
   }, [cle]); // `cle` résume modele, agent et face
 
   return { url: useUrlSvg(svg), chargement, erreur };
+}
+
+const AGENT_VIDE: DonneesAgent = { id: "calque", valeurs: {} };
+
+/**
+ * Calque de référence de l'éditeur : la maquette du graphiste (avec un exemple), rendue exactement
+ * comme un visuel de la carte puis posée en transparence, pour placer les informations au même endroit.
+ */
+export function CalqueReference({ modele, opacite }: { modele: ModeleCarte; opacite: number }) {
+  const { nom, format, fond_calque, fond_calque_avec_fond_perdu } = modele;
+  const maquette = useMemo<ModeleCarte>(
+    () => ({ nom, format, fond_recto: fond_calque ?? null, fond_recto_avec_fond_perdu: fond_calque_avec_fond_perdu ?? true, fond_verso: null, champs: [] }),
+    [nom, format, fond_calque, fond_calque_avec_fond_perdu],
+  );
+  const { url } = useApercu(maquette, AGENT_VIDE, "recto", 0);
+  if (!url) return null;
+  return (
+    <img
+      src={url}
+      alt=""
+      data-calque
+      draggable={false}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: opacite / 100, pointerEvents: "none" }}
+    />
+  );
 }
 
 interface Props {

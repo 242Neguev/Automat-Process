@@ -110,8 +110,31 @@ if ($LASTEXITCODE -ne 0) {
 
 Set-Location $racine
 
+# Fichiers de compilation (plusieurs Go) hors de OneDrive, qui tenterait sinon de tout synchroniser. Pas
+# dans %LOCALAPPDATA%\Automat-Process : c'est là que s'installe l'application.
+$dossiersOneDrive = @($env:OneDrive, $env:OneDriveCommercial, $env:OneDriveConsumer) | Where-Object { $_ }
+$dansOneDrive = $dossiersOneDrive | Where-Object { ($racine + '\').StartsWith($_.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) }
+if ($dansOneDrive -and -not $env:CARGO_TARGET_DIR) {
+    $env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA 'Automat-Process-compilation'
+    Write-Host "Projet dans OneDrive : compilation dans $env:CARGO_TARGET_DIR (hors synchronisation)."
+}
+$dossierCompilation = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $racine 'src-tauri\target' }
+
+# Chaque compilation en parallèle peut demander 1 à 2 Go : avec peu de mémoire, on en lance moins
+# (sinon le compilateur s'arrête net, avec le code 0xC0000409).
+if (-not $env:CARGO_BUILD_JOBS) {
+    $memoireGo = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
+    $taches = [int][math]::Max(1, [math]::Min([Environment]::ProcessorCount, [math]::Floor($memoireGo / 3)))
+    if ($taches -lt [Environment]::ProcessorCount) {
+        $env:CARGO_BUILD_JOBS = "$taches"
+        Write-Host "Mémoire de $([math]::Round($memoireGo)) Go : $taches compilations en parallèle."
+    }
+}
+
+# npm.cmd et non npm : appelé avec « & » depuis un script, le npm.ps1 de npm 10 tronque la commande
+# (« Unknown command: "pm" »).
 Write-Etape "Installation des dépendances de l'interface (npm ci)"
-& npm ci --no-fund --no-audit
+& npm.cmd ci --no-fund --no-audit
 if ($LASTEXITCODE -ne 0) {
     Exit-AvecErreur 'npm ci a échoué : voir les messages ci-dessus.'
 }
@@ -121,12 +144,12 @@ if ($Msi) {
     $formats = 'nsis,msi'
 }
 Write-Etape "Compilation de l'application (la première fois : 10 à 20 minutes)"
-& npm run tauri build -- --bundles $formats
+& npm.cmd run tauri build -- --bundles $formats
 if ($LASTEXITCODE -ne 0) {
     Exit-AvecErreur 'la compilation a échoué : voir les messages ci-dessus.'
 }
 
-$dossierBundles = Join-Path $racine 'src-tauri\target\release\bundle'
+$dossierBundles = Join-Path $dossierCompilation 'release\bundle'
 $installateurs = @(Get-ChildItem -Path $dossierBundles -Recurse -Include '*.exe', '*.msi' -ErrorAction SilentlyContinue |
     Where-Object { $_.Directory.Name -in @('nsis', 'msi') })
 if ($installateurs.Count -eq 0) {

@@ -1,4 +1,4 @@
-import { createTheme, type MantineColorsTuple } from "@mantine/core";
+import { Notification, createTheme, type MantineColorsTuple } from "@mantine/core";
 
 /** Palette de l'éditeur, Eau sèche : Encre, Eau (couleur d'accent) et Sec. */
 export const COULEURS = {
@@ -27,4 +27,8 @@ export const theme = createTheme({
   primaryShade: 6,
   black: COULEURS.encre,
   defaultRadius: "md",
+  components: {
+    // Les messages des notifications gardent leurs retours à la ligne (dossier créé, puis précisions).
+    Notification: Notification.extend({ styles: { description: { whiteSpace: "pre-line" } } }),
+  },
 });

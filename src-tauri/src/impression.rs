@@ -76,6 +76,8 @@ pub fn imprimantes() -> Result<Vec<Imprimante>, String> {
     Ok(Vec::new())
 }
 
+/// Imprime les faces ; `Ok(false)` : l'utilisateur a annulé (boîte « Enregistrer l'impression sous »
+/// d'une imprimante virtuelle, PDF ou XPS, refermée sans enregistrer).
 #[cfg(not(windows))]
 pub fn imprimer(
     _imprimante: &str,
@@ -84,7 +86,7 @@ pub fn imprimer(
     _faces: &[Face],
     _retourner_verso: bool,
     _rendre: &Rendu,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     Err("L'impression directe n'est disponible que sous Windows.".into())
 }
 
@@ -96,6 +98,7 @@ mod systeme {
     use std::ffi::c_void;
     use std::mem::size_of;
 
+    use windows::Win32::Foundation::{ERROR_CANCELLED, GetLastError};
     use windows::Win32::Graphics::Gdi::{
         BI_RGB, BITMAPINFO, BITMAPINFOHEADER, CreateDCW, DEVMODEW, DIB_RGB_COLORS, DM_COPIES,
         DM_DUPLEX, DM_IN_BUFFER, DM_ORIENTATION, DM_OUT_BUFFER, DMDUP_SIMPLEX, DMDUP_VERTICAL,
@@ -244,7 +247,7 @@ mod systeme {
         faces: &[Face],
         retourner_verso: bool,
         rendre: &Rendu,
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
         let nom = HSTRING::from(imprimante);
         let recto_verso = faces.iter().any(|face| face.verso);
         let devmode = reglages_pilote(&nom, taille_mm.0 > taille_mm.1, recto_verso)?;
@@ -273,7 +276,7 @@ mod systeme {
         faces: &[Face],
         retourner_verso: bool,
         rendre: &Rendu,
-    ) -> Result<(), String> {
+    ) -> Result<bool, String> {
         let nom_document = HSTRING::from(document);
         let info = DOCINFOW {
             cbSize: size_of::<DOCINFOW>() as i32,
@@ -281,6 +284,10 @@ mod systeme {
             ..Default::default()
         };
         if unsafe { StartDocW(hdc, &info) } <= 0 {
+            // Imprimante virtuelle (PDF, XPS) : sa boîte « Enregistrer l'impression sous » a été refermée.
+            if unsafe { GetLastError() } == ERROR_CANCELLED {
+                return Ok(false);
+            }
             return Err("L'impression n'a pas pu démarrer.".into());
         }
         let caps = |index| unsafe { GetDeviceCaps(Some(hdc), index) };
@@ -298,7 +305,7 @@ mod systeme {
                 demi_tour(&mut pixels);
             }
             // RVBA (cartes opaques) → BVRA attendu par Windows.
-            for pixel in pixels.chunks_exact_mut(4) {
+            for pixel in pixels.as_chunks_mut::<4>().0 {
                 pixel.swap(0, 2);
             }
             let entete = BITMAPINFO {
@@ -347,7 +354,7 @@ mod systeme {
                 AbortDoc(hdc)
             }
         };
-        resultat
+        resultat.map(|()| true)
     }
 }
 

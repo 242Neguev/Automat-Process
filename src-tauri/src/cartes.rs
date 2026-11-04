@@ -284,8 +284,10 @@ fn jpeg(
 ) -> Result<Vec<u8>, ErreurMoteur> {
     let (largeur, hauteur, rvba) = document.pixels(page, pixels_par_point)?;
     let rvb: Vec<u8> = rvba
-        .chunks_exact(4)
-        .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .flat_map(|&[r, v, b, _]| [r, v, b])
         .collect();
     let mut sortie = Vec::new();
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut sortie, qualite)
@@ -325,10 +327,13 @@ pub fn exporter_numerique(
         octets: Some(octets),
     };
     let mut fichiers = Vec::new();
+    // Profil « écran » : les versions écran des visuels, quand le modèle en a.
+    let profil = ("profil", "ecran");
     if options.format == FormatNumerique::Pdf {
         let entrees = [
             ("mode", "ecran"),
             ("verso", if verso { "oui" } else { "non" }),
+            profil,
         ];
         for (agent, nom) in agents.iter().zip(noms) {
             let pdf = compiler(moteur, projet, std::slice::from_ref(agent), &entrees)?.pdf()?;
@@ -349,12 +354,17 @@ pub fn exporter_numerique(
         } else {
             "png"
         };
-        let rectos = compiler(moteur, projet, agents, &[("mode", "mosaique")])?;
+        let rectos = compiler(moteur, projet, agents, &[("mode", "mosaique"), profil])?;
         for (page, nom) in noms.iter().enumerate() {
             fichiers.push(fichier(format!("{nom}.{extension}"), image(&rectos, page)?));
         }
         if verso {
-            let entrees = [("mode", "apercu"), ("agent", "0"), ("face", "verso")];
+            let entrees = [
+                ("mode", "apercu"),
+                ("agent", "0"),
+                ("face", "verso"),
+                profil,
+            ];
             let document = compiler(moteur, projet, &agents[..1], &entrees)?;
             fichiers.push(fichier(format!("_Verso.{extension}"), image(&document, 0)?));
         }
@@ -387,13 +397,14 @@ pub fn bon_a_tirer(
 }
 
 /// Impression directe des cartes sur une imprimante Windows : recto, et verso au dos si demandé.
+/// `Ok(false)` : l'utilisateur a annulé (imprimante virtuelle dont la boîte d'enregistrement a été refermée).
 pub fn imprimer(
     moteur: &Moteur,
     projet: &Projet,
     agents: &[DonneesAgent],
     imprimante: &str,
     reglages: impression::Reglages,
-) -> Result<(), ErreurMoteur> {
+) -> Result<bool, ErreurMoteur> {
     if agents.is_empty() {
         return Err(ErreurMoteur::simple("Aucune carte à imprimer."));
     }
@@ -718,6 +729,57 @@ mod tests {
         assert_eq!(blanc, "#ffffff");
         let bleu = couleur_autour(&moteur, &projet, zone(51.0)).unwrap();
         assert_eq!(bleu, "#1d3557");
+    }
+
+    /// Cartes numériques : la version écran d'un visuel remplace celle de l'imprimeur, qui reste
+    /// celle de l'aperçu, de la mosaïque et des PDF d'impression.
+    #[test]
+    fn cartes_numeriques_avec_la_version_ecran() {
+        let moteur = Moteur::nouveau();
+        let uni = |r, v, b| {
+            let mut image = tiny_skia::Pixmap::new(85, 55).unwrap();
+            image.fill(tiny_skia::Color::from_rgba8(r, v, b, 255));
+            Bytes::new(image.encode_png().unwrap())
+        };
+        let mut projet = projet_importe();
+        projet.fonds.insert("/fonds/1.png".into(), uni(0, 0, 255));
+        projet.fonds.insert("/fonds/2.png".into(), uni(255, 0, 0));
+        projet.modele["fond_recto_avec_fond_perdu"] = false.into();
+        projet.modele["fond_recto_ecran"] = "/fonds/2.png".into();
+        let agents = [agent(0, false)];
+        let coin = |entrees: &[(&str, &str)]| {
+            let document = compiler(&moteur, &projet, &agents, entrees).unwrap();
+            let (_, _, rvba) = document.pixels(0, 1.0).unwrap();
+            (rvba[0], rvba[1], rvba[2])
+        };
+        assert_eq!(coin(&[("mode", "mosaique")]), (0, 0, 255));
+        assert_eq!(coin(&[("mode", "cartes")]), (0, 0, 255));
+        assert_eq!(coin(&[("mode", "ecran"), ("profil", "ecran")]), (255, 0, 0));
+
+        let dossier = std::env::temp_dir()
+            .join("automat-process-tests")
+            .join("version-ecran");
+        let _ = std::fs::remove_dir_all(&dossier);
+        let options = OptionsNumerique {
+            format: FormatNumerique::Png,
+            largeur_px: 400,
+            verso: false,
+        };
+        let cree = exporter_numerique(
+            &moteur,
+            &projet,
+            &agents,
+            &["Aïssatou DIALLO".to_string()],
+            &[String::new()],
+            options,
+            dossier.to_str().unwrap(),
+            "png",
+        )
+        .unwrap();
+        let png = std::fs::read(std::path::Path::new(&cree).join("Aïssatou DIALLO.png")).unwrap();
+        let image = tiny_skia::Pixmap::decode_png(&png).unwrap();
+        let pixel = image.pixel(0, 0).unwrap();
+        assert_eq!((pixel.red(), pixel.green(), pixel.blue()), (255, 0, 0));
     }
 
     /// Visuel au format fini : posé tel quel, fond perdu complété en prolongeant ses bords.

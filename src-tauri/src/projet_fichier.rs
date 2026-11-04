@@ -21,7 +21,9 @@ use crate::moteur::ErreurMoteur;
 const APPLICATION: &str = "Automat-Process";
 const VERSION_FORMAT: u64 = 1;
 const ENTREE_PROJET: &str = "projet.json";
-const FACES: [&str; 2] = ["recto", "verso"];
+/// Visuels qu'un modèle peut désigner (clé « fond_… ») : recto et verso pour l'imprimeur, leurs
+/// versions écran (cartes numériques) et le calque de référence de l'éditeur (jamais imprimé).
+const EMPLACEMENTS: [&str; 5] = ["recto", "verso", "recto_ecran", "verso_ecran", "calque"];
 /// Sortes de documents : chacune s'ouvre dans son module.
 const DOCUMENTS: [&str; 4] = ["carte", "ecran", "signature", "word"];
 
@@ -57,7 +59,7 @@ pub fn enregistrer(
     let mut modele = modele.clone();
     let mut visuels = visuels.clone();
     let mut fichiers = Vec::new();
-    for face in FACES {
+    for face in EMPLACEMENTS {
         let cle = format!("fond_{face}");
         let Some(virtuel) = modele.get(&cle).and_then(Value::as_str).map(str::to_owned) else {
             continue;
@@ -156,7 +158,7 @@ pub fn ouvrir(chemin: &str, fonds: &Fonds) -> Result<ProjetOuvert, ErreurMoteur>
     } else {
         json!({})
     };
-    for face in FACES {
+    for face in EMPLACEMENTS {
         let cle = format!("fond_{face}");
         let Some(interne) = modele.get(&cle).and_then(Value::as_str).map(str::to_owned) else {
             continue;
@@ -265,6 +267,43 @@ mod tests {
         let ouvert = ouvrir(&chemin, &fonds).unwrap();
         assert_eq!(ouvert.document, "ecran");
         assert_eq!(ouvert.modele["format"]["px"]["largeur"], 1920);
+    }
+
+    #[test]
+    fn emporte_les_versions_ecran_et_le_calque() {
+        let fonds = Fonds::default();
+        let png = |cote: u32| {
+            let image = tiny_skia::Pixmap::new(cote, cote).unwrap();
+            image.encode_png().unwrap()
+        };
+        let ecran = fonds
+            .ajouter(png(40), "png", "recto-ecran.png".into())
+            .unwrap();
+        let calque = fonds
+            .ajouter(png(30), "png", "maquette.png".into())
+            .unwrap();
+        let mut modele = cartes::modele_demo();
+        modele["fond_recto_ecran"] = ecran.chemin.clone().into();
+        modele["fond_calque"] = calque.chemin.clone().into();
+        // Comme l'interface : les informations de chaque visuel accompagnent le modèle.
+        let visuels = json!({
+            "recto_ecran": { "nomFichier": "recto-ecran.png", "largeurPx": 40 },
+            "calque": { "nomFichier": "maquette.png", "largeurPx": 30 },
+        });
+        let chemin = chemin_temporaire("versions-ecran.automat");
+        enregistrer(&chemin, "carte", &modele, &json!({}), &visuels, &fonds).unwrap();
+
+        let rouverts = Fonds::default();
+        let ouvert = ouvrir(&chemin, &rouverts).unwrap();
+        for (cle, emplacement, cote) in [
+            ("fond_recto_ecran", "recto_ecran", 40),
+            ("fond_calque", "calque", 30),
+        ] {
+            let virtuel = ouvert.modele[cle].as_str().unwrap();
+            assert_eq!(ouvert.visuels[emplacement]["chemin"], virtuel);
+            assert_eq!(ouvert.visuels[emplacement]["largeurPx"], cote);
+            assert!(rouverts.contenu(virtuel).is_some());
+        }
     }
 
     #[test]

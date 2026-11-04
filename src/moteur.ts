@@ -74,8 +74,18 @@ export interface ModeleCarte {
   /** Le visuel contient-il déjà le fond perdu ? Sinon, le fond perdu est complété à partir de ses bords. */
   fond_recto_avec_fond_perdu?: boolean;
   fond_verso_avec_fond_perdu?: boolean;
+  /** Versions écran (RVB) des visuels : elles remplacent celles de l'imprimeur dans les cartes numériques. */
+  fond_recto_ecran?: string | null;
+  fond_verso_ecran?: string | null;
+  fond_recto_ecran_avec_fond_perdu?: boolean;
+  fond_verso_ecran_avec_fond_perdu?: boolean;
+  /** Calque de référence de l'éditeur : la maquette, posée en transparence ; jamais imprimée. */
+  fond_calque?: string | null;
+  fond_calque_avec_fond_perdu?: boolean;
   transformations?: Record<string, Transformation>;
   champs: Champ[];
+  /** Mode opérateur : le modèle ne se modifie plus, le projet s'ouvre à l'étape Liste. */
+  verrouille?: boolean;
 }
 
 /** Un agent prêt à être rendu : texte final de chaque champ et vCard du QR code. */
@@ -165,7 +175,8 @@ export interface ProjetOuvert {
   /** Modèle de carte (ModeleCarte) ou de signature, selon `document`. */
   modele: unknown;
   correspondances: Record<string, string | null>;
-  visuels: Partial<Record<Face, FondImporte & Record<string, unknown>>>;
+  /** Visuels du modèle, par emplacement (recto, verso, recto_ecran, verso_ecran, calque). */
+  visuels: Partial<Record<string, FondImporte & Record<string, unknown>>>;
 }
 
 export const infosMoteur = () => invoke<InfosMoteur>("infos_moteur");
@@ -238,18 +249,29 @@ export interface CourriersEcrits {
 export const ecrireCourriers = (modele: string, courriers: Courrier[], dossier: string, sousDossier: string) =>
   invoke<CourriersEcrits>("ecrire_courriers", { modele, courriers, dossier, sousDossier });
 
+/** Logiciel qui convertit les courriers en PDF. */
+export type Convertisseur = "word" | "libreoffice";
+
 /** Conversion en PDF : logiciel utilisé et PDF créés, dans l'ordre des documents. */
 export interface Conversion {
-  convertisseur: "word" | "libreoffice";
+  convertisseur: Convertisseur;
   pdfs: string[];
+  /** Pourquoi Word, pourtant installé, n'a pas fait la conversion (LibreOffice a pris le relais). */
+  remarque: string | null;
 }
 
 /** Convertit des courriers Word en PDF (Word, sinon LibreOffice) dans le dossier `sousDossier` de `dossier`. */
 export const convertirCourriers = (documents: string[], dossier: string, sousDossier: string, supprimerSources: boolean) =>
   invoke<Conversion>("convertir_courriers", { documents, dossier, sousDossier, supprimerSources });
 
-/** Aperçu fidèle d'un courrier : ses pages en SVG, telles que Word les produit. */
-export const apercuCourrier = (modele: string, courrier: Courrier) => invoke<string[]>("apercu_courrier", { modele, courrier });
+/** Aperçu fidèle d'un courrier : ses pages en SVG, telles que Word (ou LibreOffice) les produit. */
+export interface ApercuCourrier {
+  pages: string[];
+  convertisseur: Convertisseur;
+  remarque: string | null;
+}
+
+export const apercuCourrier = (modele: string, courrier: Courrier) => invoke<ApercuCourrier>("apercu_courrier", { modele, courrier });
 
 /** Dossier temporaire neuf, et sa suppression (documents intermédiaires). */
 export const dossierTemporaire = () => invoke<string>("dossier_temporaire");
@@ -273,8 +295,9 @@ export interface ReglagesImpression {
 
 export const imprimantes = () => invoke<Imprimante[]>("imprimantes");
 
+/** Imprime les cartes ; `false` si l'utilisateur a annulé (boîte d'enregistrement d'une imprimante PDF ou XPS). */
 export const imprimerCartes = (modele: ModeleCarte, agents: DonneesAgent[], imprimante: string, reglages: ReglagesImpression) =>
-  invoke<void>("imprimer_cartes", { modele, agents, imprimante, reglages });
+  invoke<boolean>("imprimer_cartes", { modele, agents, imprimante, reglages });
 
 /** Couleur du visuel tout autour d'une zone : elle sert à effacer un texte incrusté. */
 export const couleurAutour = (modele: ModeleCarte, zone: Zone) => invoke<string>("couleur_autour", { modele, zone });
@@ -293,6 +316,9 @@ export const lireListe = (chemin: string) => invoke<ArrayBuffer>("lire_liste", {
 
 /** Contenu brut d'un fichier choisi par l'utilisateur, après contrôle de son format et de sa taille. */
 export const lireFichier = (chemin: string, nature: "liste" | "image" | "signature") => invoke<ArrayBuffer>("lire_fichier", { chemin, nature });
+
+/** Enregistre un classeur Excel (.xlsx) préparé par l'interface. */
+export const enregistrerClasseur = (chemin: string, octets: Uint8Array) => invoke<void>("enregistrer_classeur", { chemin, octets: Array.from(octets) });
 
 /** Fichier à créer : un texte (HTML) ou des octets (image). */
 export type FichierAEcrire = { nom: string; texte: string } | { nom: string; octets: number[] };

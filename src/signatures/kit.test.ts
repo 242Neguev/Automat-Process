@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { construireKit, extraireImages } from "./kit";
+import { construireKit, dossierImages, extraireImages } from "./kit";
 
 const LOGO = "data:image/png;base64,iVBORw0KGgo=";
 const agent = (nom: string, email: string) => ({ nom, email, html: `<table><tr><td>${nom}</td></tr><tr><td><img src="${LOGO}" width="120"></td></tr></table>`, texte: `${nom}\n${email}` });
@@ -28,19 +28,26 @@ describe("kit Outlook", () => {
       "LISEZMOI.txt",
     ]);
     const texte = (nom: string) => (fichiers.find((f) => f.nom === nom) as { texte: string }).texte;
-    // Le nom de la signature devient un nom de fichier valide sous Windows.
+    // Le nom de la signature devient un nom de fichier valide sous Windows ; celui du dossier des images
+    // ne garde que des lettres ASCII.
     expect(JSON.parse(texte("kit.json"))).toEqual({
       signature: "Signature - Eau sèche",
+      images: "Signature-Eau-seche_fichiers",
       agents: [
         { numero: 1, nom: "Aïssatou DIALLO", email: "a.diallo@exemple.com", dossier: "001" },
         { numero: 2, nom: "Jean DUPONT", email: "j.dupont@exemple.com", dossier: "002" },
       ],
     });
-    expect(texte("signatures/001/signature.htm")).toContain('src="Signature%20-%20Eau%20s%C3%A8che_fichiers/image001.png"');
+    expect(texte("signatures/001/signature.htm")).toContain('src="Signature-Eau-seche_fichiers/image001.png"');
     expect(texte("installer.ps1").startsWith("﻿")).toBe(true);
     expect(texte("installer.ps1")).toContain("\r\n");
     expect(texte("Installer ma signature.cmd")).toContain('-File "%~dp0installer.ps1"');
     const txt = (fichiers.find((f) => f.nom === "signatures/001/signature.txt") as { octets: number[] }).octets;
     expect(txt.slice(0, 4)).toEqual([0xff, 0xfe, 0x41, 0x00]); // UTF-16 : marque, puis « A »
+  });
+
+  it("nomme le dossier des images sans accents ni caractères spéciaux", () => {
+    expect(dossierImages("Société Générale – Siège")).toBe("Societe-Generale-Siege_fichiers");
+    expect(dossierImages("توقيع")).toBe("signature_fichiers"); // aucun caractère latin
   });
 });

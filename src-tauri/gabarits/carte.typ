@@ -2,7 +2,7 @@
 // de la mosaïque, ou mesures de contrôle seules.
 // Fichiers virtuels : /projet.json (format, fonds, champs) et /agents.json (valeurs de chaque agent).
 // Entrées (sys.inputs) : mode = apercu | cartes | planches | mosaique | ecran | controle | bat ; agent et
-// face (aperçu) ; feuille = A4 | A3 | SRA3 ; titre et date (BAT).
+// face (aperçu) ; feuille = A4 | A3 | SRA3 ; titre et date (BAT) ; profil = impression | ecran (visuels).
 // Les positions des champs sont en mm depuis le coin haut-gauche de la carte finie (hors fond perdu).
 #let projet = json("/projet.json")
 #let agents = json("/agents.json")
@@ -139,9 +139,21 @@
 #let fond-verso = projet.at("fond_verso", default: none)
 #let avec-verso = fond-verso not in (none, "")
 
+// Profil « écran » (cartes numériques) : la version écran d'un visuel (RVB, souvent au format fini)
+// remplace celle de l'imprimeur quand le modèle en a une ; sinon, la version de l'imprimeur sert aussi.
+#let profil = entree("profil", "impression")
+#let visuel(face) = {
+  let ecran = projet.at("fond_" + face + "_ecran", default: none)
+  if profil == "ecran" and ecran not in (none, "") {
+    fond(ecran, projet.at("fond_" + face + "_ecran_avec_fond_perdu", default: false))
+  } else {
+    fond(projet.at("fond_" + face, default: none), projet.at("fond_" + face + "_avec_fond_perdu", default: true))
+  }
+}
+
 // Carte complète, fond perdu compris (cw × ch).
 #let carte-recto(a) = box(width: cw, height: ch, clip: true, fill: white, {
-  place(fond(projet.at("fond_recto", default: none), projet.at("fond_recto_avec_fond_perdu", default: true)))
+  place(visuel("recto"))
   // Zones effacées (texte d'exemple incrusté dans le visuel) : aplats sous les informations.
   for m in projet.champs.filter(f => f.type == "masque") {
     place(top + left, dx: fp + m.x_mm * 1mm, dy: fp + m.y_mm * 1mm,
@@ -155,7 +167,7 @@
     }
   }
 })
-#let carte-verso() = box(width: cw, height: ch, clip: true, fill: white, fond(fond-verso, projet.at("fond_verso_avec_fond_perdu", default: true)))
+#let carte-verso() = box(width: cw, height: ch, clip: true, fill: white, visuel("verso"))
 
 // Page au format fini avec fond perdu natif : le PDF reçoit une TrimBox (zone de coupe) pour l'imprimeur.
 #let page-carte(contenu) = page(width: largeur, height: hauteur, margin: 0pt, bleed: fp, background: contenu)[]

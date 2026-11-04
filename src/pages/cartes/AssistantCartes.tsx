@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Group, Stack, Stepper, Text, Title } from "@mantine/core";
 import { balisesDuModele, construireAgent, ficheContact, liensAgent, valeursDeLigne } from "../../donnees/agents";
 import { FORMATS, FORMATS_ECRAN } from "../../modele/formats";
-import { pourEnregistrer, preparerVisuel, type Visuel } from "../../modele/visuels";
-import { famillesPolices, modeleDemo, type Face, type ModeleCarte } from "../../moteur";
+import { EMPLACEMENTS, pourEnregistrer, preparerVisuel, type Visuels } from "../../modele/visuels";
+import { famillesPolices, modeleDemo, type ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import EtapeListe from "../commun/EtapeListe";
 import { BoutonsProjet, choisirProjet, enregistrerSous, projetOuvert } from "../commun/projet";
@@ -33,12 +33,18 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
   const [etape, setEtape] = useState(0);
   const [source, setSource] = useState<Source>("perso");
   const [modeles, setModeles] = useState<Record<Source, ModeleCarte | null>>({ perso: modeleVierge(ecran), demo: null });
-  const [visuels, setVisuels] = useState<Partial<Record<Face, Visuel>>>({});
+  const [visuels, setVisuels] = useState<Visuels>({});
   const [polices, setPolices] = useState<string[]>([]);
   const [filtre, setFiltre] = useState<Filtre>("toutes");
   // Change à chaque projet ouvert : l'étape Modèle repart d'un état neuf (outil, sélection).
   const [ouvertures, setOuvertures] = useState(0);
   const modele = modeles[source];
+  const verrouille = Boolean(modele?.verrouille);
+  const verrouiller = (verrou: boolean) =>
+    setModeles((m) => {
+      const actuel = m[source];
+      return actuel ? { ...m, [source]: { ...actuel, verrouille: verrou } } : m;
+    });
 
   useEffect(() => {
     famillesPolices().then(setPolices, signalerErreur);
@@ -81,16 +87,17 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
     const projet = await choisirProjet(ecran ? "ecran" : "carte");
     if (!projet) return;
     const modeleOuvert = projet.modele as ModeleCarte;
-    const ouverts: Partial<Record<Face, Visuel>> = {};
-    for (const face of ["recto", "verso"] as Face[]) {
-      const fond = projet.visuels[face];
-      if (fond) ouverts[face] = preparerVisuel(fond, polices).visuel;
+    const ouverts: Visuels = {};
+    for (const emplacement of EMPLACEMENTS) {
+      const fond = projet.visuels[emplacement];
+      if (fond) ouverts[emplacement] = preparerVisuel(fond, polices).visuel;
     }
     setModeles((m) => ({ ...m, perso: modeleOuvert }));
     setVisuels(ouverts);
     donnees.restaurer(projet.correspondances, balisesDuModele(modeleOuvert));
     setSource("perso");
-    setEtape(0);
+    // Modèle verrouillé (mode opérateur) : on commence par la liste.
+    setEtape(modeleOuvert.verrouille ? 1 : 0);
     setOuvertures((n) => n + 1);
     projetOuvert(modeleOuvert.nom);
   }
@@ -105,7 +112,12 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
           <Title order={2}>{libelles.titre}</Title>
           <Text c="dimmed">{libelles.sousTitre}</Text>
         </div>
-        <BoutonsProjet onOuvrir={ouvrirFichierProjet} onEnregistrer={enregistrer} enregistrable={Boolean(modele)} />
+        <BoutonsProjet
+          onOuvrir={ouvrirFichierProjet}
+          onEnregistrer={enregistrer}
+          enregistrable={Boolean(modele)}
+          verrou={modele ? { verrouille, onChange: verrouiller } : undefined}
+        />
       </Group>
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
@@ -121,6 +133,8 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
               onVisuels={setVisuels}
               polices={polices}
               avecDemo={!ecran}
+              verrouille={verrouille}
+              onDeverrouiller={() => verrouiller(false)}
             />
           )}
         </Stepper.Step>
@@ -129,6 +143,7 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
             liste={liste}
             feuilles={donnees.feuilles}
             balises={balises}
+            nomModele={modele?.nom ?? ""}
             correspondances={correspondances}
             exemple={exemple}
             anomalies={donnees.anomalies}

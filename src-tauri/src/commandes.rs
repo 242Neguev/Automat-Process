@@ -355,13 +355,22 @@ pub async fn convertir_courriers(
     .await
 }
 
+/// Aperçu fidèle d'un courrier : ses pages en SVG, le logiciel qui l'a mis en page et, si ce n'est pas
+/// Word alors qu'il est installé, pourquoi.
+#[derive(Serialize)]
+pub struct ApercuCourrier {
+    pages: Vec<String>,
+    convertisseur: conversion::Convertisseur,
+    remarque: Option<String>,
+}
+
 /// Aperçu fidèle d'un courrier : converti en PDF (Word ou LibreOffice), puis ses pages en SVG.
 #[tauri::command]
 pub async fn apercu_courrier(
     etat: State<'_, EtatMoteur>,
     modele: String,
     courrier: Courrier,
-) -> Result<Vec<String>, ErreurMoteur> {
+) -> Result<ApercuCourrier, ErreurMoteur> {
     executer(&etat, move |moteur| {
         let travail = std::path::PathBuf::from(dossier_temporaire()?);
         let resultat = (|| {
@@ -373,7 +382,11 @@ pub async fn apercu_courrier(
             let conversion = conversion::en_pdf(&documents, &travail)?;
             let pdf = std::fs::read(&conversion.pdfs[0])
                 .map_err(|e| ErreurMoteur::simple(format!("PDF illisible : {e}")))?;
-            outils_pdf::rendre_pages(moteur, pdf)
+            Ok(ApercuCourrier {
+                pages: outils_pdf::rendre_pages(moteur, pdf)?,
+                convertisseur: conversion.convertisseur,
+                remarque: conversion.remarque,
+            })
         })();
         let _ = std::fs::remove_dir_all(&travail);
         resultat
@@ -390,7 +403,8 @@ pub async fn imprimantes() -> Result<Vec<Imprimante>, ErreurMoteur> {
         .map_err(ErreurMoteur::simple)
 }
 
-/// Imprime directement les cartes des agents sur l'imprimante choisie.
+/// Imprime directement les cartes des agents sur l'imprimante choisie ; `false` si l'utilisateur a
+/// annulé (boîte « Enregistrer l'impression sous » d'une imprimante PDF ou XPS refermée).
 #[tauri::command]
 pub async fn imprimer_cartes(
     etat: State<'_, EtatMoteur>,
@@ -399,7 +413,7 @@ pub async fn imprimer_cartes(
     agents: Vec<DonneesAgent>,
     imprimante: String,
     reglages: Reglages,
-) -> Result<(), ErreurMoteur> {
+) -> Result<bool, ErreurMoteur> {
     let projet = Projet {
         modele,
         fonds: fonds.fichiers(),
@@ -422,6 +436,23 @@ pub async fn lire_fichier(chemin: String, nature: Nature) -> Result<Response, Er
     tauri::async_runtime::spawn_blocking(move || fichiers::lire(&chemin, nature).map(Response::new))
         .await
         .map_err(|erreur| ErreurMoteur::simple(format!("Lecture interrompue : {erreur}")))?
+}
+
+/// Enregistre un classeur Excel préparé par l'interface (liste vide à faire remplir) dans `chemin`,
+/// qui doit finir par « .xlsx ».
+#[tauri::command]
+pub async fn enregistrer_classeur(chemin: String, octets: Vec<u8>) -> Result<(), ErreurMoteur> {
+    en_arriere_plan(move || {
+        if !chemin.to_lowercase().ends_with(".xlsx") {
+            return Err(ErreurMoteur::simple(
+                "Le classeur doit être enregistré au format Excel (.xlsx).",
+            ));
+        }
+        std::fs::write(&chemin, octets).map_err(|erreur| {
+            ErreurMoteur::simple(format!("Impossible d'enregistrer « {chemin} » : {erreur}"))
+        })
+    })
+    .await
 }
 
 /// Écrit des fichiers (pages de signature…) dans un nouveau dossier ; renvoie son chemin.
