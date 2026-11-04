@@ -42,6 +42,7 @@ import EtapeListe from "../commun/EtapeListe";
 import { BoutonsProjet, choisirProjet, enregistrerSous, projetOuvert } from "../commun/projet";
 import { signalerErreur } from "../commun/signalerErreur";
 import { useListe } from "../commun/useListe";
+import { BandeauVerrou, LectureSeule } from "../commun/verrou";
 import ApercuFidele from "./ApercuFidele";
 import ApercuTexte from "./ApercuTexte";
 
@@ -63,6 +64,8 @@ interface ProjetWord {
   transformations: Record<string, Transformation>;
   nommage: string;
   sorties: { parPersonne: boolean; fusion: boolean; pdfParPersonne: boolean; pdfFusion: boolean };
+  /** Mode opérateur : le modèle ne se modifie plus, le projet s'ouvre à l'étape Liste. */
+  verrouille?: boolean;
 }
 
 /** Assistant « Documents Word » : Modèle → Liste → Vérification → Destination. */
@@ -77,6 +80,7 @@ export default function AssistantWord() {
   const [vue, setVue] = useState<"texte" | "fidele">("texte");
   const [nommage, setNommage] = useState("{{Prénom}} {{NOM}}");
   const [avancement, setAvancement] = useState<{ fait: number; total: number } | null>(null);
+  const [verrouille, setVerrouille] = useState(false);
   const balises = modele?.balises ?? [];
   const donnees = useListe(balises);
   const { liste, correspondances } = donnees;
@@ -111,6 +115,7 @@ export default function AssistantWord() {
       transformations: modele.transformations,
       nommage,
       sorties: { parPersonne, fusion, pdfParPersonne, pdfFusion },
+      verrouille,
     };
     return enregistrerSous("word", modele.nomFichier.replace(/\.(docx|dotx)$/i, ""), projet, correspondances);
   }
@@ -130,7 +135,9 @@ export default function AssistantWord() {
         setPdfFusion(enregistre.sorties.pdfFusion);
       }
       donnees.restaurer(projet.correspondances, prepare.balises);
-      setEtape(0);
+      setVerrouille(Boolean(enregistre.verrouille));
+      // Modèle verrouillé (mode opérateur) : on commence par la liste.
+      setEtape(enregistre.verrouille ? 1 : 0);
       projetOuvert(enregistre.nomFichier);
     } catch (e) {
       signalerErreur(e);
@@ -223,7 +230,12 @@ export default function AssistantWord() {
           <Title order={2}>{t.titre}</Title>
           <Text c="dimmed">{t.sousTitre}</Text>
         </div>
-        <BoutonsProjet onOuvrir={ouvrir} onEnregistrer={enregistrer} enregistrable={Boolean(modele)} />
+        <BoutonsProjet
+          onOuvrir={ouvrir}
+          onEnregistrer={enregistrer}
+          enregistrable={Boolean(modele)}
+          verrou={modele ? { verrouille, onChange: setVerrouille } : undefined}
+        />
       </Group>
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
@@ -245,53 +257,58 @@ export default function AssistantWord() {
               )}
             </Stack>
             <Stack gap="md" w={400} style={{ flexShrink: 0 }}>
-              <Paper withBorder p="md">
-                <Stack gap="sm">
-                  <Button leftSection={<IconFileImport size={18} />} variant={modele ? "light" : "filled"} onClick={importer}>
-                    {modele ? t.modele.autre : t.modele.importer}
-                  </Button>
-                  {modele && (
-                    <>
-                      <Group gap="xs" wrap="nowrap">
-                        <IconFileTypeDocx size={20} stroke={1.5} />
-                        <Text size="sm" truncate>
-                          {modele.nomFichier}
-                        </Text>
-                      </Group>
-                      {modele.champsFusion > 0 && (
-                        <Text size="sm" c="teal">
-                          {t.modele.champsFusion(modele.champsFusion)}
-                        </Text>
+              {verrouille && <BandeauVerrou onDeverrouiller={() => setVerrouille(false)} />}
+              <LectureSeule active={verrouille}>
+                <Stack gap="md">
+                  <Paper withBorder p="md">
+                    <Stack gap="sm">
+                      <Button leftSection={<IconFileImport size={18} />} variant={modele ? "light" : "filled"} onClick={importer}>
+                        {modele ? t.modele.autre : t.modele.importer}
+                      </Button>
+                      {modele && (
+                        <>
+                          <Group gap="xs" wrap="nowrap">
+                            <IconFileTypeDocx size={20} stroke={1.5} />
+                            <Text size="sm" truncate>
+                              {modele.nomFichier}
+                            </Text>
+                          </Group>
+                          {modele.champsFusion > 0 && (
+                            <Text size="sm" c="teal">
+                              {t.modele.champsFusion(modele.champsFusion)}
+                            </Text>
+                          )}
+                          {balises.length === 0 && <Alert color="orange">{t.modele.aucuneBalise}</Alert>}
+                        </>
                       )}
-                      {balises.length === 0 && <Alert color="orange">{t.modele.aucuneBalise}</Alert>}
-                    </>
+                      {modele && <Text size="xs" c="dimmed">{t.modele.aide}</Text>}
+                    </Stack>
+                  </Paper>
+                  {balises.length > 0 && modele && (
+                    <Paper withBorder p="md">
+                      <Stack gap="xs">
+                        <Title order={5}>{t.modele.balises}</Title>
+                        {balises.map((balise) => (
+                          <Group key={balise} justify="space-between" wrap="nowrap">
+                            <Badge variant="light" tt="none">
+                              {balise}
+                            </Badge>
+                            <Select
+                              size="xs"
+                              w={180}
+                              aria-label={tChamp.miseEnForme(balise)}
+                              value={modele.transformations[balise] ?? "aucune"}
+                              allowDeselect={false}
+                              data={Object.entries(tChamp.transformations).map(([value, label]) => ({ value, label }))}
+                              onChange={(v) => changerTransformation(balise, v && v !== "aucune" ? (v as Transformation) : null)}
+                            />
+                          </Group>
+                        ))}
+                      </Stack>
+                    </Paper>
                   )}
-                  {modele && <Text size="xs" c="dimmed">{t.modele.aide}</Text>}
                 </Stack>
-              </Paper>
-              {balises.length > 0 && modele && (
-                <Paper withBorder p="md">
-                  <Stack gap="xs">
-                    <Title order={5}>{t.modele.balises}</Title>
-                    {balises.map((balise) => (
-                      <Group key={balise} justify="space-between" wrap="nowrap">
-                        <Badge variant="light" tt="none">
-                          {balise}
-                        </Badge>
-                        <Select
-                          size="xs"
-                          w={180}
-                          aria-label={tChamp.miseEnForme(balise)}
-                          value={modele.transformations[balise] ?? "aucune"}
-                          allowDeselect={false}
-                          data={Object.entries(tChamp.transformations).map(([value, label]) => ({ value, label }))}
-                          onChange={(v) => changerTransformation(balise, v && v !== "aucune" ? (v as Transformation) : null)}
-                        />
-                      </Group>
-                    ))}
-                  </Stack>
-                </Paper>
-              )}
+              </LectureSeule>
             </Stack>
           </Group>
         </Stepper.Step>
@@ -301,6 +318,7 @@ export default function AssistantWord() {
             liste={liste}
             feuilles={donnees.feuilles}
             balises={balises}
+            nomModele={modele?.nomFichier.replace(/\.(docx|dotx)$/i, "") ?? ""}
             correspondances={correspondances}
             exemple={destinataires[0]?.valeurs ?? {}}
             anomalies={donnees.anomalies}

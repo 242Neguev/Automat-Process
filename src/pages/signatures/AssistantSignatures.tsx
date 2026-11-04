@@ -28,6 +28,8 @@ export default function AssistantSignatures() {
   );
   const apercu = agents[0]?.valeurs ?? valeursExemple(modele);
   const modelePret = modele.source === "html" ? Boolean(modele.html) && balises.length > 0 : balises.length > 0;
+  const verrouille = Boolean(modele.verrouille);
+  const verrouiller = (verrou: boolean) => setModele((m) => ({ ...m, verrouille: verrou }));
 
   async function ouvrir() {
     const projet = await choisirProjet("signature");
@@ -36,7 +38,8 @@ export default function AssistantSignatures() {
     const ouvert: ModeleSignature = { ...modeleParDefaut(), ...(projet.modele as Partial<ModeleSignature>) };
     setModele(ouvert);
     donnees.restaurer(projet.correspondances, balisesSignature(ouvert));
-    setEtape(0);
+    // Modèle verrouillé (mode opérateur) : on commence par la liste.
+    setEtape(ouvert.verrouille ? 1 : 0);
     setOuvertures((n) => n + 1);
     projetOuvert(ouvert.nom);
   }
@@ -50,18 +53,31 @@ export default function AssistantSignatures() {
           <Title order={2}>{t.titre}</Title>
           <Text c="dimmed">{t.sousTitre}</Text>
         </div>
-        <BoutonsProjet onOuvrir={ouvrir} onEnregistrer={() => enregistrerSous("signature", modele.nom, modele, correspondances)} />
+        <BoutonsProjet
+          onOuvrir={ouvrir}
+          onEnregistrer={() => enregistrerSous("signature", modele.nom, modele, correspondances)}
+          verrou={{ verrouille, onChange: verrouiller }}
+        />
       </Group>
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
         <Stepper.Step label={t.etapes.modele.titre} description={t.etapes.modele.description}>
-          <EtapeModeleSignature key={ouvertures} modele={modele} onModele={setModele} valeurs={apercu} depuisListe={agents.length > 0} />
+          <EtapeModeleSignature
+            key={ouvertures}
+            modele={modele}
+            onModele={setModele}
+            valeurs={apercu}
+            depuisListe={agents.length > 0}
+            verrouille={verrouille}
+            onDeverrouiller={() => verrouiller(false)}
+          />
         </Stepper.Step>
         <Stepper.Step label={t.etapes.liste.titre} description={t.etapes.liste.description}>
           <EtapeListe
             liste={liste}
             feuilles={donnees.feuilles}
             balises={balises}
+            nomModele={modele.nom}
             correspondances={correspondances}
             exemple={agents[0]?.valeurs ?? {}}
             anomalies={donnees.anomalies}

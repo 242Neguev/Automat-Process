@@ -5,6 +5,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { enregistrerProjet, ouvrirProjet, type Document, type ProjetOuvert } from "../../moteur";
 import { textes } from "../../textes";
 import { signalerErreur } from "./signalerErreur";
+import { BoutonVerrou } from "./verrou";
 
 const t = textes.projet;
 const FILTRE = [{ name: t.filtre, extensions: ["automat"] }];
@@ -39,10 +40,24 @@ export async function choisirProjet(document: Document): Promise<ProjetOuvert | 
 export const projetOuvert = (nom: string) =>
   notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.ouvert, message: nom });
 
-/** Boutons « Ouvrir un projet… » et « Enregistrer le projet… » de l'en-tête d'un assistant. */
-export function BoutonsProjet({ onOuvrir, onEnregistrer, enregistrable = true }: { onOuvrir: () => void; onEnregistrer: () => void; enregistrable?: boolean }) {
+/**
+ * Boutons de l'en-tête d'un assistant : « Ouvrir un projet… », « Enregistrer le projet… » et, si
+ * `verrou` est donné, le verrou du modèle (mode opérateur).
+ */
+export function BoutonsProjet({
+  onOuvrir,
+  onEnregistrer,
+  enregistrable = true,
+  verrou,
+}: {
+  onOuvrir: () => void;
+  onEnregistrer: () => void;
+  enregistrable?: boolean;
+  verrou?: { verrouille: boolean; onChange: (verrouille: boolean) => void };
+}) {
   return (
     <Group gap="xs" wrap="nowrap">
+      {verrou && <BoutonVerrou verrouille={verrou.verrouille} onChange={verrou.onChange} />}
       <Button variant="default" leftSection={<IconFolderOpen size={16} />} onClick={onOuvrir}>
         {t.ouvrir}
       </Button>

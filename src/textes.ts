@@ -61,13 +61,23 @@ export const textes = {
       filtreVisuels: "Visuels (PDF, SVG, PNG, JPG)",
       aucunVisuel: "Sans visuel, la carte est blanche : importez le design exporté par le graphiste.",
       contientFondPerdu: "Le visuel contient déjà le fond perdu",
+      versionEcran: "Version écran (facultative)",
+      versionEcranAide:
+        "Pour les cartes numériques (images, PDF cliquables) : le même visuel en couleurs d'écran (RVB), utilisé à la place de celui de l'imprimeur.",
+      ajouterVersionEcran: "Ajouter une version écran…",
+      calqueTitre: "Calque de référence",
+      calqueAide:
+        "La maquette du graphiste (avec un exemple), posée en transparence sur la carte pour placer les informations au même endroit. Elle n'est jamais imprimée.",
+      choisirCalque: "Choisir la maquette…",
+      afficherCalque: "Afficher le calque",
+      opaciteCalque: "Opacité du calque",
       balisesDetectees: (n: number) =>
         n > 1 ? `${n} informations détectées dans le visuel et placées sur la carte.` : "1 information détectée dans le visuel et placée sur la carte.",
       ajouterTitre: "Ajouter une information",
       ajouterAide: "Cliquez pour l'ajouter, puis faites-la glisser à sa place sur la carte.",
       ajouterQr: "QR code (fiche contact)",
       aideEditeur:
-        "Faites glisser les informations sur la carte ; la poignée à droite règle leur largeur. Flèches du clavier : déplacement fin. Pointillés gris : zone de sécurité (3 mm).",
+        "Faites glisser les informations sur la carte : elles s'aimantent aux autres, au centre et à la zone de sécurité (touche Alt pour les placer librement) ; la poignée à droite règle leur largeur. Flèches du clavier : déplacement fin. Pointillés gris : zone de sécurité (3 mm).",
       versoSansChamps: "Le verso est le même pour toutes les cartes.",
       nomModele: "Nom du modèle",
       outils: { edition: "Déplacer", remplacer: "Remplacer un texte d'exemple", effacer: "Effacer une zone" },
@@ -259,7 +269,10 @@ export const textes = {
       balisesDetectees: (n: number) =>
         n > 1 ? `${n} informations détectées dans le visuel et placées sur l'image.` : "1 information détectée dans le visuel et placée sur l'image.",
       ajouterAide: "Cliquez pour l'ajouter, puis faites-la glisser à sa place sur l'image.",
-      aideEditeur: "Faites glisser les informations sur l'image ; la poignée à droite règle leur largeur. Flèches du clavier : déplacement fin.",
+      aideEditeur:
+        "Faites glisser les informations sur l'image : elles s'aimantent aux autres et au centre (touche Alt pour les placer librement) ; la poignée à droite règle leur largeur. Flèches du clavier : déplacement fin.",
+      calqueAide:
+        "La maquette (avec un exemple), posée en transparence sur l'image pour placer les informations au même endroit. Elle n'est jamais exportée.",
     },
     controle: {
       calcul: "Contrôle des images…",
@@ -444,6 +457,23 @@ export const textes = {
       nomDossier: (nom: string) => `Courriers - ${nom}`,
     },
   },
+  verrou: {
+    verrouiller: "Verrouiller le modèle",
+    verrouille: "Modèle verrouillé",
+    verrouillerAide:
+      "Mode opérateur : le modèle ne peut plus être modifié par mégarde. Enregistrez ensuite le projet ; il s'ouvrira directement à l'étape Liste.",
+    deverrouillerAide: "Le modèle est verrouillé (mode opérateur) : cliquez pour le déverrouiller.",
+    bandeauTitre: "Modèle verrouillé",
+    bandeau: "Ce modèle a été préparé pour vous : choisissez la liste à l'étape suivante, vérifiez, puis exportez.",
+    deverrouiller: "Déverrouiller…",
+    confirmationTitre: "Déverrouiller le modèle ?",
+    confirmation:
+      "Toute modification du modèle changera les documents de tous les agents. Si d'autres personnes utilisent ce projet, enregistrez-le ensuite sous un autre nom.",
+    confirmer: "Déverrouiller",
+    annuler: "Annuler",
+    format: "Format",
+    visuels: "Visuels",
+  },
   projet: {
     ouvrir: "Ouvrir un projet…",
     enregistrer: "Enregistrer le projet…",
@@ -461,6 +491,24 @@ export const textes = {
   liste: {
     importer: "Importer un fichier Excel ou CSV…",
     exemple: "Utiliser la liste d'exemple",
+    listeVide: {
+      bouton: "Créer le fichier Excel à remplir…",
+      aideBouton: "Un fichier Excel avec une colonne par information du modèle : faites-le remplir (ressources humaines…), puis importez-le ici.",
+      nomFichier: (nom: string) => `Liste à remplir - ${nom}.xlsx`,
+      nomParDefaut: "Modèle",
+      filtre: "Classeur Excel",
+      cree: "Fichier Excel créé",
+      modeEmploi: (nom: string) => [
+        `Liste à remplir pour le modèle « ${nom} » (Automat-Process)`,
+        "",
+        "1. Remplissez la feuille « Liste » : une ligne par personne, à partir de la ligne 2.",
+        "2. Ne modifiez pas les titres de la première ligne : ils relient chaque colonne au modèle.",
+        "3. Laissez vide une information absente (pas de tiret ni de « néant ») : elle n'apparaîtra pas sur le document.",
+        "4. Les cellules sont au format texte : les numéros gardent leurs zéros et leur présentation (0612345678, +237 6 12 34 56 78).",
+        "",
+        "Renvoyez ensuite ce fichier : il s'importe tel quel à l'étape Liste d'Automat-Process.",
+      ],
+    },
     filtre: "Listes (Excel, CSV, ODS)",
     aucuneListe: "Choisissez le fichier qui contient la liste des agents. Les numéros sont lus tels qu'Excel les affiche.",
     feuille: "Feuille",

@@ -171,6 +171,35 @@ export function diagnostiquer(
   return messages;
 }
 
+/**
+ * Messages sur la version écran d'un visuel de carte (cartes numériques de 1 200 ou 2 400 px de
+ * large) : netteté et proportions.
+ */
+export function diagnostiquerVersionEcran(
+  visuel: { largeurMm?: number | null; hauteurMm?: number | null; largeurPx?: number | null; hauteurPx?: number | null },
+  format: Format,
+): { niveau: Niveau; message: string }[] {
+  const marge = contientFondPerdu(visuel, format) ? format.fond_perdu_mm : 0;
+  const zoneL = format.largeur_mm + 2 * marge;
+  const cible = zoneL / (format.hauteur_mm + 2 * marge);
+  const recadre = (proportions: number) => Math.abs(proportions - cible) / cible > 0.03;
+  const messages: { niveau: Niveau; message: string }[] = [];
+  const { largeurPx, hauteurPx, largeurMm, hauteurMm } = visuel;
+  if (largeurPx && hauteurPx) {
+    // Largeur de la carte finie dans l'image (sans son éventuel fond perdu).
+    const utile = Math.round((largeurPx * format.largeur_mm) / zoneL);
+    const taille = `${largeurPx} × ${hauteurPx} px`;
+    if (utile >= 2400) messages.push({ niveau: "ok", message: `Image de ${taille} : nette même en grande taille (2 400 px).` });
+    else if (utile >= 1200) messages.push({ niveau: "ok", message: `Image de ${taille} : nette en taille moyenne (1 200 px).` });
+    else messages.push({ niveau: "attention", message: `Image de ${taille} : un peu petite, les cartes numériques seront moins nettes.` });
+    if (recadre(largeurPx / hauteurPx)) messages.push({ niveau: "attention", message: "Les proportions de l'image diffèrent de la carte : elle est recadrée." });
+  } else if (largeurMm && hauteurMm) {
+    messages.push({ niveau: "ok", message: "Visuel vectoriel : net à toutes les tailles." });
+    if (recadre(largeurMm / hauteurMm)) messages.push({ niveau: "attention", message: "Les proportions du visuel diffèrent de la carte : il est recadré." });
+  }
+  return messages;
+}
+
 /** Messages sur un visuel destiné à l'écran : taille en pixels et proportions. */
 export function diagnostiquerEcran(
   visuel: { largeurMm?: number | null; hauteurMm?: number | null; largeurPx?: number | null; hauteurPx?: number | null },

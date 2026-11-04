@@ -1,10 +1,11 @@
-import { Alert, Badge, Button, Group, Paper, ScrollArea, Select, Stack, Table, Text, Title } from "@mantine/core";
-import { IconFileSpreadsheet, IconListDetails } from "@tabler/icons-react";
+import { Alert, Badge, Button, Group, Paper, ScrollArea, Select, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
+import { IconFileSpreadsheet, IconListDetails, IconTablePlus } from "@tabler/icons-react";
 import type { Anomalie } from "../../donnees/controle";
 import type { Correspondances } from "../../donnees/correspondances";
 import type { Liste } from "../../donnees/liste";
 import { textes } from "../../textes";
 import IconeGravite from "./IconeGravite";
+import { creerListeVide } from "./listeVide";
 
 const t = textes.liste;
 const LIGNES_APERCU = 8;
@@ -67,6 +68,8 @@ interface Props {
   liste: Liste | null;
   feuilles: string[];
   balises: string[];
+  /** Nom du modèle, pour nommer la liste vide à faire remplir. */
+  nomModele: string;
   correspondances: Correspondances;
   /** Valeur nettoyée de chaque balise pour la première ligne, pour vérifier d'un coup d'œil. */
   exemple: Record<string, string>;
@@ -77,7 +80,7 @@ interface Props {
   onCorrespondance: (balise: string, colonne: string | null) => void;
 }
 
-export default function EtapeListe({ liste, feuilles, balises, correspondances, exemple, anomalies, onImporter, onExemple, onFeuille, onCorrespondance }: Props) {
+export default function EtapeListe({ liste, feuilles, balises, nomModele, correspondances, exemple, anomalies, onImporter, onExemple, onFeuille, onCorrespondance }: Props) {
   return (
     <Stack gap="lg">
       <Group>
@@ -87,6 +90,11 @@ export default function EtapeListe({ liste, feuilles, balises, correspondances, 
         <Button variant="light" leftSection={<IconListDetails size={18} />} onClick={onExemple}>
           {t.exemple}
         </Button>
+        <Tooltip label={t.listeVide.aideBouton} multiline w={320} withArrow>
+          <Button variant="subtle" leftSection={<IconTablePlus size={18} />} disabled={balises.length === 0} onClick={() => creerListeVide(balises, nomModele)}>
+            {t.listeVide.bouton}
+          </Button>
+        </Tooltip>
       </Group>
 
       {!liste ? (
