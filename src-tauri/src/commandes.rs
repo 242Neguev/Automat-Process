@@ -438,6 +438,23 @@ pub async fn lire_fichier(chemin: String, nature: Nature) -> Result<Response, Er
         .map_err(|erreur| ErreurMoteur::simple(format!("Lecture interrompue : {erreur}")))?
 }
 
+/// Enregistre un classeur Excel préparé par l'interface (liste vide à faire remplir) dans `chemin`,
+/// qui doit finir par « .xlsx ».
+#[tauri::command]
+pub async fn enregistrer_classeur(chemin: String, octets: Vec<u8>) -> Result<(), ErreurMoteur> {
+    en_arriere_plan(move || {
+        if !chemin.to_lowercase().ends_with(".xlsx") {
+            return Err(ErreurMoteur::simple(
+                "Le classeur doit être enregistré au format Excel (.xlsx).",
+            ));
+        }
+        std::fs::write(&chemin, octets).map_err(|erreur| {
+            ErreurMoteur::simple(format!("Impossible d'enregistrer « {chemin} » : {erreur}"))
+        })
+    })
+    .await
+}
+
 /// Écrit des fichiers (pages de signature…) dans un nouveau dossier ; renvoie son chemin.
 #[tauri::command]
 pub async fn ecrire_fichiers(

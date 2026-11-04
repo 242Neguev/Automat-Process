@@ -16,9 +16,9 @@ import {
   transformationsParDefaut,
   type PlacementVisuel,
 } from "../../modele/champs";
-import { contientFondPerdu } from "../../modele/formats";
+import { contientFondPerdu, FORMATS, FORMATS_ECRAN } from "../../modele/formats";
 import { analyserSvg, retirerTexteSvg } from "../../modele/svg";
-import { preparerVisuel, type Visuel } from "../../modele/visuels";
+import { preparerVisuel, type Emplacement, type Visuel, type Visuels } from "../../modele/visuels";
 import {
   couleurAutour,
   importerFond,
@@ -35,7 +35,8 @@ import {
 } from "../../moteur";
 import { textes } from "../../textes";
 import { signalerErreur } from "../commun/signalerErreur";
-import ApercuCarte from "./ApercuCarte";
+import { BandeauVerrou } from "../commun/verrou";
+import ApercuCarte, { CalqueReference } from "./ApercuCarte";
 import CoucheEdition, { type Outil, type TexteCliquable } from "./CoucheEdition";
 import { libellesCartes } from "./libelles";
 import PanneauVisuels from "./PanneauVisuels";
@@ -43,7 +44,8 @@ import ProprietesChamp from "./ProprietesChamp";
 
 export type Source = "demo" | "perso";
 type Information = (typeof INFORMATIONS)[number];
-type Visuels = Partial<Record<Face, Visuel>>;
+/** Visuels secondaires : versions écran des faces et calque de référence. */
+export type Secondaire = Exclude<Emplacement, Face>;
 
 const ICONES_OUTILS: Record<Outil, typeof IconArrowsMove> = { edition: IconArrowsMove, remplacer: IconReplace, effacer: IconEraser };
 
@@ -58,6 +60,53 @@ interface Props {
   polices: string[];
   /** Le modèle de démonstration (une carte de visite) n'est proposé que pour les cartes. */
   avecDemo?: boolean;
+  /** Mode opérateur : le modèle s'affiche sans pouvoir être modifié. */
+  verrouille?: boolean;
+  onDeverrouiller?: () => void;
+}
+
+/** Le modèle d'un coup d'œil, en mode opérateur : format, informations à fournir et visuels. */
+function RecapitulatifModele({ modele, visuels }: { modele: ModeleCarte; visuels: Visuels }) {
+  const t = libellesCartes(Boolean(modele.format.px)).modele;
+  const { largeur_mm, hauteur_mm, fond_perdu_mm, px } = modele.format;
+  const predefini = (px ? FORMATS_ECRAN : FORMATS).find((f) => f.largeur_mm === largeur_mm && f.hauteur_mm === hauteur_mm && f.fond_perdu_mm === fond_perdu_mm);
+  const balises = balisesDuModele(modele);
+  const noms = (["recto", "verso"] as Face[]).map((f) => visuels[f]?.nomFichier).filter(Boolean);
+  return (
+    <Paper withBorder p="md">
+      <Stack gap="sm">
+        <Title order={5}>{modele.nom}</Title>
+        <Text size="sm">
+          <Text span fw={500}>
+            {textes.verrou.format} :{" "}
+          </Text>
+          {predefini?.libelle ?? t.format(largeur_mm, hauteur_mm, fond_perdu_mm)}
+        </Text>
+        {noms.length > 0 && (
+          <Text size="sm">
+            <Text span fw={500}>
+              {textes.verrou.visuels} :{" "}
+            </Text>
+            {noms.join(", ")}
+          </Text>
+        )}
+        {balises.length > 0 && (
+          <>
+            <Text size="sm" fw={500}>
+              {t.balises}
+            </Text>
+            <Group gap={6}>
+              {balises.map((balise) => (
+                <Badge key={balise} variant="light" tt="none">
+                  {balise}
+                </Badge>
+              ))}
+            </Group>
+          </>
+        )}
+      </Stack>
+    </Paper>
+  );
 }
 
 /** Où le visuel apparaît sur la carte ; rien pour une image, dont on ne lit pas les textes. */
@@ -74,13 +123,16 @@ function avecChamps(m: ModeleCarte, nouveaux: ChampTexte[], transformations?: Re
   return { ...m, champs, transformations: { ...defaut, ...transformations, ...m.transformations } };
 }
 
-export default function EtapeModele({ source, onSource, modele, onModele, visuels, onVisuels, polices, avecDemo = true }: Props) {
+export default function EtapeModele({ source, onSource, modele, onModele, visuels, onVisuels, polices, avecDemo = true, verrouille = false, onDeverrouiller }: Props) {
   const t = libellesCartes(Boolean(modele.format.px)).modele;
   const [face, setFace] = useState<Face>("recto");
   const [selection, setSelection] = useState<string | null>(null);
   const [outil, setOutil] = useState<Outil>("edition");
   const [texteChoisi, setTexteChoisi] = useState<TexteVisuel | null>(null);
   const [occupe, setOccupe] = useState(false);
+  // Calque de référence : posé sur la carte, à demi transparent (réglages de la session).
+  const [calqueVisible, setCalqueVisible] = useState(true);
+  const [opaciteCalque, setOpaciteCalque] = useState(50);
   // Dernière version du modèle, pour les actions qui attendent une réponse du cœur.
   const modeleRecent = useRef(modele);
   useEffect(() => {
@@ -98,8 +150,9 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
     recto && placementRecto
       ? recto.textes.map((texte) => ({ id: texte.id, texte: texte.texte, boite: boiteTexteVisuel(texte, placementRecto, modele.format) }))
       : [];
-  const aide =
-    faceAffichee === "verso"
+  const aide = verrouille
+    ? ""
+    : faceAffichee === "verso"
       ? t.versoSansChamps
       : outilActif === "remplacer"
         ? textesCliquables.length > 0
@@ -192,16 +245,48 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
     onVisuels((v) => {
       const reste = { ...v };
       delete reste[faceVisuel];
+      delete reste[`${faceVisuel}_ecran`];
       return reste;
     });
     onModele((m) => ({
       ...m,
       [`fond_${faceVisuel}`]: null,
+      // Sa version écran part avec lui.
+      [`fond_${faceVisuel}_ecran`]: null,
       // Les zones effacées n'avaient de sens que sur ce visuel.
       champs: faceVisuel === "recto" ? m.champs.filter((c) => c.type !== "masque") : m.champs,
     }));
     setFace("recto");
     changerOutil("edition");
+  }
+
+  /** Version écran d'une face, ou calque de référence : ni informations à placer, ni textes à remplacer. */
+  async function importerSecondaire(emplacement: Secondaire) {
+    const chemin = await open({ multiple: false, directory: false, filters: [{ name: t.filtreVisuels, extensions: ["pdf", "svg", "png", "jpg", "jpeg"] }] });
+    if (typeof chemin !== "string") return;
+    try {
+      const { visuel, svgNettoye } = preparerVisuel(await importerFond(chemin), polices);
+      // Tirée du même fichier que celle de l'imprimeur, une version écran porte les mêmes balises :
+      // elles sont retirées (celles d'un PDF le sont déjà par le cœur).
+      if (svgNettoye) await remplacerFond(visuel.chemin, svgNettoye);
+      onVisuels((v) => ({ ...v, [emplacement]: visuel }));
+      onModele((m) => ({ ...m, [`fond_${emplacement}`]: visuel.chemin, [`fond_${emplacement}_avec_fond_perdu`]: contientFondPerdu(visuel, m.format) }));
+      if (emplacement === "calque") {
+        setCalqueVisible(true);
+        setFace("recto");
+      }
+    } catch (e) {
+      signalerErreur(e);
+    }
+  }
+
+  function retirerSecondaire(emplacement: Secondaire) {
+    onVisuels((v) => {
+      const reste = { ...v };
+      delete reste[emplacement];
+      return reste;
+    });
+    onModele((m) => ({ ...m, [`fond_${emplacement}`]: null }));
   }
 
   /** Le texte d'exemple quitte le visuel et devient une information, au même endroit et au même style. */
@@ -249,7 +334,7 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
 
   return (
     <Stack gap="md">
-      {avecDemo && (
+      {avecDemo && !verrouille && (
         <SegmentedControl
           w={360}
           value={source}
@@ -265,7 +350,7 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
       )}
       <Group align="flex-start" gap="lg" wrap="nowrap">
         <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
-          {avecOutils && (
+          {avecOutils && !verrouille && (
             <SegmentedControl
               size="xs"
               value={outilActif}
@@ -285,7 +370,8 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
             />
           )}
           <ApercuCarte modele={modele} agent={agent} face={faceAffichee}>
-            {faceAffichee === "recto" && (
+            {faceAffichee === "recto" && !verrouille && modele.fond_calque && calqueVisible && <CalqueReference modele={modele} opacite={opaciteCalque} />}
+            {faceAffichee === "recto" && !verrouille && (
               <CoucheEdition
                 modele={modele}
                 selection={selection}
@@ -323,84 +409,94 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
         {/* Colonne de réglages : l'ajout d'informations reste toujours en haut ; en dessous, le texte
             d'exemple à remplacer, sinon les réglages de l'information sélectionnée, sinon le format et les visuels. */}
         <ScrollArea.Autosize mah="calc(100vh - 280px)" w={380} type="auto" scrollbars="y" offsetScrollbars style={{ flexShrink: 0 }}>
-          <Stack gap="md">
-            <Paper withBorder p="md">
-              <Stack gap="sm">
-                <div>
-                  <Title order={5}>{t.ajouterTitre}</Title>
-                  <Text size="xs" c="dimmed">
-                    {t.ajouterAide}
-                  </Text>
-                </div>
-                <Group gap={6}>
-                  {INFORMATIONS.map((information) => (
-                    <Button key={information.libelle} size="compact-sm" variant="light" leftSection={<IconPlus size={14} />} onClick={() => ajouter(information)}>
-                      {information.libelle}
-                    </Button>
-                  ))}
-                  <Button size="compact-sm" variant="light" leftSection={<IconQrcode size={14} />} onClick={ajouterQr}>
-                    {t.ajouterQr}
-                  </Button>
-                </Group>
-                {balisesDuModele(modele).length > 0 && (
-                  <>
-                    <Text size="sm" fw={500} mt="xs">
-                      {t.balises}
-                    </Text>
-                    <Group gap={6}>
-                      {balisesDuModele(modele).map((balise) => (
-                        <Badge key={balise} variant="light" tt="none">
-                          {balise}
-                        </Badge>
-                      ))}
-                    </Group>
-                  </>
-                )}
-              </Stack>
-            </Paper>
-            {texteChoisi ? (
-              <Paper withBorder p="md" style={{ borderColor: "#e8590c" }}>
+          {verrouille ? (
+            <Stack gap="md">
+              <BandeauVerrou onDeverrouiller={() => onDeverrouiller?.()} />
+              <RecapitulatifModele modele={modele} visuels={visuels} />
+            </Stack>
+          ) : (
+            <Stack gap="md">
+              <Paper withBorder p="md">
                 <Stack gap="sm">
-                  <Title order={5}>{t.remplacerPar(texteChoisi.texte)}</Title>
+                  <div>
+                    <Title order={5}>{t.ajouterTitre}</Title>
+                    <Text size="xs" c="dimmed">
+                      {t.ajouterAide}
+                    </Text>
+                  </div>
                   <Group gap={6}>
                     {INFORMATIONS.map((information) => (
-                      <Button key={information.libelle} size="compact-sm" variant="light" disabled={occupe} onClick={() => remplacerTexte(texteChoisi, information)}>
+                      <Button key={information.libelle} size="compact-sm" variant="light" leftSection={<IconPlus size={14} />} onClick={() => ajouter(information)}>
                         {information.libelle}
                       </Button>
                     ))}
+                    <Button size="compact-sm" variant="light" leftSection={<IconQrcode size={14} />} onClick={ajouterQr}>
+                      {t.ajouterQr}
+                    </Button>
                   </Group>
-                  <Button variant="default" onClick={() => setTexteChoisi(null)}>
-                    {t.annuler}
-                  </Button>
+                  {balisesDuModele(modele).length > 0 && (
+                    <>
+                      <Text size="sm" fw={500} mt="xs">
+                        {t.balises}
+                      </Text>
+                      <Group gap={6}>
+                        {balisesDuModele(modele).map((balise) => (
+                          <Badge key={balise} variant="light" tt="none">
+                            {balise}
+                          </Badge>
+                        ))}
+                      </Group>
+                    </>
+                  )}
                 </Stack>
               </Paper>
-            ) : choisi ? (
-              <ProprietesChamp
-                champ={choisi}
-                modele={modele}
-                polices={polices}
-                onChamp={modifierChamp}
-                onTransformation={changerTransformation}
-                onSupprimer={supprimerChamp}
-                onFermer={() => setSelection(null)}
-                onMesurerCouleur={mesurerCouleur}
-              />
-            ) : (
-              source === "perso" && (
-                <PanneauVisuels
-                  nom={modele.nom}
-                  onNom={(nom) => onModele((m) => ({ ...m, nom }))}
-                  format={modele.format}
-                  visuels={visuels}
-                  avecFondPerdu={{ recto: modele.fond_recto_avec_fond_perdu ?? true, verso: modele.fond_verso_avec_fond_perdu ?? true }}
-                  onFormat={(format) => onModele((m) => ({ ...m, format }))}
-                  onFondPerdu={(faceVisuel, avec) => onModele((m) => ({ ...m, [`fond_${faceVisuel}_avec_fond_perdu`]: avec }))}
-                  onImporter={importer}
-                  onRetirer={retirer}
+              {texteChoisi ? (
+                <Paper withBorder p="md" style={{ borderColor: "#e8590c" }}>
+                  <Stack gap="sm">
+                    <Title order={5}>{t.remplacerPar(texteChoisi.texte)}</Title>
+                    <Group gap={6}>
+                      {INFORMATIONS.map((information) => (
+                        <Button key={information.libelle} size="compact-sm" variant="light" disabled={occupe} onClick={() => remplacerTexte(texteChoisi, information)}>
+                          {information.libelle}
+                        </Button>
+                      ))}
+                    </Group>
+                    <Button variant="default" onClick={() => setTexteChoisi(null)}>
+                      {t.annuler}
+                    </Button>
+                  </Stack>
+                </Paper>
+              ) : choisi ? (
+                <ProprietesChamp
+                  champ={choisi}
+                  modele={modele}
+                  polices={polices}
+                  onChamp={modifierChamp}
+                  onTransformation={changerTransformation}
+                  onSupprimer={supprimerChamp}
+                  onFermer={() => setSelection(null)}
+                  onMesurerCouleur={mesurerCouleur}
                 />
-              )
-            )}
-          </Stack>
+              ) : (
+                source === "perso" && (
+                  <PanneauVisuels
+                    nom={modele.nom}
+                    onNom={(nom) => onModele((m) => ({ ...m, nom }))}
+                    format={modele.format}
+                    visuels={visuels}
+                    avecFondPerdu={{ recto: modele.fond_recto_avec_fond_perdu ?? true, verso: modele.fond_verso_avec_fond_perdu ?? true }}
+                    onFormat={(format) => onModele((m) => ({ ...m, format }))}
+                    onFondPerdu={(faceVisuel, avec) => onModele((m) => ({ ...m, [`fond_${faceVisuel}_avec_fond_perdu`]: avec }))}
+                    onImporter={importer}
+                    onRetirer={retirer}
+                    onImporterSecondaire={importerSecondaire}
+                    onRetirerSecondaire={retirerSecondaire}
+                    calque={{ visible: calqueVisible, opacite: opaciteCalque, onVisible: setCalqueVisible, onOpacite: setOpaciteCalque }}
+                  />
+                )
+              )}
+            </Stack>
+          )}
         </ScrollArea.Autosize>
       </Group>
     </Stack>

@@ -19,12 +19,16 @@ Les quatre modules sont disponibles. L'application a été compilée et essayée
 | **Socle (phase 0)** : application Tauri 2 + React + TypeScript (interface Mantine aux couleurs d'Eau sèche) ; moteur **Typst** intégré (PDF vectoriel, CMJN, polices incorporées, zone de coupe, PNG, SVG) ; vérifications et installateur Windows par GitHub Actions | ✅ |
 | **Assistant « Cartes de visite »** en 4 étapes : Modèle, Liste, Vérification, Destination | ✅ |
 | **Import des listes** Excel, CSV ou ODS : valeurs telles qu'Excel les affiche, en-tête trouvé sous un éventuel titre, CSV français (point-virgule, accents) | ✅ |
+| **Liste vide à faire remplir** : un fichier Excel avec une colonne par information du modèle (cellules au format texte, pour garder les zéros des numéros) et son mode d'emploi, à envoyer aux ressources humaines puis à importer tel quel | ✅ |
 | **Correspondances automatiques** entre balises et colonnes, y compris les synonymes (Courriel, GSM, Poste…), modifiables à la main | ✅ |
 | **Nettoyage** (espaces, MAJUSCULES, Nom Propre, minuscules), lignes vides masquées, **QR code vCard** pour chaque agent, écriture de droite à gauche (arabe) | ✅ |
 | Export PDF : cartes unitaires, ou planches A4/A3/SRA3 recto/verso avec traits de coupe | ✅ |
 | **Vos modèles** : visuel PDF, SVG, PNG ou JPG pour le recto et le verso ; format (dont badge PVC) et fond perdu ; diagnostic du visuel (fond perdu, résolution, proportions) | ✅ |
 | **Balises `{{…}}` d'un SVG** (Illustrator, CorelDRAW, Inkscape…) détectées et placées automatiquement, avec leur police, taille et couleur | ✅ |
 | **Éditeur de placement manuel** : ajouter des informations, les déplacer à la souris ou au clavier, régler police, taille, couleur, alignement et mise en forme ; QR code vCard qui réserve sa place | ✅ |
+| **Aides au placement** : repères magnétiques (alignement sur les autres informations, le centre et la zone de sécurité ; touche Alt pour placer librement), **calque de référence** (la maquette du graphiste posée en transparence, jamais imprimée), pipette du choix de couleur (une couleur prise sur le visuel) | ✅ |
+| **Deux visuels par face** : la version de l'imprimeur (PDF CMJN…) et une version écran facultative (RVB), utilisée d'office pour les cartes numériques | ✅ |
+| **Mode opérateur** : le graphiste verrouille le modèle et enregistre le projet ; l'opérateur le rouvre directement à l'étape Liste, sans pouvoir modifier le modèle par mégarde (cartes, visuels, signatures, courriers) | ✅ |
 | **Fond perdu complété** pour un visuel livré au format fini : il est posé tel quel et ses bords sont prolongés, rien n'est rogné | ✅ |
 | **Balises `{{…}}` d'un PDF** détectées, retirées du visuel et placées automatiquement, avec leur police, taille et couleur (CMJN conservé) | ✅ |
 | **Textes d'exemple remplacés d'un clic** (PDF, SVG) : le texte quitte le visuel et devient une information, au même endroit et au même style | ✅ |

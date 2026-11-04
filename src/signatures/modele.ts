@@ -41,6 +41,8 @@ export interface ModeleSignature {
   /** Signature HTML existante (source « html »), balises comprises. */
   html: string | null;
   transformations?: Record<string, Transformation>;
+  /** Mode opérateur : le modèle ne se modifie plus, le projet s'ouvre à l'étape Liste. */
+  verrouille?: boolean;
 }
 
 /** Polices disponibles sur tous les ordinateurs et dans les messageries, avec leurs polices de repli. */

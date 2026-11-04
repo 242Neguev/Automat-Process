@@ -1,9 +1,17 @@
 // Visuels tels que l'éditeur les utilise : dimensions, textes d'exemple et, pour un SVG, sa source
 // actuelle (balises et textes déjà remplacés en moins).
-import type { FondImporte, TexteVisuel } from "../moteur";
+import type { Face, FondImporte, TexteVisuel } from "../moteur";
 import { analyserSvg } from "./svg";
 
 export type Visuel = FondImporte & { svgSource?: string };
+
+/**
+ * Emplacements d'un visuel dans un modèle (clé « fond_… ») : recto et verso pour l'imprimeur, leurs
+ * versions écran pour les cartes numériques, et le calque de référence de l'éditeur.
+ */
+export type Emplacement = Face | "recto_ecran" | "verso_ecran" | "calque";
+export const EMPLACEMENTS: Emplacement[] = ["recto", "verso", "recto_ecran", "verso_ecran", "calque"];
+export type Visuels = Partial<Record<Emplacement, Visuel>>;
 
 /**
  * Prépare un visuel importé, ou rouvert avec un projet. Un SVG est analysé ici : ses textes à

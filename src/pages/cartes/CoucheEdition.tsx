@@ -2,6 +2,7 @@ import { useRef, useState, type KeyboardEvent, type PointerEvent as PointerEvent
 import { Box, Tooltip } from "@mantine/core";
 import { arrondir, boiteChamp } from "../../modele/champs";
 import { MARGE_SECURITE_MM, zonePersonne } from "../../modele/formats";
+import { aimanter, SEUIL_PX, type Repere } from "../../modele/reperes";
 import type { Champ, ModeleCarte, Zone } from "../../moteur";
 import { textes } from "../../textes";
 import { COULEURS } from "../../theme";
@@ -48,6 +49,8 @@ function appliquerGeste(champ: Champ, geste: Geste, dx: number, dy: number, larg
 }
 
 const PAS_CLAVIER: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+/** Couleur des repères magnétiques : bien visible sur la plupart des visuels. */
+const COULEUR_REPERE = "#d6336c";
 
 const enPourcents = (boite: { x: number; y: number; largeur: number; hauteur: number }, largeur: number, hauteur: number) => ({
   left: `${(boite.x / largeur) * 100}%`,
@@ -60,6 +63,7 @@ const enPourcents = (boite: { x: number; y: number; largeur: number; hauteur: nu
 export default function CoucheEdition({ modele, selection, outil, textesVisuel, onSelection, onChamp, onSupprimer, onZone, onTexteVisuel }: Props) {
   const couche = useRef<HTMLDivElement>(null);
   const [trace, setTrace] = useState<Zone | null>(null);
+  const [reperes, setReperes] = useState<Repere[]>([]);
   const { largeur_mm, hauteur_mm } = modele.format;
   const zone = zonePersonne(modele.format);
   // Les zones effacées passent dessous : une information posée par-dessus reste facile à attraper.
@@ -77,11 +81,24 @@ export default function CoucheEdition({ modele, selection, outil, textesVisuel, 
     couche.current?.focus();
     const echelle = mmParPx();
     const depart = { x: evenement.clientX, y: evenement.clientY };
-    const bouger = (e: PointerEvent) =>
-      onChamp(champ.id, appliquerGeste(champ, geste, (e.clientX - depart.x) * echelle, (e.clientY - depart.y) * echelle, largeur_mm));
+    const autres = modele.champs.filter((c) => c.id !== champ.id);
+    const bouger = (e: PointerEvent) => {
+      let dx = (e.clientX - depart.x) * echelle;
+      let dy = (e.clientY - depart.y) * echelle;
+      // Repères magnétiques pendant un déplacement ; la touche Alt permet de placer librement.
+      if (geste === "deplacer" && !e.altKey) {
+        const aimante = aimanter(champ, dx, dy, autres, modele.format, SEUIL_PX * echelle);
+        ({ dx, dy } = aimante);
+        setReperes(aimante.reperes);
+      } else {
+        setReperes([]);
+      }
+      onChamp(champ.id, appliquerGeste(champ, geste, dx, dy, largeur_mm));
+    };
     const finir = () => {
       window.removeEventListener("pointermove", bouger);
       window.removeEventListener("pointerup", finir);
+      setReperes([]);
     };
     window.addEventListener("pointermove", bouger);
     window.addEventListener("pointerup", finir);
@@ -250,6 +267,21 @@ export default function CoucheEdition({ modele, selection, outil, textesVisuel, 
           }}
         />
       )}
+
+      {/* Repères magnétiques : la ligne sur laquelle l'information vient de s'aligner. */}
+      {reperes.map((repere) => (
+        <Box
+          key={`${repere.axe}:${repere.position}`}
+          data-repere={repere.axe}
+          pos="absolute"
+          style={{
+            ...(repere.axe === "x"
+              ? { left: `${(repere.position / largeur_mm) * 100}%`, top: 0, bottom: 0, borderLeft: `1px solid ${COULEUR_REPERE}` }
+              : { top: `${(repere.position / hauteur_mm) * 100}%`, left: 0, right: 0, borderTop: `1px solid ${COULEUR_REPERE}` }),
+            pointerEvents: "none",
+          }}
+        />
+      ))}
     </Box>
   );
 }

@@ -1,8 +1,9 @@
-import { Button, Group, List, NumberInput, Paper, Select, Stack, Switch, Text, TextInput, ThemeIcon, Title } from "@mantine/core";
-import { IconAlertTriangle, IconCheck, IconInfoSmall, IconPhoto } from "@tabler/icons-react";
-import { diagnostiquer, diagnostiquerEcran, FORMATS, FORMATS_ECRAN, type Format, type Niveau } from "../../modele/formats";
-import type { Visuel } from "../../modele/visuels";
+import { Button, Group, List, NumberInput, Paper, Select, Slider, Stack, Switch, Text, TextInput, ThemeIcon, Title } from "@mantine/core";
+import { IconAlertTriangle, IconCheck, IconDeviceDesktop, IconInfoSmall, IconPhoto, IconStack2 } from "@tabler/icons-react";
+import { diagnostiquer, diagnostiquerEcran, diagnostiquerVersionEcran, FORMATS, FORMATS_ECRAN, type Format, type Niveau } from "../../modele/formats";
+import type { Visuel, Visuels } from "../../modele/visuels";
 import type { Face } from "../../moteur";
+import type { Secondaire } from "./EtapeModele";
 import { libellesCartes } from "./libelles";
 
 const PERSONNALISE = "personnalise";
@@ -16,15 +17,73 @@ interface Props {
   nom: string;
   onNom: (nom: string) => void;
   format: Format;
-  visuels: Partial<Record<Face, Visuel>>;
+  visuels: Visuels;
   avecFondPerdu: Record<Face, boolean>;
   onFormat: (format: Format) => void;
   onFondPerdu: (face: Face, avec: boolean) => void;
   onImporter: (face: Face) => void;
   onRetirer: (face: Face) => void;
+  /** Versions écran des faces (cartes) et calque de référence. */
+  onImporterSecondaire: (emplacement: Secondaire) => void;
+  onRetirerSecondaire: (emplacement: Secondaire) => void;
+  calque: { visible: boolean; opacite: number; onVisible: (visible: boolean) => void; onOpacite: (opacite: number) => void };
 }
 
-export default function PanneauVisuels({ nom, onNom, format, visuels, avecFondPerdu, onFormat, onFondPerdu, onImporter, onRetirer }: Props) {
+/** Diagnostics d'un visuel, avec leur icône. */
+function Diagnostics({ messages }: { messages: { niveau: Niveau; message: string }[] }) {
+  if (messages.length === 0) return null;
+  return (
+    <List spacing={4} size="xs" center>
+      {messages.map(({ niveau, message }) => {
+        const { couleur, icone: Icone } = ICONES[niveau];
+        return (
+          <List.Item
+            key={message}
+            icon={
+              <ThemeIcon color={couleur} size={16} radius="xl" variant="light">
+                <Icone size={12} />
+              </ThemeIcon>
+            }
+          >
+            {message}
+          </List.Item>
+        );
+      })}
+    </List>
+  );
+}
+
+/** Nom d'un visuel secondaire déjà choisi, avec « Remplacer… » et « Retirer ». */
+function VisuelChoisi({ visuel, onRemplacer, onRetirer, remplacer, retirer }: { visuel: Visuel; onRemplacer: () => void; onRetirer: () => void; remplacer: string; retirer: string }) {
+  return (
+    <Group gap={4} wrap="nowrap">
+      <Text size="sm" c="dimmed" truncate style={{ flex: 1, minWidth: 0 }}>
+        {visuel.nomFichier}
+      </Text>
+      <Button size="compact-sm" variant="light" onClick={onRemplacer}>
+        {remplacer}
+      </Button>
+      <Button size="compact-sm" variant="subtle" color="gray" onClick={onRetirer}>
+        {retirer}
+      </Button>
+    </Group>
+  );
+}
+
+export default function PanneauVisuels({
+  nom,
+  onNom,
+  format,
+  visuels,
+  avecFondPerdu,
+  onFormat,
+  onFondPerdu,
+  onImporter,
+  onRetirer,
+  onImporterSecondaire,
+  onRetirerSecondaire,
+  calque,
+}: Props) {
   // Format d'écran (Visuels numériques) : formats en pixels seulement, sans fond perdu ni verso.
   const ecran = Boolean(format.px);
   const t = libellesCartes(ecran).modele;
@@ -89,25 +148,7 @@ export default function PanneauVisuels({ nom, onNom, format, visuels, avecFondPe
                   {face === "recto" ? t.choisirRecto : t.choisirVerso}
                 </Button>
               )}
-              {visuel ? (
-                <List spacing={4} size="xs" center>
-                  {(ecran ? diagnostiquerEcran(visuel, format) : diagnostiquer(visuel, format, avecFondPerdu[face])).map(({ niveau, message }) => {
-                    const { couleur, icone: Icone } = ICONES[niveau];
-                    return (
-                      <List.Item
-                        key={message}
-                        icon={
-                          <ThemeIcon color={couleur} size={16} radius="xl" variant="light">
-                            <Icone size={12} />
-                          </ThemeIcon>
-                        }
-                      >
-                        {message}
-                      </List.Item>
-                    );
-                  })}
-                </List>
-              ) : null}
+              {visuel && <Diagnostics messages={ecran ? diagnostiquerEcran(visuel, format) : diagnostiquer(visuel, format, avecFondPerdu[face])} />}
               {visuel && format.fond_perdu_mm > 0 && (
                 <Switch
                   size="xs"
@@ -121,10 +162,102 @@ export default function PanneauVisuels({ nom, onNom, format, visuels, avecFondPe
                   {t.aucunVisuel}
                 </Text>
               )}
+              {/* Cartes : une version écran (RVB) facultative, pour les cartes numériques. */}
+              {visuel && !ecran && (
+                <VersionEcran face={face} visuels={visuels} format={format} onImporterSecondaire={onImporterSecondaire} onRetirerSecondaire={onRetirerSecondaire} />
+              )}
             </Stack>
           );
         })}
+
+        <Title order={5} mt="xs">
+          {t.calqueTitre}
+        </Title>
+        <Text size="xs" c="dimmed">
+          {t.calqueAide}
+        </Text>
+        {visuels.calque ? (
+          <>
+            <VisuelChoisi
+              visuel={visuels.calque}
+              onRemplacer={() => onImporterSecondaire("calque")}
+              onRetirer={() => onRetirerSecondaire("calque")}
+              remplacer={t.remplacer}
+              retirer={t.retirer}
+            />
+            <Switch size="xs" label={t.afficherCalque} checked={calque.visible} onChange={(e) => calque.onVisible(e.currentTarget.checked)} />
+            <div>
+              <Text size="xs" mb={4}>
+                {t.opaciteCalque}
+              </Text>
+              <Slider
+                aria-label={t.opaciteCalque}
+                min={10}
+                max={90}
+                step={5}
+                value={calque.opacite}
+                label={(valeur) => `${valeur} %`}
+                disabled={!calque.visible}
+                onChange={calque.onOpacite}
+              />
+            </div>
+          </>
+        ) : (
+          <Button variant="light" leftSection={<IconStack2 size={16} />} onClick={() => onImporterSecondaire("calque")}>
+            {t.choisirCalque}
+          </Button>
+        )}
       </Stack>
     </Paper>
+  );
+}
+
+/** Version écran d'une face : facultative, elle remplace celle de l'imprimeur dans les cartes numériques. */
+function VersionEcran({
+  face,
+  visuels,
+  format,
+  onImporterSecondaire,
+  onRetirerSecondaire,
+}: {
+  face: Face;
+  visuels: Visuels;
+  format: Format;
+  onImporterSecondaire: (emplacement: Secondaire) => void;
+  onRetirerSecondaire: (emplacement: Secondaire) => void;
+}) {
+  const t = libellesCartes(false).modele;
+  const emplacement: Secondaire = face === "recto" ? "recto_ecran" : "verso_ecran";
+  const version = visuels[emplacement];
+  return (
+    <Stack gap={4} pl="sm" style={{ borderLeft: "2px solid var(--mantine-color-gray-3)" }} data-version-ecran={face}>
+      <Group gap={6} wrap="nowrap">
+        <IconDeviceDesktop size={15} stroke={1.5} />
+        <Text size="xs" fw={500}>
+          {t.versionEcran}
+        </Text>
+      </Group>
+      {version ? (
+        <>
+          <VisuelChoisi
+            visuel={version}
+            onRemplacer={() => onImporterSecondaire(emplacement)}
+            onRetirer={() => onRetirerSecondaire(emplacement)}
+            remplacer={t.remplacer}
+            retirer={t.retirer}
+          />
+          <Diagnostics messages={diagnostiquerVersionEcran(version, format)} />
+        </>
+      ) : (
+        <>
+          <Button size="compact-sm" variant="subtle" style={{ alignSelf: "flex-start" }} onClick={() => onImporterSecondaire(emplacement)}>
+            {t.ajouterVersionEcran}
+          </Button>
+          <Text size="xs" c="dimmed">
+            {t.versionEcranAide}
+          </Text>
+        </>
+      )}
+    </Stack>
   );
 }
