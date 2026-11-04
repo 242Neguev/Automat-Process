@@ -2,7 +2,7 @@
 
 Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par le pilote Windows, la conversion des courriers par Word et les signatures dans Outlook. Le reste de l'application a été testé de bout en bout sur Mac, y compris avec la politique de sécurité de la version finale.
 
-Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : voir les [résultats](#résultats-du-4-novembre-2026). Il reste surtout à produire et installer **l'installateur** (partie 1), à essayer une **imprimante à badges** (partie 4b) et **Outlook avec un compte de messagerie** (parties 6 et 7).
+Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : voir les [résultats](#résultats-du-4-novembre-2026). L'installateur a été produit, installé et essayé. Il reste surtout à essayer une **imprimante à badges** (partie 4b) et **Outlook avec un compte de messagerie** (parties 6 et 7).
 
 **Version à tester** : celle du 4 novembre 2026 ou plus récente (`git log -1` pour le vérifier).
 
@@ -31,6 +31,7 @@ Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : 
    - Accepter les installations proposées : Node.js, outils C++ de Visual Studio, Rust.
    - Si le script demande de fermer la fenêtre et de le relancer (après une installation), le faire.
    - S'il s'arrête sur **ÉCHEC**, faire une capture des 30 dernières lignes de la fenêtre.
+   - Avec 8 Go de mémoire, fermer navigateur et messagerie pendant la compilation : l'étape finale demande à elle seule environ 3 Go. Après un échec faute de mémoire (`memory allocation of … bytes failed`, code `0xC0000409`), il suffit de relancer le script : la compilation reprend là où elle s'était arrêtée.
 3. À la fin, le dossier de l'installateur s'ouvre : `src-tauri\target\release\bundle\nsis\`, ou `%LOCALAPPDATA%\Automat-Process-compilation\release\bundle\nsis\` si le projet est dans OneDrive (la compilation se fait alors hors de OneDrive). Lancer `Automat-Process_0.1.0_x64-setup.exe`.
    - « Windows a protégé votre ordinateur » : cliquer sur **Informations complémentaires**, puis sur **Exécuter quand même**.
    - L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
@@ -159,7 +160,7 @@ PC portable sous Windows 11 (Core i5, 8 Go de mémoire, écran à 125 %), Office
 
 | Partie | Résultat | Remarques |
 |---|---|---|
-| 1. Compilation et installation | ◐ | Compilation de développement, tests et lints : ✅. Avec 8 compilations simultanées, la mémoire saturait et le compilateur s'arrêtait (code 0xC0000409) : le script en lance désormais moins quand la mémoire est faible, et compile hors de OneDrive quand le projet y est. **Corrigé** : le script échouait sur `npm ci` (« Unknown command: "pm" »). La compilation finale de l'installateur a démarré, mais a dû être arrêtée faute de mémoire (PC partagé avec d'autres compilations) : installateur et installation restent à essayer. |
+| 1. Compilation et installation | ✅ | Compilation de développement, tests et lints : ✅. Avec 8 compilations simultanées, la mémoire saturait et le compilateur s'arrêtait (code 0xC0000409) : le script en lance désormais moins quand la mémoire est faible, et compile hors de OneDrive quand le projet y est. **Corrigé** : le script échouait sur `npm ci` (« Unknown command: "pm" ») ; il compilait dans le dossier même où s'installe l'application. **Installateur** : `Automat-Process_0.1.0_x64-setup.exe`, 15,2 Mo, en 1 h 45 de compilation cumulée, une compilation à la fois, sur un PC partagé avec d'autres compilations. Interrompue quatre fois faute de mémoire, elle a chaque fois repris là où elle s'était arrêtée ; l'étape finale demande à elle seule 3,1 Go (`typst-library` : 2,5 Go). **Installation** pour l'utilisateur courant, sans droits d'administrateur, en 16 s : « Automat-Process 0.1.0 » d'« Eau sèche » dans les programmes installés, raccourci dans le menu Démarrer. L'application installée affiche « Moteur Typst 0.15.1 · 328 polices », les quatre modules, et ⓘ montre le logo et les coordonnées d'Eau sèche. Vrai PDF des planches enregistré par la boîte « Enregistrer sous » de Windows (au premier plan) dans un dossier accentué : 2 pages A4, polices incorporées. Defender : aucune détection. « Windows a protégé votre ordinateur » non vu : l'installateur a été copié sur le PC, pas téléchargé. |
 | 2. Affichage | ✅ | Échelle de 125 % : textes et aperçus nets, rien de coupé. 150 % non essayé. |
 | 3. PDF pour l'imprimeur | ✅ | Planche A4 : 6 cartes, traits de coupe, accents corrects (Aïssatou, Éloïse, Kouamé), polices incorporées, dossier au nom accentué. |
 | 4a. Microsoft Print to PDF | ✅ | Recto verso grisé avec son message. Carte de 85,0 × 55,0 mm, centrée au dixième de millimètre, rendue à 600 dpi. La fenêtre « Enregistrer l'impression sous » s'ouvre au premier plan. **Corrigé** : l'annuler affichait « L'impression n'a pas pu démarrer » ; c'est maintenant « Impression annulée ». |
