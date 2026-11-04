@@ -110,11 +110,12 @@ if ($LASTEXITCODE -ne 0) {
 
 Set-Location $racine
 
-# Fichiers de compilation (plusieurs Go) hors de OneDrive, qui tenterait sinon de tout synchroniser.
+# Fichiers de compilation (plusieurs Go) hors de OneDrive, qui tenterait sinon de tout synchroniser. Pas
+# dans %LOCALAPPDATA%\Automat-Process : c'est là que s'installe l'application.
 $dossiersOneDrive = @($env:OneDrive, $env:OneDriveCommercial, $env:OneDriveConsumer) | Where-Object { $_ }
 $dansOneDrive = $dossiersOneDrive | Where-Object { ($racine + '\').StartsWith($_.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase) }
 if ($dansOneDrive -and -not $env:CARGO_TARGET_DIR) {
-    $env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA 'Automat-Process\compilation'
+    $env:CARGO_TARGET_DIR = Join-Path $env:LOCALAPPDATA 'Automat-Process-compilation'
     Write-Host "Projet dans OneDrive : compilation dans $env:CARGO_TARGET_DIR (hors synchronisation)."
 }
 $dossierCompilation = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $racine 'src-tauri\target' }

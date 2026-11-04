@@ -64,7 +64,7 @@ npm run verifier       # TypeScript, mise en forme et lints Rust, tests du cœur
 
 La première compilation Rust est longue (plusieurs minutes) ; les suivantes sont rapides.
 
-> **Projet dans OneDrive ?** Les fichiers compilés pèsent plusieurs Go : placez-les hors de OneDrive, par exemple `$env:CARGO_TARGET_DIR = "$env:LOCALAPPDATA\Automat-Process\compilation"` dans PowerShell avant les commandes ci-dessus (le script de compilation Windows le fait de lui-même). **8 Go de mémoire ou moins ?** Limitez les compilations simultanées (`$env:CARGO_BUILD_JOBS = "2"`), sinon le compilateur peut s'arrêter avec le code `0xC0000409`.
+> **Projet dans OneDrive ?** Les fichiers compilés pèsent plusieurs Go : placez-les hors de OneDrive, par exemple `$env:CARGO_TARGET_DIR = "$env:LOCALAPPDATA\Automat-Process-compilation"` dans PowerShell avant les commandes ci-dessus (le script de compilation Windows le fait de lui-même). **8 Go de mémoire ou moins ?** Limitez les compilations simultanées (`$env:CARGO_BUILD_JOBS = "2"`), sinon le compilateur peut s'arrêter avec le code `0xC0000409`.
 
 ## Obtenir l'installateur Windows
 
@@ -91,7 +91,7 @@ Pour publier une version, il suffit d'envoyer un tag : `git tag v0.1.0 && git pu
    - Rust.
 
    Windows peut demander d'autoriser ces installations. Compter de 30 à 60 minutes la première fois (davantage sur un PC de 8 Go de mémoire, où le script lance moins de compilations à la fois), quelques minutes ensuite.
-3. À la fin, le dossier contenant l'installateur `.exe` s'ouvre tout seul (`src-tauri\target\release\bundle\nsis\`, ou `%LOCALAPPDATA%\Automat-Process\compilation\release\bundle\nsis\` si le projet est dans OneDrive : la compilation se fait alors hors de OneDrive).
+3. À la fin, le dossier contenant l'installateur `.exe` s'ouvre tout seul (`src-tauri\target\release\bundle\nsis\`, ou `%LOCALAPPDATA%\Automat-Process-compilation\release\bundle\nsis\` si le projet est dans OneDrive : la compilation se fait alors hors de OneDrive).
 
 Pour produire aussi un `.msi`, lancer `scripts\compiler-windows.cmd -Msi` dans un terminal.
 

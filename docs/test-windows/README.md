@@ -31,7 +31,7 @@ Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : 
    - Accepter les installations proposées : Node.js, outils C++ de Visual Studio, Rust.
    - Si le script demande de fermer la fenêtre et de le relancer (après une installation), le faire.
    - S'il s'arrête sur **ÉCHEC**, faire une capture des 30 dernières lignes de la fenêtre.
-3. À la fin, le dossier de l'installateur s'ouvre : `src-tauri\target\release\bundle\nsis\`, ou `%LOCALAPPDATA%\Automat-Process\compilation\release\bundle\nsis\` si le projet est dans OneDrive (la compilation se fait alors hors de OneDrive). Lancer `Automat-Process_0.1.0_x64-setup.exe`.
+3. À la fin, le dossier de l'installateur s'ouvre : `src-tauri\target\release\bundle\nsis\`, ou `%LOCALAPPDATA%\Automat-Process-compilation\release\bundle\nsis\` si le projet est dans OneDrive (la compilation se fait alors hors de OneDrive). Lancer `Automat-Process_0.1.0_x64-setup.exe`.
    - « Windows a protégé votre ordinateur » : cliquer sur **Informations complémentaires**, puis sur **Exécuter quand même**.
    - L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
 
