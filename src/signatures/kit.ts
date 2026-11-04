@@ -69,14 +69,18 @@ Pour chaque agent (Outlook classique sous Windows)
 1. Fermez Outlook.
 2. Double-cliquez sur « Installer ma signature.cmd ».
 3. Confirmez votre nom, ou tapez votre numéro ou une partie de votre nom.
-4. Rouvrez Outlook : la signature est ajoutée aux nouveaux messages et aux réponses.
+4. Rouvrez Outlook : la signature est ajoutée aux nouveaux messages et aux réponses de votre
+   compte. Vous pouvez toujours en choisir une autre (Fichier > Options > Courrier > Signatures).
 
 Si Windows affiche « Windows a protégé votre ordinateur », cliquez sur « Informations
 complémentaires », puis sur « Exécuter quand même ».
 
 Pour le service informatique (installation sans question, par exemple au démarrage de session)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer.ps1 -Choix prenom.nom@exemple.com
-(-Choix accepte aussi le numéro ou le nom de l'agent ; -SansRegistre n'impose pas la signature par défaut.)
+-Choix accepte aussi le numéro ou le nom de l'agent.
+-Imposer verrouille la signature sur tous les comptes : l'agent ne peut plus la changer dans Outlook
+(relancer le kit sans -Imposer la déverrouille).
+-SansRegistre installe seulement les fichiers de la signature, sans toucher aux réglages d'Outlook.
 
 Le nouvel Outlook, Outlook sur le web et Gmail gardent leurs signatures en ligne : pour eux, utilisez
 la page de signature de chaque agent (copier-coller).
@@ -85,12 +89,26 @@ Kit créé avec Automat-Process, une solution Eau sèche.
 `;
 }
 
+/**
+ * Dossier des images d'une signature, en lettres ASCII seulement (« Signature-Eau-seche_fichiers ») :
+ * le HTML le désigne sans aucun caractère encodé, que toutes les versions d'Outlook lisent de la même façon.
+ */
+export function dossierImages(signature: string): string {
+  const ascii = signature
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `${ascii || "signature"}_fichiers`;
+}
+
 /** Fichiers du kit Outlook pour tous les agents (chemins relatifs au dossier du kit). */
 export function construireKit(nomSignature: string, agents: AgentKit[]): FichierAEcrire[] {
   const signature = nomsUniques([nomSignature])[0];
-  const prefixe = `${encodeURIComponent(signature)}_fichiers/`;
+  const images = dossierImages(signature);
+  const prefixe = `${images}/`;
   const fichiers: FichierAEcrire[] = [];
-  const config = { signature, agents: [] as { numero: number; nom: string; email: string; dossier: string }[] };
+  const config = { signature, images, agents: [] as { numero: number; nom: string; email: string; dossier: string }[] };
   agents.forEach((agent, i) => {
     const dossier = String(i + 1).padStart(3, "0");
     const { html, images } = extraireImages(agent.html, prefixe);

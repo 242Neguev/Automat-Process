@@ -2,7 +2,9 @@
 
 Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par le pilote Windows, la conversion des courriers par Word et les signatures dans Outlook. Le reste de l'application a été testé de bout en bout sur Mac, y compris avec la politique de sécurité de la version finale.
 
-**Version à tester** : le commit `518e03d` ou plus récent (`git log -1` pour le vérifier).
+Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : voir les [résultats](#résultats-du-4-novembre-2026). Il reste surtout à produire et installer **l'installateur** (partie 1), à essayer une **imprimante à badges** (partie 4b) et **Outlook avec un compte de messagerie** (parties 6 et 7).
+
+**Version à tester** : celle du 4 novembre 2026 ou plus récente (`git log -1` pour le vérifier).
 
 ## Avant de commencer
 
@@ -29,7 +31,7 @@ Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par
    - Accepter les installations proposées : Node.js, outils C++ de Visual Studio, Rust.
    - Si le script demande de fermer la fenêtre et de le relancer (après une installation), le faire.
    - S'il s'arrête sur **ÉCHEC**, faire une capture des 30 dernières lignes de la fenêtre.
-3. À la fin, le dossier `src-tauri\target\release\bundle\nsis\` s'ouvre. Lancer `Automat-Process_0.1.0_x64-setup.exe`.
+3. À la fin, le dossier de l'installateur s'ouvre : `src-tauri\target\release\bundle\nsis\`, ou `%LOCALAPPDATA%\Automat-Process\compilation\release\bundle\nsis\` si le projet est dans OneDrive (la compilation se fait alors hors de OneDrive). Lancer `Automat-Process_0.1.0_x64-setup.exe`.
    - « Windows a protégé votre ordinateur » : cliquer sur **Informations complémentaires**, puis sur **Exécuter quand même**.
    - L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
 
@@ -58,12 +60,13 @@ Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par
 
 1. Même carte, destination **Impression directe**. Imprimante : **Microsoft Print to PDF**.
 2. Cartes à imprimer : **Jean-Baptiste NKOULOU MBARGA (ligne 2)** seulement. Cliquer sur **Imprimer**.
-3. Windows demande où enregistrer le PDF. La fenêtre peut s'ouvrir **derrière** l'application : regarder la barre des tâches.
+3. Windows demande où enregistrer le PDF (fenêtre « Enregistrer l'impression sous »). Si elle n'apparaît pas, regarder la barre des tâches.
 
 **Attendu** :
 - le message « Cette imprimante n'imprime pas recto verso » s'affiche, et l'interrupteur Recto verso est grisé ;
 - le PDF contient une page avec la carte, au centre et à sa taille réelle. Imprimer ce PDF sur papier en « Taille réelle » (sans « Ajuster ») et mesurer : 85 × 55 mm ;
-- la carte est nette (pas de flou ni d'escalier sur les textes).
+- la carte est nette (pas de flou ni d'escalier sur les textes) ;
+- si l'on clique sur **Annuler** dans la fenêtre d'enregistrement, l'application affiche « Impression annulée ».
 
 ### 4b. Avec l'imprimante à badges (si disponible)
 
@@ -86,7 +89,7 @@ Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par
 5. Après les conversions, ouvrir le Gestionnaire des tâches (`Ctrl + Maj + Échap`).
    **Attendu** : aucun « Microsoft Word » ne reste en arrière-plan, à part celui ouvert à la main.
 
-**Si rien ne se passe après 2 minutes** : regarder dans le Gestionnaire des tâches si « Microsoft Word » tourne. Ouvrir Word une fois à la main et fermer ses éventuelles fenêtres de premier lancement (activation, confidentialité), puis réessayer. Noter ce qui s'affichait.
+**Si Word ne répond pas** (fenêtre invisible d'activation ou de premier lancement…) : au bout d'1 min 30, l'application l'arrête et LibreOffice, s'il est installé, prend le relais ; la notification et l'aperçu l'expliquent. Ouvrir alors Word une fois à la main, fermer ses fenêtres (activation, confidentialité), relancer Automat-Process et réessayer. Noter ce qui s'affichait.
 
 ## 6. Signatures : copier-coller dans Outlook
 
@@ -109,9 +112,11 @@ Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par
 4. **Attendu** : « Signature de … installee. » Rouvrir Outlook :
    - nouveau message : la signature est insérée, avec le logo ;
    - réponse à un message : la signature est insérée ;
-   - *Fichier > Options > Courrier > Signatures…* : la signature est là, choisie par défaut, et ce choix peut encore être changé.
+   - *Fichier > Options > Courrier > Signatures…* : la signature est là, choisie par défaut pour votre compte, et ce choix peut encore être changé.
 
-Pour aller plus loin : relancer le kit et choisir un autre agent. La signature doit être remplacée, sans doublon.
+Pour aller plus loin :
+- relancer le kit et choisir un autre agent : la signature doit être remplacée, sans doublon ;
+- dans un terminal, dans le dossier du kit : `powershell -ExecutionPolicy Bypass -File installer.ps1 -Choix 1 -Imposer`. Rouvrir Outlook : le choix de la signature par défaut est grisé. Relancer la même commande sans `-Imposer` : il redevient modifiable.
 
 ## 8. Visuels numériques : fond Teams
 
@@ -146,4 +151,21 @@ Pour aller plus loin : relancer le kit et choisir un autre agent. La signature d
 | 8. Fond Teams | | |
 | 9. Projets et dossiers | | |
 
-Les parties 1, 4, 5 et 7 sont les plus importantes : ce sont celles qui n'ont jamais pu être essayées.
+Les parties 1, 4b, 6 et 7 sont désormais les plus importantes : ce sont celles qui n'ont pas pu être essayées jusqu'au bout (voir ci-dessous).
+
+## Résultats du 4 novembre 2026
+
+PC portable sous Windows 11 (Core i5, 8 Go de mémoire, écran à 125 %), Office 2019 (licence expirée : Word en lecture seule, ce qui n'empêche pas la conversion en PDF), LibreOffice 7.6, Rust 1.99, Visual Studio 2022. Les parties 2 à 9 ont été menées dans l'application réelle, pilotée par Playwright ; les boîtes de dialogue de fichiers étaient simulées, celle du pilote d'impression était bien réelle.
+
+| Partie | Résultat | Remarques |
+|---|---|---|
+| 1. Compilation et installation | ◐ | Compilation de développement, tests et lints : ✅. Avec 8 compilations simultanées, la mémoire saturait et le compilateur s'arrêtait (code 0xC0000409) : le script en lance désormais moins quand la mémoire est faible, et compile hors de OneDrive quand le projet y est. **Corrigé** : le script échouait sur `npm ci` (« Unknown command: "pm" »). La compilation finale de l'installateur a démarré, mais a dû être arrêtée faute de mémoire (PC partagé avec d'autres compilations) : installateur et installation restent à essayer. |
+| 2. Affichage | ✅ | Échelle de 125 % : textes et aperçus nets, rien de coupé. 150 % non essayé. |
+| 3. PDF pour l'imprimeur | ✅ | Planche A4 : 6 cartes, traits de coupe, accents corrects (Aïssatou, Éloïse, Kouamé), polices incorporées, dossier au nom accentué. |
+| 4a. Microsoft Print to PDF | ✅ | Recto verso grisé avec son message. Carte de 85,0 × 55,0 mm, centrée au dixième de millimètre, rendue à 600 dpi. La fenêtre « Enregistrer l'impression sous » s'ouvre au premier plan. **Corrigé** : l'annuler affichait « L'impression n'a pas pu démarrer » ; c'est maintenant « Impression annulée ». |
+| 4b. Imprimante à badges | — | Pas d'imprimante à badges sur ce poste. |
+| 5. Courriers Word en PDF | ✅ | « 2 champs de publipostage » convertis ; aperçu fidèle par Word en 35 s la première fois ; 6 `.docx`, 6 PDF et `_Tous les courriers.pdf` en 24 s ; aucun Word résiduel ; un Word déjà ouvert reste intact. **Ajouté** : un Word qui ne répond plus est arrêté et LibreOffice prend le relais (lors d'un premier essai, mémoire saturée, Word était resté bloqué 4 minutes). |
+| 6. Signatures copiées dans Outlook | ◐ | Pages créées ; dans Edge, « Copier la signature » met bien le HTML dans le presse-papiers. Outlook classique n'a pas de compte sur ce poste : collage non essayé. |
+| 7. Kit Outlook | ◐ | Kit créé par l'application, script essayé avec Windows PowerShell 5.1 sur une copie factice du registre d'Outlook. **Corrigé** : `-Choix` et la saisie d'un numéro ne trouvaient jamais l'agent (sous PowerShell 5.1) ; le script bouclait sans fin lancé sans clavier ; la signature par défaut était imposée (choix grisé dans Outlook) ; le chemin du logo contenait des caractères encodés. À essayer dans Outlook avec un compte. |
+| 8. Fond Teams | ✅ | « Image de 1920 × 1080 px : assez grande pour ce format » ; 6 images de 1920 × 1080 px, texte en blanc lisible. Pas essayé dans Teams. |
+| 9. Projets et dossiers | ✅ | Projet rouvert après redémarrage (visuel et informations retrouvés) ; refus dans le mauvais module, avec le bon message. OneDrive et partage réseau non essayés. |

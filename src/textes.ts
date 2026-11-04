@@ -223,6 +223,8 @@ export const textes = {
         detail: "Chaque carte est envoyée au pilote de l'imprimante, à sa résolution, sans fichier intermédiaire.",
         imprimer: "Imprimer",
         envoyee: (imprimante: string) => `Impression envoyée à ${imprimante}`,
+        annulee: "Impression annulée",
+        annuleeDetail: "Aucune carte n'a été imprimée.",
         nbCartes: (n: number) => `${n} carte${n > 1 ? "s" : ""}`,
       },
       confirmation: {
@@ -417,8 +419,8 @@ export const textes = {
       courrier: (numero: number, total: number) => `Courrier ${numero} sur ${total}`,
       destinataires: "Destinataires",
       vues: { texte: "Texte", fidele: "Aperçu fidèle (PDF)" },
-      calculFidele: "Word prépare l'aperçu…",
-      fideleAide: "Le courrier tel que Word l'imprime (ou LibreOffice, sans Word).",
+      calculFidele: "Préparation de l'aperçu fidèle… (jusqu'à une vingtaine de secondes la première fois)",
+      fideleAide: { word: "Le courrier tel que Word l'imprime.", libreoffice: "Le courrier tel que LibreOffice l'imprime : la mise en page peut différer légèrement de celle de Word." },
     },
     destination: {
       titre: "Documents à créer",

@@ -238,18 +238,29 @@ export interface CourriersEcrits {
 export const ecrireCourriers = (modele: string, courriers: Courrier[], dossier: string, sousDossier: string) =>
   invoke<CourriersEcrits>("ecrire_courriers", { modele, courriers, dossier, sousDossier });
 
+/** Logiciel qui convertit les courriers en PDF. */
+export type Convertisseur = "word" | "libreoffice";
+
 /** Conversion en PDF : logiciel utilisé et PDF créés, dans l'ordre des documents. */
 export interface Conversion {
-  convertisseur: "word" | "libreoffice";
+  convertisseur: Convertisseur;
   pdfs: string[];
+  /** Pourquoi Word, pourtant installé, n'a pas fait la conversion (LibreOffice a pris le relais). */
+  remarque: string | null;
 }
 
 /** Convertit des courriers Word en PDF (Word, sinon LibreOffice) dans le dossier `sousDossier` de `dossier`. */
 export const convertirCourriers = (documents: string[], dossier: string, sousDossier: string, supprimerSources: boolean) =>
   invoke<Conversion>("convertir_courriers", { documents, dossier, sousDossier, supprimerSources });
 
-/** Aperçu fidèle d'un courrier : ses pages en SVG, telles que Word les produit. */
-export const apercuCourrier = (modele: string, courrier: Courrier) => invoke<string[]>("apercu_courrier", { modele, courrier });
+/** Aperçu fidèle d'un courrier : ses pages en SVG, telles que Word (ou LibreOffice) les produit. */
+export interface ApercuCourrier {
+  pages: string[];
+  convertisseur: Convertisseur;
+  remarque: string | null;
+}
+
+export const apercuCourrier = (modele: string, courrier: Courrier) => invoke<ApercuCourrier>("apercu_courrier", { modele, courrier });
 
 /** Dossier temporaire neuf, et sa suppression (documents intermédiaires). */
 export const dossierTemporaire = () => invoke<string>("dossier_temporaire");
@@ -273,8 +284,9 @@ export interface ReglagesImpression {
 
 export const imprimantes = () => invoke<Imprimante[]>("imprimantes");
 
+/** Imprime les cartes ; `false` si l'utilisateur a annulé (boîte d'enregistrement d'une imprimante PDF ou XPS). */
 export const imprimerCartes = (modele: ModeleCarte, agents: DonneesAgent[], imprimante: string, reglages: ReglagesImpression) =>
-  invoke<void>("imprimer_cartes", { modele, agents, imprimante, reglages });
+  invoke<boolean>("imprimer_cartes", { modele, agents, imprimante, reglages });
 
 /** Couleur du visuel tout autour d'une zone : elle sert à effacer un texte incrusté. */
 export const couleurAutour = (modele: ModeleCarte, zone: Zone) => invoke<string>("couleur_autour", { modele, zone });

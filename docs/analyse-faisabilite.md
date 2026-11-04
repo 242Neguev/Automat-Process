@@ -2,7 +2,7 @@
 
 **Documents personnalisés à partir d'un modèle et d'une liste : cartes de visite imprimées et numériques, signatures e-mail, documents Word**
 
-*Version 2, 29 octobre 2026. Elle intègre les décisions prises le même jour (§ 2). Statut : validée ; phase 0 terminée, phase 1 en cours. Éditeur : Eau sèche.*
+*Version 2, 29 octobre 2026, mise à jour le 4 novembre 2026. Elle intègre les décisions prises le 29 octobre (§ 2). Statut : validée ; phases 0 et 1 livrées, version Pro (phase 2) en partie ; premiers essais sous Windows le 4 novembre 2026. Éditeur : Eau sèche.*
 
 ---
 
@@ -249,7 +249,7 @@ Le modèle de signature peut être :
 | Mode | Fonctionnement | Phase |
 |---|---|---|
 | **Copier-coller** | Une page par agent, avec un bouton « Copier la signature » et un mode d'emploi illustré pour Outlook (classique et nouveau), Outlook sur le web et Gmail | MVP |
-| **Kit Outlook** | Par agent, un petit script qui installe la signature dans **Outlook classique** sur son PC et la définit par défaut. ⚠️ Le **nouvel Outlook** et Outlook sur le web stockent les signatures en ligne : pour eux, il faut le copier-coller ou le déploiement centralisé. | V2 |
+| **Kit Outlook** | Par agent, un petit script qui installe la signature dans **Outlook classique** sur son PC et la définit par défaut pour son compte (il peut encore en changer ; l'option `-Imposer` la verrouille). ⚠️ Le **nouvel Outlook** et Outlook sur le web stockent les signatures en ligne : pour eux, il faut le copier-coller ou le déploiement centralisé. | V2 |
 | **Centralisé, Google Workspace** | L'administrateur autorise l'application, qui pose la signature de tous les comptes via l'interface Gmail officielle | V3 |
 | **Centralisé, Microsoft 365** | Deux voies. (a) Une **règle de transport Exchange** : le serveur ajoute la signature. C'est simple, mais la signature n'apparaît pas dans les éléments envoyés et se place en bas du fil. (b) Une pose dans les signatures en ligne d'Outlook, qui passe par des interfaces peu documentées : à étudier le moment venu. | V3 |
 
@@ -469,4 +469,5 @@ Durées **indicatives**, en temps de développement assisté.
 
 1. **Fichiers réels** à déposer dans `exemples-reels/` : deux ou trois modèles par logiciel, un Excel anonymisé, une signature e-mail existante et un modèle Word. C'est le test le plus important.
 2. **Hébergement web**, le moment venu, pour les images des signatures (rendu « image », logos dans Gmail) et les cartes en ligne.
-3. **Imprimantes PVC** : décidé le 29 octobre 2026, toutes les marques sont prises en charge (choix parmi les imprimantes installées, imprimante à cartes proposée d'office). Reste à **essayer l'impression directe** sur une vraie imprimante (Evolis, Zebra…), notamment le recto verso et le sens du verso.
+3. **Imprimantes PVC** : décidé le 29 octobre 2026, toutes les marques sont prises en charge (choix parmi les imprimantes installées, imprimante à cartes proposée d'office). L'impression directe a été validée le 4 novembre 2026 avec Microsoft Print to PDF (carte à sa taille exacte, centrée, à la résolution de l'imprimante). Reste à l'**essayer sur une vraie imprimante** (Evolis, Zebra…), notamment le recto verso et le sens du verso.
+4. **Outlook** : essayer le collage de la signature et le kit Outlook avec un vrai compte de messagerie (le poste d'essai du 4 novembre 2026 n'en avait pas).

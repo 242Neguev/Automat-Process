@@ -284,8 +284,10 @@ fn jpeg(
 ) -> Result<Vec<u8>, ErreurMoteur> {
     let (largeur, hauteur, rvba) = document.pixels(page, pixels_par_point)?;
     let rvb: Vec<u8> = rvba
-        .chunks_exact(4)
-        .flat_map(|pixel| [pixel[0], pixel[1], pixel[2]])
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .flat_map(|&[r, v, b, _]| [r, v, b])
         .collect();
     let mut sortie = Vec::new();
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut sortie, qualite)
@@ -387,13 +389,14 @@ pub fn bon_a_tirer(
 }
 
 /// Impression directe des cartes sur une imprimante Windows : recto, et verso au dos si demandé.
+/// `Ok(false)` : l'utilisateur a annulé (imprimante virtuelle dont la boîte d'enregistrement a été refermée).
 pub fn imprimer(
     moteur: &Moteur,
     projet: &Projet,
     agents: &[DonneesAgent],
     imprimante: &str,
     reglages: impression::Reglages,
-) -> Result<(), ErreurMoteur> {
+) -> Result<bool, ErreurMoteur> {
     if agents.is_empty() {
         return Err(ErreurMoteur::simple("Aucune carte à imprimer."));
     }

@@ -81,8 +81,11 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
   async function imprimer(imprimante: string, cartes: DonneesAgent[], reglages: ReglagesImpression) {
     setEnCours(true);
     try {
-      await imprimerCartes(modele, cartes, imprimante, reglages);
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.impression.envoyee(imprimante), message: t.impression.nbCartes(cartes.length) });
+      if (await imprimerCartes(modele, cartes, imprimante, reglages)) {
+        notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.impression.envoyee(imprimante), message: t.impression.nbCartes(cartes.length) });
+      } else {
+        notifications.show({ color: "gray", title: t.impression.annulee, message: t.impression.annuleeDetail });
+      }
     } catch (e) {
       signalerErreur(e);
     } finally {

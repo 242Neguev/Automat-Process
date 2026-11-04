@@ -19,7 +19,7 @@ import {
   Title,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconCheck, IconChevronLeft, IconChevronRight, IconFileImport, IconFileTypeDocx, IconInfoCircle } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconFileImport, IconFileTypeDocx, IconInfoCircle } from "@tabler/icons-react";
 import { join } from "@tauri-apps/api/path";
 import { open } from "@tauri-apps/plugin-dialog";
 import { remplir, valeursDeLigne } from "../../donnees/agents";
@@ -33,7 +33,7 @@ import {
   fusionnerPdf,
   lireModeleWord,
   supprimerTemporaire,
-  type Conversion,
+  type Convertisseur,
   type Courrier,
 } from "../../moteur";
 import { textes } from "../../textes";
@@ -167,7 +167,9 @@ export default function AssistantWord() {
       temporaires.push(...[docxTemporaires, pdfTemporaires].filter((d): d is string => d !== null));
       const corps: string[] = [];
       const pdfs: string[] = [];
-      let conversion: Conversion | null = null;
+      // Logiciels qui ont converti les lots, et pourquoi Word a été remplacé s'il l'a été.
+      const convertisseurs = new Set<Convertisseur>();
+      let remarque: string | null = null;
       // Parties du premier courrier : le document fusionné reprend ses en-têtes et pieds de page.
       const premier: { parties?: Record<string, string> } = {};
       for (let debut = 0; debut < destinataires.length; debut += LOT) {
@@ -180,7 +182,9 @@ export default function AssistantWord() {
         if (parPersonne || veutPdf) {
           const ecrits = await ecrireCourriers(modele.chemin, lot, docxTemporaires ?? dossier, docxTemporaires ? "docx" : sousDossier);
           if (veutPdf) {
-            conversion = await convertirCourriers(ecrits.fichiers, pdfTemporaires ?? dossier, pdfTemporaires ? "pdf" : sousDossier, docxTemporaires !== null);
+            const conversion = await convertirCourriers(ecrits.fichiers, pdfTemporaires ?? dossier, pdfTemporaires ? "pdf" : sousDossier, docxTemporaires !== null);
+            convertisseurs.add(conversion.convertisseur);
+            remarque ??= conversion.remarque;
             pdfs.push(...conversion.pdfs);
           }
         }
@@ -191,8 +195,17 @@ export default function AssistantWord() {
         await ecrireCourriers(modele.chemin, [{ nom: t.destination.fichierFusion, parties }], dossier, sousDossier);
       }
       if (pdfFusion) await fusionnerPdf(pdfs, await join(final, t.destination.pdfFusionne));
-      const message = conversion ? `${final}\n${t.destination.conversion(t.destination.logiciels[conversion.convertisseur])}` : final;
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.destination.cree, message, autoClose: 10000 });
+      const lignes = [final];
+      if (convertisseurs.size > 0) lignes.push(t.destination.conversion([...convertisseurs].map((c) => t.destination.logiciels[c]).join(" et ")));
+      if (remarque) lignes.push(remarque);
+      notifications.show({
+        color: remarque ? "orange" : "teal",
+        icon: remarque ? <IconAlertTriangle size={18} /> : <IconCheck size={18} />,
+        title: t.destination.cree,
+        message: lignes.join("\n"),
+        // Une remarque (Word remplacé par LibreOffice) reste affichée jusqu'à ce qu'on la ferme.
+        autoClose: remarque ? false : 10000,
+      });
     } catch (e) {
       signalerErreur(e);
     } finally {

@@ -91,7 +91,8 @@ pub struct FichierAEcrire {
     pub octets: Option<Vec<u8>>,
 }
 
-/// Nom de fichier sans risque : ni séparateur, ni caractère interdit par Windows, ni « .. ».
+/// Nom de fichier sans risque : ni séparateur, ni caractère interdit par Windows, ni « .. », ni nom
+/// réservé par Windows (« CON », « NUL.pdf »… deviennent « CON_ », « NUL_.pdf »).
 pub fn nom_sur(nom: &str) -> Option<String> {
     let propre: String = nom
         .chars()
@@ -105,7 +106,28 @@ pub fn nom_sur(nom: &str) -> Option<String> {
         .collect();
     // Les points finaux sont retirés (Windows les ignore) : « . » et « .. » deviennent vides.
     let propre = propre.trim().trim_end_matches('.').to_string();
-    (!propre.is_empty()).then_some(propre)
+    if propre.is_empty() {
+        return None;
+    }
+    let fin_du_nom = propre.find('.').unwrap_or(propre.len());
+    Some(if reserve_par_windows(&propre[..fin_du_nom]) {
+        format!("{}_{}", &propre[..fin_du_nom], &propre[fin_du_nom..])
+    } else {
+        propre
+    })
+}
+
+/// Noms de périphériques de Windows : un fichier ainsi nommé, même avec une extension, est inaccessible.
+fn reserve_par_windows(nom: &str) -> bool {
+    let nom = nom.trim_end().to_ascii_uppercase();
+    let numerote = |prefixe: &str| {
+        nom.len() == 4 && nom.starts_with(prefixe) && nom.as_bytes()[3].is_ascii_digit()
+    };
+    matches!(
+        nom.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    ) || numerote("COM")
+        || numerote("LPT")
 }
 
 /// Chemin relatif sans risque (« signatures/001/logo.png ») : chaque élément est un nom sûr ; les
@@ -171,6 +193,17 @@ mod tests {
         );
         let erreur = lire(logo.to_str().unwrap(), Nature::Signature).unwrap_err();
         assert!(erreur.message.contains(".htm"));
+    }
+
+    #[test]
+    fn evite_les_noms_reserves_par_windows() {
+        assert_eq!(nom_sur("Con").as_deref(), Some("Con_"));
+        assert_eq!(nom_sur("nul.pdf").as_deref(), Some("nul_.pdf"));
+        assert_eq!(nom_sur("COM1.docx").as_deref(), Some("COM1_.docx"));
+        assert_eq!(nom_sur("lpt9").as_deref(), Some("lpt9_"));
+        assert_eq!(nom_sur("Constance").as_deref(), Some("Constance"));
+        assert_eq!(nom_sur("COM10").as_deref(), Some("COM10"));
+        assert_eq!(nom_sur("Aux Champs.png").as_deref(), Some("Aux Champs.png"));
     }
 
     #[test]
