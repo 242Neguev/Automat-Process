@@ -65,6 +65,8 @@ export interface ChampMasque {
 export type Champ = ChampTexte | ChampQr | ChampMasque;
 
 export interface ModeleCarte {
+  /** Identifiant du modèle : le registre de ses exports (mise à jour incrémentale) est rangé sous ce nom. */
+  id?: string;
   nom: string;
   /** `px` : format d'écran (fond Teams, bannière…), exporté à cette taille en pixels. */
   format: { largeur_mm: number; hauteur_mm: number; fond_perdu_mm: number; px?: { largeur: number; hauteur: number } };
@@ -310,6 +312,14 @@ export const enregistrerProjet = (chemin: string, document: Document, modele: un
   invoke<void>("enregistrer_projet", { chemin, document, modele, correspondances, visuels });
 
 export const ouvrirProjet = (chemin: string) => invoke<ProjetOuvert>("ouvrir_projet", { chemin });
+
+/** Empreinte du modèle tel qu'il s'imprime (contenu des visuels compris) : s'il change, toutes les cartes sont à refaire. */
+export const empreinteModele = (modele: ModeleCarte) => invoke<string>("empreinte_modele", { modele });
+
+/** Registre des exports d'un modèle (mise à jour incrémentale) : des empreintes seulement, rangées avec les données de l'application. */
+export const lireRegistre = (id: string) => invoke<unknown>("lire_registre", { id });
+export const ecrireRegistre = (id: string, registre: unknown) => invoke<void>("ecrire_registre", { id, registre });
+export const oublierRegistre = (id: string) => invoke<void>("oublier_registre", { id });
 
 /** Contenu brut d'un fichier de liste choisi par l'utilisateur. */
 export const lireListe = (chemin: string) => invoke<ArrayBuffer>("lire_liste", { chemin });

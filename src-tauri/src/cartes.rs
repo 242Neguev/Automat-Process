@@ -109,6 +109,71 @@ pub fn fichier_demo(chemin: &str) -> Option<Bytes> {
     FICHIERS_DEMO.get(chemin).cloned()
 }
 
+/// Empreinte du modèle tel qu'il s'imprime, pour la mise à jour incrémentale : format, champs, mises
+/// en forme et contenu des visuels (leur chemin virtuel change à chaque ouverture du projet). Le nom,
+/// l'identifiant, le verrou et le calque de référence (jamais imprimé) n'y entrent pas.
+pub fn empreinte_modele(modele: &serde_json::Value, fonds: &Fichiers) -> String {
+    use serde_json::Value;
+    fn canonique(valeur: &Value, fonds: &Fichiers, sortie: &mut String) {
+        match valeur {
+            Value::String(texte) => {
+                let contenu = fonds
+                    .get(texte.as_str())
+                    .cloned()
+                    .or_else(|| fichier_demo(texte));
+                match contenu {
+                    Some(octets) => sortie.push_str(&format!(
+                        "\"#{:016x}\"",
+                        crate::registres::fnv1a(&octets[..])
+                    )),
+                    None => sortie.push_str(&valeur.to_string()),
+                }
+            }
+            Value::Array(elements) => {
+                sortie.push('[');
+                for (i, element) in elements.iter().enumerate() {
+                    if i > 0 {
+                        sortie.push(',');
+                    }
+                    canonique(element, fonds, sortie);
+                }
+                sortie.push(']');
+            }
+            // Clés triées : l'ordre dans lequel l'interface a construit l'objet ne compte pas.
+            Value::Object(objet) => {
+                let mut cles: Vec<&String> = objet.keys().collect();
+                cles.sort();
+                sortie.push('{');
+                for (i, cle) in cles.into_iter().enumerate() {
+                    if i > 0 {
+                        sortie.push(',');
+                    }
+                    sortie.push_str(&Value::String(cle.clone()).to_string());
+                    sortie.push(':');
+                    canonique(&objet[cle], fonds, sortie);
+                }
+                sortie.push('}');
+            }
+            autre => sortie.push_str(&autre.to_string()),
+        }
+    }
+    let mut modele = modele.clone();
+    if let Some(objet) = modele.as_object_mut() {
+        for cle in [
+            "nom",
+            "id",
+            "verrouille",
+            "fond_calque",
+            "fond_calque_avec_fond_perdu",
+        ] {
+            objet.remove(cle);
+        }
+    }
+    let mut texte = String::new();
+    canonique(&modele, fonds, &mut texte);
+    format!("{:016x}", crate::registres::fnv1a(texte.as_bytes()))
+}
+
 /// Zone de la carte finie, en mm depuis son coin haut-gauche.
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct Zone {
@@ -822,5 +887,35 @@ mod tests {
         }))
         .unwrap();
         assert!(agent.vcard.is_none());
+    }
+
+    /// Mise à jour incrémentale : un projet rouvert (visuels sous d'autres chemins virtuels, clés dans
+    /// un autre ordre) garde l'empreinte de son modèle ; un autre visuel ou un champ déplacé la change.
+    #[test]
+    fn empreinte_du_modele_independante_des_chemins_virtuels() {
+        let projet = projet_importe();
+        let empreinte = empreinte_modele(&projet.modele, &projet.fonds);
+        assert_eq!(empreinte.len(), 16);
+        let mut rouvert = serde_json::json!({ "champs": projet.modele["champs"].clone() });
+        for (cle, valeur) in projet.modele.as_object().unwrap().iter().rev() {
+            rouvert[cle] = valeur.clone();
+        }
+        rouvert["fond_recto"] = "/fonds/7.png".into();
+        rouvert["nom"] = "Autre nom".into();
+        rouvert["verrouille"] = true.into();
+        let meme_visuel = Fichiers::from([(
+            "/fonds/7.png".to_string(),
+            projet.fonds["/fonds/1.png"].clone(),
+        )]);
+        assert_eq!(empreinte_modele(&rouvert, &meme_visuel), empreinte);
+
+        let autre_visuel = Fichiers::from([(
+            "/fonds/7.png".to_string(),
+            Bytes::new(&include_bytes!("../icons/32x32.png")[..]),
+        )]);
+        assert_ne!(empreinte_modele(&rouvert, &autre_visuel), empreinte);
+        let mut deplace = projet.modele.clone();
+        deplace["champs"][0]["x_mm"] = 7.into();
+        assert_ne!(empreinte_modele(&deplace, &projet.fonds), empreinte);
     }
 }

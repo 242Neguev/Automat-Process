@@ -174,6 +174,23 @@ export const textes = {
     destination: {
       titre: "Exporter les cartes",
       resume: (n: number) => `${n} carte${n > 1 ? "s" : ""} recto/verso`,
+      quantites: (agents: number, colonne: string) => `${agents} agent${agents > 1 ? "s" : ""}, quantités de la colonne « ${colonne} »`,
+      miseAJour: {
+        titre: "Mise à jour",
+        dernier: (date: string, n: number) => `Dernier export le ${date} : ${n} carte${n > 1 ? "s" : ""}.`,
+        toutes: (n: number) => `Toutes (${n})`,
+        nouvelles: (n: number) => `Nouvelles et modifiées (${n})`,
+        detail: (nouvelles: number, modifiees: number, inchangees: number) =>
+          [
+            `${nouvelles} nouvelle${nouvelles > 1 ? "s" : ""}`,
+            `${modifiees} modifiée${modifiees > 1 ? "s" : ""}`,
+            `${inchangees} inchangée${inchangees > 1 ? "s" : ""}`,
+          ].join(" · "),
+        modeleChange: "Le modèle a changé depuis : toutes les cartes sont à refaire.",
+        rien: "Aucune carte nouvelle ni modifiée : rien à refaire.",
+        oublier: "Oublier les exports précédents",
+        aide: "Chaque agent est reconnu à son matricule, sinon à son e-mail, sinon à son nom.",
+      },
       uneCarteParPage: "Une carte par page",
       planches: "Planches à découper",
       feuille: "Format de la feuille",
@@ -293,6 +310,22 @@ export const textes = {
     destination: {
       titre: "Exporter les images",
       resume: (n: number) => `${n} image${n > 1 ? "s" : ""}`,
+      miseAJour: {
+        titre: "Mise à jour",
+        dernier: (date: string, n: number) => `Dernier export le ${date} : ${n} image${n > 1 ? "s" : ""}.`,
+        toutes: (n: number) => `Toutes (${n})`,
+        nouvelles: (n: number) => `Nouvelles et modifiées (${n})`,
+        detail: (nouvelles: number, modifiees: number, inchangees: number) =>
+          [
+            `${nouvelles} nouvelle${nouvelles > 1 ? "s" : ""}`,
+            `${modifiees} modifiée${modifiees > 1 ? "s" : ""}`,
+            `${inchangees} inchangée${inchangees > 1 ? "s" : ""}`,
+          ].join(" · "),
+        modeleChange: "Le visuel a changé depuis : toutes les images sont à refaire.",
+        rien: "Aucune image nouvelle ni modifiée : rien à refaire.",
+        oublier: "Oublier les exports précédents",
+        aide: "Chaque personne est reconnue à son matricule, sinon à son e-mail, sinon à son nom.",
+      },
     },
     confirmation: {
       message: (n: number) => (n > 1 ? `${n} images ont un problème grave :` : "1 image a un problème grave :"),
@@ -521,6 +554,13 @@ export const textes = {
     choisir: "Choisir une colonne",
     reliee: "Reliée",
     aChoisir: "À choisir",
+    quantite: {
+      titre: "Nombre de cartes par agent",
+      aide: "Une colonne de la liste peut donner la quantité de cartes de chacun (PDF de l'imprimeur et impression directe).",
+      aucune: "Une carte par agent",
+      total: (cartes: number) => `${cartes} carte${cartes > 1 ? "s" : ""} au total.`,
+      illisibles: (lignes: string) => `Quantité illisible, une seule carte : ${lignes}.`,
+    },
     apercuTitre: "Aperçu de la liste",
     lignesAffichees: (affichees: number, total: number) => `${affichees} premières lignes sur ${total}`,
     vide: "Aucune ligne de données n'a été trouvée dans cette feuille.",

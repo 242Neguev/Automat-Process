@@ -9,6 +9,7 @@ mod outils_pdf;
 mod pdf_textes;
 mod projet_fichier;
 mod qr;
+mod registres;
 mod word;
 
 use std::sync::Arc;
@@ -40,6 +41,10 @@ pub fn run() {
             commandes::imprimer_cartes,
             commandes::couleur_autour,
             commandes::retirer_texte_pdf,
+            commandes::empreinte_modele,
+            commandes::lire_registre,
+            commandes::ecrire_registre,
+            commandes::oublier_registre,
             commandes::enregistrer_projet,
             commandes::ouvrir_projet,
             commandes::lire_liste,

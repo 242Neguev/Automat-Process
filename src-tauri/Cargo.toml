@@ -25,8 +25,8 @@ tiny-skia = "0.12"
 qrcode = { version = "0.14", default-features = false }
 # Lecture et retrait ciblé des balises dans les modèles PDF.
 lopdf = { version = "0.46", default-features = false }
-# Vignettes JPEG de la mosaïque (déjà compilé pour Typst).
-image = { version = "0.25", default-features = false, features = ["jpeg"] }
+# Vignettes JPEG de la mosaïque, photos des agents et effacement intelligent (déjà compilé pour Typst).
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 # Fichiers de projet « .automat » (archives ZIP).
 zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 typst = "=0.15.1"
@@ -37,8 +37,22 @@ typst-svg = "=0.15.1"
 typst-kit = { version = "=0.15.1", default-features = false, features = ["scan-fonts", "embedded-fonts", "datetime"] }
 
 # Impression directe (imprimantes à cartes PVC) par le pilote Windows ; déjà compilé pour Tauri.
+# Reconnaissance de caractères et détection des visages intégrées à Windows 10/11, hors ligne
+# (Windows.Media.Ocr, Windows.Media.FaceAnalysis).
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_Graphics_Printing", "Win32_Storage_Xps"] }
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Printing",
+    "Win32_Storage_Xps",
+    "Foundation",
+    "Foundation_Collections",
+    "Globalization",
+    "Graphics_Imaging",
+    "Media_FaceAnalysis",
+    "Media_Ocr",
+    "Storage_Streams",
+] }
 
 # Voir https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

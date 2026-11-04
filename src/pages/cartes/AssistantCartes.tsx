@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Group, Stack, Stepper, Text, Title } from "@mantine/core";
 import { balisesDuModele, construireAgent, ficheContact, liensAgent, valeursDeLigne } from "../../donnees/agents";
+import { quantitesDe } from "../../donnees/quantite";
+import { identites, nouvelIdentifiant } from "../../donnees/registre";
 import { FORMATS, FORMATS_ECRAN } from "../../modele/formats";
 import { EMPLACEMENTS, pourEnregistrer, preparerVisuel, type Visuels } from "../../modele/visuels";
 import { famillesPolices, modeleDemo, type ModeleCarte } from "../../moteur";
@@ -20,7 +22,15 @@ const t = textes.cartes;
 /** Modèle vierge : carte de visite, ou fond d'écran pour les visuels numériques. */
 function modeleVierge(ecran: boolean): ModeleCarte {
   const { largeur_mm, hauteur_mm, fond_perdu_mm, px } = ecran ? FORMATS_ECRAN[0] : FORMATS[0];
-  return { nom: ecran ? textes.ecran.nomModele : t.modele.nomPerso, format: { largeur_mm, hauteur_mm, fond_perdu_mm, px }, fond_recto: null, fond_verso: null, transformations: {}, champs: [] };
+  return {
+    id: nouvelIdentifiant(),
+    nom: ecran ? textes.ecran.nomModele : t.modele.nomPerso,
+    format: { largeur_mm, hauteur_mm, fond_perdu_mm, px },
+    fond_recto: null,
+    fond_verso: null,
+    transformations: {},
+    champs: [],
+  };
 }
 
 /**
@@ -50,7 +60,7 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
     famillesPolices().then(setPolices, signalerErreur);
   }, []);
   useEffect(() => {
-    if (source === "demo" && !modeles.demo) modeleDemo().then((demo) => setModeles((m) => ({ ...m, demo })), signalerErreur);
+    if (source === "demo" && !modeles.demo) modeleDemo().then((demo) => setModeles((m) => ({ ...m, demo: { ...demo, id: "demo" } })), signalerErreur);
   }, [source, modeles.demo]);
 
   const balises = useMemo(() => (modele ? balisesDuModele(modele) : []), [modele]);
@@ -61,6 +71,11 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
     () => (modele && liste ? liste.lignes.map((ligne) => construireAgent(modele, ligne, correspondances)) : []),
     [modele, liste, correspondances],
   );
+  // Mise à jour incrémentale : identité de chaque agent d'une liste à la suivante (empreintes).
+  const cles = useMemo(() => (liste ? identites(liste.lignes, liste.colonnes) : []), [liste]);
+  // Nombre de cartes de chaque agent (colonne « Quantité »), pour les cartes imprimées seulement.
+  const colonneQuantite = ecran ? null : donnees.colonneQuantite;
+  const quantites = useMemo(() => (liste ? quantitesDe(liste.lignes, colonneQuantite) : []), [liste, colonneQuantite]);
   // Cartes numériques : liens cliquables et fiche contact, calculés seulement à l'étape Destination.
   const numeriques = useMemo(() => {
     if (etape < 3 || !modele || !liste) return [];
@@ -80,7 +95,7 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
   function enregistrer() {
     if (!modele) return;
     const infos = Object.fromEntries(Object.entries(source === "perso" ? visuels : {}).map(([face, visuel]) => [face, pourEnregistrer(visuel)]));
-    return enregistrerSous(ecran ? "ecran" : "carte", modele.nom, modele, correspondances, infos);
+    return enregistrerSous(ecran ? "ecran" : "carte", modele.nom, modele, donnees.aEnregistrer(), infos);
   }
 
   async function ouvrirFichierProjet() {
@@ -151,6 +166,7 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
             onExemple={donnees.utiliserExemple}
             onFeuille={donnees.setFeuille}
             onCorrespondance={donnees.relier}
+            quantite={ecran ? undefined : { colonne: donnees.colonneQuantite, onChange: donnees.choisirQuantite }}
           />
         </Stepper.Step>
         <Stepper.Step label={libelles.etapes.verification.titre} description={libelles.etapes.verification.description}>
@@ -161,6 +177,9 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
             <EtapeDestination
               modele={modele}
               agents={agents}
+              cles={cles}
+              quantites={quantites}
+              colonneQuantite={colonneQuantite}
               numeriques={numeriques}
               controle={controle}
               onVoirCartes={() => {

@@ -12,6 +12,7 @@ use tauri::ipc::Response;
 use crate::cartes::{self, DonneesAgent, Face, Feuille, OptionsNumerique, Projet, Sortie, Zone};
 use crate::conversion::{self, Conversion};
 use crate::fichiers::{self, FichierAEcrire, Nature};
+use crate::registres;
 use crate::fonds::{FondImporte, Fonds, TexteRetire};
 use crate::impression::{self, Imprimante, Reglages};
 use crate::moteur::{ErreurMoteur, Moteur, VERSION_TYPST};
@@ -534,4 +535,50 @@ pub async fn retirer_texte_pdf(
     tauri::async_runtime::spawn_blocking(move || fonds.retirer_texte_pdf(&chemin, id))
         .await
         .map_err(|erreur| ErreurMoteur::simple(format!("Traitement interrompu : {erreur}")))?
+}
+
+/// Empreinte du modèle tel qu'il s'imprime (mise à jour incrémentale : s'il change, toutes les cartes
+/// sont à refaire).
+#[tauri::command]
+pub async fn empreinte_modele(
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+) -> Result<String, ErreurMoteur> {
+    let fichiers = fonds.fichiers();
+    tauri::async_runtime::spawn_blocking(move || cartes::empreinte_modele(&modele, &fichiers))
+        .await
+        .map_err(|erreur| ErreurMoteur::simple(format!("Calcul interrompu : {erreur}")))
+}
+
+/// Dossier de données de l'application (registres des exports).
+fn dossier_donnees(app: &tauri::AppHandle) -> Result<std::path::PathBuf, ErreurMoteur> {
+    use tauri::Manager;
+    app.path().app_data_dir().map_err(|erreur| {
+        ErreurMoteur::simple(format!(
+            "Dossier de données de l'application introuvable : {erreur}"
+        ))
+    })
+}
+
+/// Registre des exports d'un modèle (empreintes seulement), s'il existe.
+#[tauri::command]
+pub async fn lire_registre(
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<Option<serde_json::Value>, ErreurMoteur> {
+    registres::lire(&dossier_donnees(&app)?, &id)
+}
+
+#[tauri::command]
+pub async fn ecrire_registre(
+    app: tauri::AppHandle,
+    id: String,
+    registre: serde_json::Value,
+) -> Result<(), ErreurMoteur> {
+    registres::ecrire(&dossier_donnees(&app)?, &id, &registre)
+}
+
+#[tauri::command]
+pub async fn oublier_registre(app: tauri::AppHandle, id: String) -> Result<(), ErreurMoteur> {
+    registres::oublier(&dossier_donnees(&app)?, &id)
 }
