@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ActionIcon, Alert, Anchor, Button, CopyButton, Divider, Group, Image, Modal, SegmentedControl, Stack, Text, Title, Tooltip } from "@mantine/core";
-import { IconCheck, IconCopy, IconLanguage, IconMail, IconPhone } from "@tabler/icons-react";
+import { IconBrandGithub, IconCheck, IconCopy, IconLanguage, IconMail, IconPhone } from "@tabler/icons-react";
 import nomEauSeche from "./assets/eau-seche/nom.png";
 import symboleEauSeche from "./assets/eau-seche/symbole.png";
 import { version } from "../package.json";
@@ -100,6 +100,9 @@ export default function APropos({ ouvert, fermer, versionTypst }: { ouvert: bool
         <Text size="xs" c="dimmed">
           {t.droits}
         </Text>
+        <Group justify="center">
+          <Coordonnee icone={IconBrandGithub} valeur={t.codeSource} />
+        </Group>
       </Stack>
     </Modal>
   );
