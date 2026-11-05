@@ -12,7 +12,7 @@ Les outils PDF (fusionner, séparer, organiser, protéger, diffuser) forment dep
 
 ## État actuel
 
-Les quatre modules sont disponibles. L'application a été compilée, installée par son installateur et essayée sous Windows 11 le 4 novembre 2026 ([résultats](docs/test-windows/README.md#résultats-du-4-novembre-2026)) : il reste à essayer une imprimante à badges et Outlook avec un compte de messagerie.
+Version 0.2.0 : les quatre modules et la Version Pro (variantes et photos, mise à jour incrémentale, reconnaissance du texte, interface en anglais) sont disponibles. L'application a été compilée, installée par son installateur et essayée sous Windows 11 les 4 et 5 novembre 2026 ([résultats](docs/test-windows/README.md#résultats-du-4-novembre-2026)) : il reste à essayer une imprimante à badges et Outlook avec un compte de messagerie.
 
 | Fonction | État |
 |---|---|
@@ -82,7 +82,7 @@ La première compilation Rust est longue (plusieurs minutes) ; les suivantes son
 2. Ouvrir l'onglet **Actions**, choisir **Installateur Windows**, puis **Run workflow**.
 3. À la fin de l'exécution (environ 20 à 30 minutes), télécharger les **artefacts** : l'installateur `.exe` (NSIS) et le `.msi`.
 
-Pour publier une version, il suffit d'envoyer un tag : `git tag v0.1.0 && git push origin v0.1.0`. Une **publication GitHub en brouillon** est alors créée avec les installateurs attachés.
+Pour publier une version, il suffit d'envoyer un tag : `git tag v0.2.0 && git push origin v0.2.0`. Une **publication GitHub en brouillon** est alors créée avec les installateurs attachés.
 
 > Les vérifications tournent sur Windows à chaque envoi sur `main`. Sur un dépôt **privé**, GitHub décompte les minutes Windows double. Pour les économiser, l'installateur n'est construit qu'à la demande ou sur un tag.
 
@@ -96,7 +96,7 @@ Pour publier une version, il suffit d'envoyer un tag : `git tag v0.1.0 && git pu
    - les outils C++ de Visual Studio (plusieurs Go) ;
    - Rust.
 
-   Windows peut demander d'autoriser ces installations. Compter de 30 à 60 minutes la première fois (davantage sur un PC de 8 Go de mémoire, où le script lance moins de compilations à la fois), quelques minutes ensuite. Avec 8 Go, mieux vaut fermer navigateur et messagerie pendant la compilation : l'étape finale demande à elle seule environ 3 Go. Si le script s'arrête faute de mémoire (code `0xC0000409`), il suffit de le relancer : la compilation reprend là où elle s'était arrêtée.
+   Windows peut demander d'autoriser ces installations. Compter de 30 à 60 minutes la première fois (davantage sur un PC de 8 Go de mémoire : le script y lance moins de compilations à la fois et découpe en 16 parties celle du paquet `windows`, qui sinon ne tient pas en mémoire), quelques minutes ensuite. Avec 8 Go, mieux vaut fermer navigateur et messagerie pendant la compilation : l'étape finale demande à elle seule environ 3 Go. Si le script s'arrête faute de mémoire (code `0xC0000409`), il suffit de le relancer : la compilation reprend là où elle s'était arrêtée.
 3. À la fin, le dossier contenant l'installateur `.exe` s'ouvre tout seul (`src-tauri\target\release\bundle\nsis\`, ou `%LOCALAPPDATA%\Automat-Process-compilation\release\bundle\nsis\` si le projet est dans OneDrive : la compilation se fait alors hors de OneDrive).
 
 Pour produire aussi un `.msi`, lancer `scripts\compiler-windows.cmd -Msi` dans un terminal.
