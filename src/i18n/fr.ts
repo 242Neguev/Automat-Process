@@ -1,0 +1,814 @@
+// Textes de l'interface en français, et des documents qu'elle produit. La traduction anglaise
+// (en.ts) a exactement la même forme : TypeScript vérifie qu'il n'y manque rien.
+import type { Transformation } from "../donnees/nettoyage";
+
+/** Information proposée dans l'éditeur des cartes (« Prénom NOM », « Fonction »…). */
+export interface InformationModele {
+  libelle: string;
+  modele: string;
+  taille_pt?: number;
+  graisse?: number;
+  lignes_max?: number;
+  transformations?: Record<string, Transformation>;
+}
+
+export const fr = {
+  application: "Automat-Process",
+  parEditeur: "par Eau sèche",
+  aPropos: {
+    bouton: "À propos",
+    titre: "À propos",
+    version: (version: string) => `Version ${version}`,
+    description: "Documents personnalisés en série à partir d'un modèle et d'une liste : cartes de visite, signatures e-mail, visuels et courriers.",
+    editeur: "Une solution développée par",
+    moteur: (version: string) => `Moteur de rendu : Typst ${version} (licence Apache-2.0).`,
+    droits: `© ${new Date().getFullYear()} Eau sèche. Tous droits réservés.`,
+    telephone: "+242 06 853 26 77",
+    email: "gneguev@gmail.com",
+    copier: (valeur: string) => `Copier ${valeur}`,
+    copie: "Copié",
+  },
+  modules: {
+    cartes: { titre: "Cartes de visite", description: "Imprimées et numériques" },
+    signatures: { titre: "Signatures e-mail", description: "Outlook, Gmail" },
+    numerique: { titre: "Visuels numériques", description: "Fonds Teams et Zoom, bannières" },
+    word: { titre: "Documents Word", description: "Courriers personnalisés" },
+    bientot: "Bientôt",
+  },
+  moteur: {
+    preparation: "Préparation du moteur…",
+    pret: (version: string, polices: number) => `Moteur Typst ${version} · ${polices} polices`,
+  },
+  cartes: {
+    titre: "Cartes de visite",
+    sousTitre: "Un modèle, une liste d'agents : toutes les cartes, prêtes à imprimer.",
+    etapes: {
+      modele: { titre: "Modèle", description: "Le visuel de la carte" },
+      liste: { titre: "Liste", description: "Les agents (Excel)" },
+      verification: { titre: "Vérification", description: "Carte par carte" },
+      destination: { titre: "Destination", description: "Impression" },
+    },
+    precedent: "Précédent",
+    suivant: "Suivant",
+    recto: "Recto",
+    verso: "Verso",
+    modele: {
+      format: (largeur: number, hauteur: number, fondPerdu: number) =>
+        `Format ${largeur} × ${hauteur} mm, fond perdu de ${fondPerdu} mm`,
+      balises: "Informations à remplir pour chaque agent",
+      source: { demo: "Modèle de démonstration", perso: "Mon modèle" },
+      nomPerso: "Mon modèle",
+      formatTitre: "Format de la carte",
+      formatPersonnalise: "Format personnalisé",
+      largeur: "Largeur (mm)",
+      hauteur: "Hauteur (mm)",
+      fondPerdu: "Fond perdu (mm)",
+      fondPerduAide: "Marge de sécurité coupée par l'imprimeur (3 mm en général, 0 pour un badge PVC).",
+      visuelsTitre: "Visuels",
+      recto: "Recto",
+      verso: "Verso",
+      choisirRecto: "Choisir le visuel du recto…",
+      choisirVerso: "Ajouter un verso…",
+      remplacer: "Remplacer…",
+      retirer: "Retirer",
+      filtreVisuels: "Visuels (PDF, SVG, PNG, JPG)",
+      aucunVisuel: "Sans visuel, la carte est blanche : importez le design exporté par le graphiste.",
+      contientFondPerdu: "Le visuel contient déjà le fond perdu",
+      versionEcran: "Version écran (facultative)",
+      versionEcranAide:
+        "Pour les cartes numériques (images, PDF cliquables) : le même visuel en couleurs d'écran (RVB), utilisé à la place de celui de l'imprimeur.",
+      ajouterVersionEcran: "Ajouter une version écran…",
+      calqueTitre: "Calque de référence",
+      calqueAide:
+        "La maquette du graphiste (avec un exemple), posée en transparence sur la carte pour placer les informations au même endroit. Elle n'est jamais imprimée.",
+      choisirCalque: "Choisir la maquette…",
+      afficherCalque: "Afficher le calque",
+      opaciteCalque: "Opacité du calque",
+      balisesDetectees: (n: number) =>
+        n > 1 ? `${n} informations détectées dans le visuel et placées sur la carte.` : "1 information détectée dans le visuel et placée sur la carte.",
+      ajouterTitre: "Ajouter une information",
+      ajouterAide: "Cliquez pour l'ajouter, puis faites-la glisser à sa place sur la carte.",
+      ajouterQr: "QR code (fiche contact)",
+      ajouterPhoto: "Photo de l'agent",
+      variantes: {
+        titre: "Variantes",
+        aide: "Le même modèle décliné selon une colonne de la liste (filiale, langue…) : chaque variante peut avoir son recto et son verso. Les agents d'aucune variante gardent les visuels du modèle.",
+        activer: "Décliner le modèle selon une colonne",
+        balise: "Information qui choisit la variante",
+        baliseAide: "Reliée à une colonne de la liste à l'étape suivante, comme les autres informations.",
+        baliseDefaut: "Variante",
+        valeur: "Valeur dans la colonne",
+        valeurExemple: "ex. Douala",
+        ajouter: "Ajouter une variante",
+        supprimer: "Supprimer cette variante",
+        importer: { recto: "Recto…", verso: "Verso…" },
+        retirer: "Retirer",
+        commeModele: "comme le modèle",
+        apercu: "Aperçu",
+        modele: "Visuels du modèle",
+        nommee: (n: number) => `Variante ${n}`,
+      },
+      aideEditeur:
+        "Faites glisser les informations sur la carte : elles s'aimantent aux autres, au centre et à la zone de sécurité (touche Alt pour les placer librement) ; la poignée à droite règle leur largeur. Flèches du clavier : déplacement fin. Pointillés gris : zone de sécurité (3 mm).",
+      versoSansChamps: "Le verso est le même pour toutes les cartes.",
+      nomModele: "Nom du modèle",
+      outils: { edition: "Déplacer", remplacer: "Remplacer un texte d'exemple", effacer: "Effacer une zone" },
+      aideRemplacer: "Cliquez sur un texte d'exemple du visuel (cadres orange) pour le remplacer par une information.",
+      aucunTexte: "Aucun texte lisible dans ce visuel. Si le texte d'exemple fait partie d'une image, utilisez « Effacer une zone ».",
+      remplacerPar: (texte: string) => `Remplacer « ${texte} » par :`,
+      annuler: "Annuler",
+      aideEffacer: "Tracez un rectangle sur le texte d'exemple à effacer : il est recouvert de la couleur qui l'entoure.",
+      aideEffacerImage: "Tracez un rectangle sur le texte d'exemple à effacer : il disparaît et le fond est reconstruit autour.",
+      lireTextes: "Lire les textes du visuel",
+      lectureTextes: "Lecture des textes du visuel…",
+      aucunTexteLu: "Aucun texte reconnu dans ce visuel : utilisez « Effacer une zone », puis ajoutez les informations.",
+      textesLus: (n: number) =>
+        `${n} texte${n > 1 ? "s" : ""} d'exemple reconnu${n > 1 ? "s" : ""} dans le visuel : cliquez-en un pour le remplacer par une information.`,
+      annulerEffacement: "Annuler le dernier effacement",
+      versoBalises: "Les informations variables au verso ne sont pas encore prises en charge : elles ont été ignorées.",
+    },
+    champ: {
+      titre: "Information sélectionnée",
+      titreQr: "QR code sélectionné",
+      contenu: "Texte",
+      contenuAide: "Les mots entre {{ }} sont remplacés par les colonnes de votre liste.",
+      police: "Police",
+      taille: "Taille (pt)",
+      style: "Style",
+      normal: "Normal",
+      gras: "Gras",
+      couleur: "Couleur",
+      alignement: "Alignement",
+      gauche: "Gauche",
+      centre: "Centre",
+      droite: "Droite",
+      miseEnForme: (balise: string) => `Mise en forme de ${balise}`,
+      transformations: { aucune: "Telle quelle", majuscules: "MAJUSCULES", minuscules: "minuscules", "nom-propre": "Nom Propre" },
+      avance: "Réglages avancés",
+      largeurMax: "Largeur maximale (mm)",
+      tailleMin: "Taille minimale (pt)",
+      tailleMinAide: "Un texte trop long est réduit jusqu'à cette taille.",
+      lignesMax: "Nombre de lignes maximum",
+      interlettrage: "Espacement des lettres (em)",
+      tailleQr: "Taille (mm)",
+      vcardTitre: "Contenu de la fiche contact",
+      vcard: {
+        prenom: "Prénom",
+        nom: "Nom",
+        fonction: "Fonction",
+        organisation: "Organisation",
+        mobile: "Mobile",
+        fixe: "Téléphone fixe",
+        email: "E-mail",
+        site: "Site web",
+      },
+      supprimer: "Supprimer",
+      fermer: "Fermer (revenir au format et aux visuels)",
+      titrePhoto: "Photo sélectionnée",
+      photoBalise: "Information qui donne la photo",
+      photoBaliseAide: "La colonne de la liste qui contient le nom du fichier de chaque photo (avec ou sans extension), ou son chemin complet.",
+      forme: "Forme",
+      formes: { rectangle: "Rectangle", arrondi: "Arrondie", cercle: "Ronde" },
+      largeurPhoto: "Largeur (mm)",
+      hauteurPhoto: "Hauteur (mm)",
+      titreMasque: "Zone effacée",
+      masqueAide: "Un aplat posé sur le visuel cache le texte d'exemple. Sa couleur est mesurée autour de la zone.",
+      mesurerCouleur: "Mesurer la couleur autour",
+      largeurMasque: "Largeur (mm)",
+      hauteurMasque: "Hauteur (mm)",
+    },
+    controle: {
+      calcul: "Contrôle des cartes…",
+      toutesCorrectes: "Toutes les cartes sont correctes.",
+      aCorriger: (n: number) => `${n} carte${n > 1 ? "s" : ""} à corriger`,
+      aVerifier: (n: number) => `${n} carte${n > 1 ? "s" : ""} à vérifier`,
+      ajustees: (n: number) => `${n} carte${n > 1 ? "s" : ""} ajustée${n > 1 ? "s" : ""} automatiquement (texte réduit ou sur plusieurs lignes).`,
+      nbCartes: (n: number) => `${n} carte${n > 1 ? "s" : ""}`,
+      problemes: {
+        deborde: (libelle: string, taille: string) => `« ${libelle} » est trop long : il dépasse même réduit à ${taille} pt.`,
+        "chevauche-qr": (libelle: string) => `« ${libelle} » chevauche le QR code.`,
+        chevauche: (a: string, b: string) => `« ${a} » chevauche « ${b} ».`,
+        "hors-zone": (libelle: string, marge: number) => `« ${libelle} » sort de la zone de sécurité (${marge} mm du bord) : il risque d'être coupé.`,
+        descend: (mm: string) => `Les textes descendent ${mm} mm plus bas que prévu : vérifiez qu'ils ne touchent pas le bas du visuel.`,
+        reduit: (libelle: string, taille: string, origine: string) => `« ${libelle} » est réduit à ${taille} pt (au lieu de ${origine} pt) pour tenir.`,
+        lignes: (libelle: string, lignes: number) => `« ${libelle} » passe sur ${lignes} lignes.`,
+      },
+      resumes: {
+        deborde: (libelles: string[]) => `« ${libelles[0]} » trop long, même réduit`,
+        "chevauche-qr": (libelles: string[]) => `« ${libelles[0]} » sur le QR code`,
+        chevauche: (libelles: string[]) => `« ${libelles[0]} » sur « ${libelles[1]} »`,
+        "hors-zone": (libelles: string[]) => `« ${libelles[0]} » hors de la zone de sécurité`,
+        descend: () => "Textes plus bas que prévu",
+        reduit: (libelles: string[]) => `« ${libelles[0]} » réduit pour tenir`,
+        lignes: (libelles: string[]) => `« ${libelles[0]} » sur plusieurs lignes`,
+      },
+    },
+    verification: {
+      agent: (numero: number, total: number) => `Agent ${numero} sur ${total}`,
+      precedent: "Agent précédent",
+      suivant: "Agent suivant",
+      agents: "Agents",
+      sansNom: "(sans nom)",
+      vues: { carte: "Carte par carte", mosaique: "Mosaïque" },
+      filtres: { toutes: "Toutes les cartes", "a-verifier": "Cartes à vérifier" },
+      aucuneCarte: "Aucune carte ne correspond à ce filtre.",
+      casLePlusLong: "Cas le plus long",
+      casAide: "La carte où chaque information est la plus longue :",
+      rienASignaler: "Rien à signaler sur cette carte.",
+      controleImpossible: "Le contrôle des cartes n'a pas pu être fait",
+      recadrage: {
+        titre: "Recadrage de la photo",
+        zoom: "Zoom",
+        horizontal: "Position horizontale",
+        vertical: "Position verticale",
+        auto: "Recadrage automatique",
+        aide: "Centré d'office sur le visage (sous Windows). Le réglage est gardé pour cette photo.",
+        sansPhoto: "Pas de photo pour cet agent.",
+      },
+    },
+    destination: {
+      titre: "Exporter les cartes",
+      resume: (n: number) => `${n} carte${n > 1 ? "s" : ""} recto/verso`,
+      quantites: (agents: number, colonne: string) => `${agents} agent${agents > 1 ? "s" : ""}, quantités de la colonne « ${colonne} »`,
+      miseAJour: {
+        titre: "Mise à jour",
+        dernier: (date: string, n: number) => `Dernier export le ${date} : ${n} carte${n > 1 ? "s" : ""}.`,
+        toutes: (n: number) => `Toutes (${n})`,
+        nouvelles: (n: number) => `Nouvelles et modifiées (${n})`,
+        detail: (nouvelles: number, modifiees: number, inchangees: number) =>
+          [
+            `${nouvelles} nouvelle${nouvelles > 1 ? "s" : ""}`,
+            `${modifiees} modifiée${modifiees > 1 ? "s" : ""}`,
+            `${inchangees} inchangée${inchangees > 1 ? "s" : ""}`,
+          ].join(" · "),
+        modeleChange: "Le modèle a changé depuis : toutes les cartes sont à refaire.",
+        rien: "Aucune carte nouvelle ni modifiée : rien à refaire.",
+        oublier: "Oublier les exports précédents",
+        aide: "Chaque agent est reconnu à son matricule, sinon à son e-mail, sinon à son nom.",
+      },
+      uneCarteParPage: "Une carte par page",
+      planches: "Planches à découper",
+      feuille: "Format de la feuille",
+      feuilles: { A4: "A4 (imprimante de bureau)", A3: "A3", SRA3: "SRA3 (presse numérique)" },
+      detailCartes: "Recto puis verso de chaque agent, avec fond perdu de 3 mm et zone de coupe.",
+      detailPlanches: "Le plus de cartes possible par feuille, traits de coupe, verso aligné sur le recto.",
+      enregistrer: "Enregistrer le PDF…",
+      nomFichier: { cartes: "cartes.pdf", planches: "planches.pdf" },
+      filtrePdf: "Document PDF",
+      enregistre: "PDF enregistré",
+      modes: { pdf: "Imprimeur", impression: "Impression directe", numerique: "Numérique", bat: "BAT" },
+      bat: {
+        detail:
+          "Le bon à tirer, à faire valider avant l'impression : une page A4 par carte, recto et verso en taille réelle (fond perdu et ligne de coupe visibles), recto agrandi, filigrane « BON À TIRER » et encadré à signer.",
+        cartes: "Cartes du bon à tirer",
+        choix: { cas: "La première et les cas les plus longs", premiere: "La première carte", toutes: "Toutes les cartes" },
+        nombre: (n: number) => `${n} carte${n > 1 ? "s" : ""}, donc ${n} page${n > 1 ? "s" : ""}`,
+        creer: "Créer le bon à tirer…",
+        nomFichier: (nom: string) => `BAT - ${nom}.pdf`,
+        cree: "Bon à tirer enregistré",
+      },
+      numerique: {
+        format: "Format",
+        formats: { png: "Image PNG", jpg: "Image JPG", pdf: "PDF cliquable" },
+        details: {
+          png: "Une image par agent, pour WhatsApp, LinkedIn ou un e-mail. Le verso, le même pour tous, est fourni une seule fois.",
+          jpg: "Une image par agent, plus légère (pratique quand le visuel contient une photo). Le verso est fourni une seule fois.",
+          pdf: "Un PDF par agent, au format de la carte, sans traits de coupe : le téléphone, l'e-mail et le site s'ouvrent d'un clic.",
+        },
+        taille: "Taille des images",
+        tailles: { "1200": "Moyenne (1 200 px de large)", "2400": "Grande (2 400 px de large)" },
+        verso: "Avec le verso",
+        fiches: "Fiche contact (.vcf) de chaque agent",
+        fichesAide: "Un double clic sur ce fichier ajoute la personne aux contacts du téléphone ou d'Outlook.",
+        creer: "Créer les fichiers…",
+        choisirDossier: "Dossier où créer les cartes numériques",
+        cree: "Cartes numériques créées",
+        nomDossier: (nom: string) => `Cartes numériques - ${nom}`,
+      },
+      impression: {
+        imprimante: "Imprimante",
+        actualiser: "Actualiser la liste des imprimantes",
+        recherche: "Recherche des imprimantes…",
+        aucune: "Aucune imprimante trouvée. Installez le pilote de votre imprimante à cartes (Evolis, Zebra, Magicard…), puis actualisez la liste.",
+        indisponible: "L'impression directe n'est disponible que sous Windows. Ici, exportez un fichier PDF.",
+        aCartes: "imprimante à cartes",
+        parDefaut: "par défaut",
+        cartes: "Cartes à imprimer",
+        toutes: (n: number) => `Toutes les cartes (${n})`,
+        rectoVerso: "Recto verso",
+        sansRectoVerso: "Cette imprimante n'imprime pas recto verso : seul le recto sera imprimé.",
+        retourner: "Retourner le verso",
+        retournerAide: "À cocher si le verso sort à l'envers.",
+        exemplaires: "Exemplaires de chaque carte",
+        format: (largeur: number, hauteur: number) =>
+          `Le modèle mesure ${largeur} × ${hauteur} mm ; une carte PVC (CR80) mesure 85,6 × 54 mm. Chaque carte est imprimée à sa taille réelle, centrée.`,
+        detail: "Chaque carte est envoyée au pilote de l'imprimante, à sa résolution, sans fichier intermédiaire.",
+        imprimer: "Imprimer",
+        envoyee: (imprimante: string) => `Impression envoyée à ${imprimante}`,
+        annulee: "Impression annulée",
+        annuleeDetail: "Aucune carte n'a été imprimée.",
+        nbCartes: (n: number) => `${n} carte${n > 1 ? "s" : ""}`,
+      },
+      confirmation: {
+        titre: { pdf: "Avant d'exporter", impression: "Avant d'imprimer" },
+        message: (n: number) => (n > 1 ? `${n} cartes ont un problème grave :` : "1 carte a un problème grave :"),
+        conseil: "Corrigez le modèle (taille minimale, largeur, nombre de lignes) ou la liste, puis recommencez.",
+        voir: "Voir les cartes",
+        exporter: "Exporter quand même",
+        imprimer: "Imprimer quand même",
+      },
+    },
+  },
+  ecran: {
+    titre: "Visuels numériques",
+    sousTitre: "Un fond d'écran Teams ou Zoom, une bannière… avec le nom de chacun, en images prêtes à l'emploi.",
+    etapes: {
+      modele: { titre: "Modèle", description: "Le visuel" },
+      verification: { titre: "Vérification", description: "Image par image" },
+      destination: { titre: "Destination", description: "Les images" },
+    },
+    nomModele: "Mon visuel",
+    zonePersonne: "Zone cachée par la personne",
+    miroir: "Dans Teams et Zoom, votre propre aperçu montre l'image inversée ; vos interlocuteurs, eux, la voient à l'endroit.",
+    installer: "Teams : Effets d'arrière-plan › Ajouter. Zoom : Paramètres › Arrière-plan et effets › +.",
+    taille: (largeur: number, hauteur: number) => `Images de ${largeur} × ${hauteur} pixels, la taille exacte du format.`,
+    // Textes de l'assistant des cartes qui parlent d'images ici (mêmes clés, voir libellesCartes).
+    modele: {
+      formatTitre: "Format du visuel",
+      recto: "Image de fond",
+      choisirRecto: "Choisir l'image de fond…",
+      aucunVisuel: "Sans image de fond, l'image est blanche : importez le fond créé par le graphiste.",
+      balisesDetectees: (n: number) =>
+        n > 1 ? `${n} informations détectées dans le visuel et placées sur l'image.` : "1 information détectée dans le visuel et placée sur l'image.",
+      ajouterAide: "Cliquez pour l'ajouter, puis faites-la glisser à sa place sur l'image.",
+      aideEditeur:
+        "Faites glisser les informations sur l'image : elles s'aimantent aux autres et au centre (touche Alt pour les placer librement) ; la poignée à droite règle leur largeur. Flèches du clavier : déplacement fin.",
+      calqueAide:
+        "La maquette (avec un exemple), posée en transparence sur l'image pour placer les informations au même endroit. Elle n'est jamais exportée.",
+    },
+    controle: {
+      calcul: "Contrôle des images…",
+      toutesCorrectes: "Toutes les images sont correctes.",
+      aCorriger: (n: number) => `${n} image${n > 1 ? "s" : ""} à corriger`,
+      aVerifier: (n: number) => `${n} image${n > 1 ? "s" : ""} à vérifier`,
+      ajustees: (n: number) => `${n} image${n > 1 ? "s" : ""} ajustée${n > 1 ? "s" : ""} automatiquement (texte réduit ou sur plusieurs lignes).`,
+      nbCartes: (n: number) => `${n} image${n > 1 ? "s" : ""}`,
+    },
+    verification: {
+      vues: { carte: "Image par image", mosaique: "Mosaïque" },
+      filtres: { toutes: "Toutes les images", "a-verifier": "Images à vérifier" },
+      aucuneCarte: "Aucune image ne correspond à ce filtre.",
+      casAide: "L'image où chaque information est la plus longue :",
+      rienASignaler: "Rien à signaler sur cette image.",
+      controleImpossible: "Le contrôle des images n'a pas pu être fait",
+    },
+    destination: {
+      titre: "Exporter les images",
+      resume: (n: number) => `${n} image${n > 1 ? "s" : ""}`,
+      miseAJour: {
+        titre: "Mise à jour",
+        dernier: (date: string, n: number) => `Dernier export le ${date} : ${n} image${n > 1 ? "s" : ""}.`,
+        toutes: (n: number) => `Toutes (${n})`,
+        nouvelles: (n: number) => `Nouvelles et modifiées (${n})`,
+        detail: (nouvelles: number, modifiees: number, inchangees: number) =>
+          [
+            `${nouvelles} nouvelle${nouvelles > 1 ? "s" : ""}`,
+            `${modifiees} modifiée${modifiees > 1 ? "s" : ""}`,
+            `${inchangees} inchangée${inchangees > 1 ? "s" : ""}`,
+          ].join(" · "),
+        modeleChange: "Le visuel a changé depuis : toutes les images sont à refaire.",
+        rien: "Aucune image nouvelle ni modifiée : rien à refaire.",
+        oublier: "Oublier les exports précédents",
+        aide: "Chaque personne est reconnue à son matricule, sinon à son e-mail, sinon à son nom.",
+      },
+    },
+    confirmation: {
+      message: (n: number) => (n > 1 ? `${n} images ont un problème grave :` : "1 image a un problème grave :"),
+      voir: "Voir les images",
+    },
+    numerique: {
+      choisirDossier: "Dossier où créer les images",
+      cree: "Images créées",
+      nomDossier: (nom: string) => `Visuels numériques - ${nom}`,
+    },
+  },
+  signatures: {
+    titre: "Signatures e-mail",
+    sousTitre: "Un modèle, une liste d'agents : la signature de chacun, prête à coller dans Outlook ou Gmail.",
+    etapes: {
+      modele: { titre: "Modèle", description: "La mise en page" },
+      liste: { titre: "Liste", description: "Les agents (Excel)" },
+      verification: { titre: "Vérification", description: "Agent par agent" },
+      destination: { titre: "Destination", description: "Pages à envoyer" },
+    },
+    modele: {
+      nom: "Nom du modèle",
+      sources: { "mise-en-page": "Mise en page prête", html: "Signature existante" },
+      apercuClair: "Fond clair",
+      apercuSombre: "Fond sombre",
+      aideSombre:
+        "Certaines messageries en mode sombre gardent ces couleurs : un logo foncé sur fond transparent et un texte foncé deviennent difficiles à lire. Préférez un logo sur fond clair.",
+      exemple: "Aperçu avec un agent d'exemple.",
+      exempleListe: "Aperçu avec le premier agent de la liste.",
+      miseEnPageTitre: "Mise en page",
+      misesEnPage: { classique: "Classique", "logo-gauche": "Logo à gauche", bandeau: "Bandeau" },
+      styleTitre: "Style",
+      police: "Police",
+      policeAide: "Polices installées partout, pour un affichage identique chez tous les destinataires.",
+      taille: "Taille du texte (px)",
+      couleurs: { principale: "Couleur principale", texte: "Texte", discrete: "Texte secondaire" },
+      logoTitre: "Logo",
+      logoAide: "Le logo est intégré à la signature : il s'affiche dans Outlook. Gmail refuse les images intégrées : la page de chaque agent explique comment l'ajouter.",
+      choisirLogo: "Choisir le logo…",
+      remplacerLogo: "Remplacer…",
+      retirerLogo: "Retirer",
+      largeurLogo: "Largeur du logo (px)",
+      filtreImages: "Images (PNG, JPG, GIF, SVG)",
+      lignesTitre: "Lignes",
+      lignesAide: "Les mots entre {{ }} sont remplacés par les colonnes de la liste. Une ligne dont les informations sont vides disparaît.",
+      ajouterLigne: "Ajouter une ligne",
+      monter: "Monter",
+      descendre: "Descendre",
+      supprimer: "Supprimer",
+      roles: {
+        nom: "Nom",
+        fonction: "Fonction",
+        societe: "Société",
+        telephone: "Téléphone",
+        email: "E-mail",
+        site: "Site web",
+        texte: "Texte",
+        mention: "Mention légale",
+      },
+      exemples: {
+        nom: "{{Prénom}} {{NOM}}",
+        fonction: "{{Fonction}}",
+        societe: "Nom de l'entreprise",
+        telephone: "Tél. {{Fixe}}",
+        email: "{{Email}}",
+        site: "www.exemple.com",
+        texte: "Adresse, ville",
+        mention: "Ce message et ses pièces jointes sont confidentiels.",
+      },
+      miseEnFormeTitre: "Mise en forme des informations",
+      importerHtml: "Importer une signature (.htm, .html)…",
+      remplacerHtml: "Importer une autre signature…",
+      filtreHtml: "Signature HTML",
+      htmlAide:
+        "Dans votre signature actuelle, remplacez les informations de la personne par des balises : {{Prénom}}, {{NOM}}, {{Fonction}}, {{Mobile}}, {{Email}}… Outlook classique enregistre ses signatures dans le dossier %APPDATA%\\Microsoft\\Signatures.",
+      htmlImporte: (nom: string) => `Signature importée : ${nom}`,
+      balisesTrouvees: "Balises trouvées",
+      aucuneBalise: "Aucune balise {{…}} dans cette signature : elle serait la même pour tous les agents.",
+      balisesCoupees: "Certaines balises semblent coupées par la mise en forme : retapez-les d'un seul tenant (par exemple {{NOM}}).",
+      imagesManquantes: (n: number) => `${n} image${n > 1 ? "s" : ""} introuvable${n > 1 ? "s" : ""} à côté du fichier : elle${n > 1 ? "s" : ""} ne s'affichera${n > 1 ? "ont" : ""} pas.`,
+    },
+    verification: {
+      agents: "Agents",
+      agent: (numero: number, total: number) => `Agent ${numero} sur ${total}`,
+      taille: (n: number) => `Code HTML : ${n.toLocaleString("fr-FR")} caractères`,
+      tailleGmail: (n: number, limite: number) =>
+        n > limite
+          ? `Trop longue pour Gmail (${n.toLocaleString("fr-FR")} caractères sur ${limite.toLocaleString("fr-FR")} au maximum).`
+          : `Version Gmail : ${n.toLocaleString("fr-FR")} caractères (limite ${limite.toLocaleString("fr-FR")}).`,
+      copier: "Copier la signature",
+      copierGmail: "Copier pour Gmail (sans le logo)",
+      copiee: "Signature copiée : collez-la dans votre messagerie.",
+    },
+    destination: {
+      titre: "Pages à envoyer aux agents",
+      resume: (n: number) => `${n} signature${n > 1 ? "s" : ""}`,
+      detail:
+        "Un dossier est créé avec une page par agent : sa signature, les boutons pour la copier et le mode d'emploi d'Outlook, Gmail et Thunderbird. Une page récapitule tout le monde.",
+      logo: "Le fichier du logo est joint, pour l'ajouter dans Gmail.",
+      creer: "Créer les pages…",
+      choisirDossier: "Dossier où créer les pages",
+      cree: "Pages de signature créées",
+      recapitulatif: "_Toutes les signatures.html",
+      nomDossier: (nom: string) => `Signatures - ${nom}`,
+      kit: {
+        titre: "Kit Outlook (installation en un double-clic)",
+        detail:
+          "Un seul dossier pour tous, à déposer sur un partage réseau ou une clé USB : chaque agent lance « Installer ma signature.cmd » et choisit son nom ; sa signature s'installe dans Outlook classique et devient celle des nouveaux messages et des réponses.",
+        attention: "Les messageries bloquent souvent les scripts envoyés par e-mail : préférez un partage réseau.",
+        creer: "Créer le kit Outlook…",
+        cree: "Kit Outlook créé",
+        nomDossier: (nom: string) => `Kit Outlook - ${nom}`,
+      },
+    },
+  },
+  word: {
+    titre: "Documents Word",
+    sousTitre: "Un modèle Word, une liste : le courrier de chacun, en .docx ou en PDF.",
+    etapes: {
+      modele: { titre: "Modèle", description: "Le document Word" },
+      liste: { titre: "Liste", description: "Les destinataires" },
+      verification: { titre: "Vérification", description: "Courrier par courrier" },
+      destination: { titre: "Destination", description: "Documents à créer" },
+    },
+    modele: {
+      importer: "Importer un modèle Word (.docx)…",
+      autre: "Importer un autre modèle…",
+      filtre: "Documents Word",
+      aide: "Dans Word, écrivez les informations variables entre doubles accolades : {{Prénom}}, {{NOM}}, {{Adresse}}… Les champs de publipostage d'un modèle existant (« Nom ») sont aussi reconnus.",
+      champsFusion: (n: number) => `${n} champ${n > 1 ? "s" : ""} de publipostage Word converti${n > 1 ? "s" : ""} en balise${n > 1 ? "s" : ""}.`,
+      balises: "Informations à remplir pour chaque destinataire",
+      aucuneBalise: "Aucune balise {{…}} ni champ de publipostage dans ce document : il serait le même pour tous.",
+      apercu: "Aperçu du texte",
+      apercuAide: "Le texte du corps du document ; la mise en page réelle est celle de Word.",
+    },
+    verification: {
+      courrier: (numero: number, total: number) => `Courrier ${numero} sur ${total}`,
+      destinataires: "Destinataires",
+      vues: { texte: "Texte", fidele: "Aperçu fidèle (PDF)" },
+      calculFidele: "Préparation de l'aperçu fidèle… (jusqu'à une vingtaine de secondes la première fois)",
+      fideleAide: { word: "Le courrier tel que Word l'imprime.", libreoffice: "Le courrier tel que LibreOffice l'imprime : la mise en page peut différer légèrement de celle de Word." },
+    },
+    destination: {
+      titre: "Documents à créer",
+      resume: (n: number) => `${n} courrier${n > 1 ? "s" : ""}`,
+      parPersonne: "Un document Word (.docx) par personne",
+      fusion: "Un document Word fusionné (.docx)",
+      fusionAide: "Tous les courriers à la suite, chacun sur une nouvelle page, pour imprimer en une fois.",
+      pdfParPersonne: "Un PDF par personne",
+      pdfFusion: "Un PDF fusionné",
+      pdfAide: "Les PDF sont produits par Microsoft Word (rendu identique), sinon par LibreOffice s'il est installé.",
+      conversion: (logiciel: string) => `Conversion en PDF : ${logiciel}`,
+      logiciels: { word: "Microsoft Word", libreoffice: "LibreOffice" },
+      nommage: "Nom des fichiers",
+      nommageAide: "Les mots entre {{ }} sont remplacés par les colonnes de la liste.",
+      creer: "Créer les documents…",
+      choisirDossier: "Dossier où créer les documents",
+      progression: (fait: number, total: number) => `${fait} sur ${total}`,
+      cree: "Documents créés",
+      fichierFusion: "_Tous les courriers",
+      pdfFusionne: "_Tous les courriers.pdf",
+      nomDossier: (nom: string) => `Courriers - ${nom}`,
+    },
+  },
+  verrou: {
+    verrouiller: "Verrouiller le modèle",
+    verrouille: "Modèle verrouillé",
+    verrouillerAide:
+      "Mode opérateur : le modèle ne peut plus être modifié par mégarde. Enregistrez ensuite le projet ; il s'ouvrira directement à l'étape Liste.",
+    deverrouillerAide: "Le modèle est verrouillé (mode opérateur) : cliquez pour le déverrouiller.",
+    bandeauTitre: "Modèle verrouillé",
+    bandeau: "Ce modèle a été préparé pour vous : choisissez la liste à l'étape suivante, vérifiez, puis exportez.",
+    deverrouiller: "Déverrouiller…",
+    confirmationTitre: "Déverrouiller le modèle ?",
+    confirmation:
+      "Toute modification du modèle changera les documents de tous les agents. Si d'autres personnes utilisent ce projet, enregistrez-le ensuite sous un autre nom.",
+    confirmer: "Déverrouiller",
+    annuler: "Annuler",
+    format: "Format",
+    visuels: "Visuels",
+  },
+  projet: {
+    ouvrir: "Ouvrir un projet…",
+    enregistrer: "Enregistrer le projet…",
+    filtre: "Projet Automat-Process",
+    nomParDefaut: { carte: "Cartes de visite", ecran: "Visuels numériques", signature: "Signatures e-mail", word: "Courriers" },
+    enregistre: "Projet enregistré",
+    ouvert: "Projet ouvert",
+    autreModule: {
+      carte: "Ce projet contient des cartes de visite : ouvrez-le depuis le module « Cartes de visite ».",
+      ecran: "Ce projet contient un visuel numérique : ouvrez-le depuis le module « Visuels numériques ».",
+      signature: "Ce projet contient des signatures e-mail : ouvrez-le depuis le module « Signatures e-mail ».",
+      word: "Ce projet contient des courriers Word : ouvrez-le depuis le module « Documents Word ».",
+    },
+  },
+  liste: {
+    importer: "Importer un fichier Excel ou CSV…",
+    exemple: "Utiliser la liste d'exemple",
+    listeVide: {
+      bouton: "Créer le fichier Excel à remplir…",
+      aideBouton: "Un fichier Excel avec une colonne par information du modèle : faites-le remplir (ressources humaines…), puis importez-le ici.",
+      nomFichier: (nom: string) => `Liste à remplir - ${nom}.xlsx`,
+      nomParDefaut: "Modèle",
+      feuilles: { liste: "Liste", aide: "Mode d'emploi" },
+      filtre: "Classeur Excel",
+      cree: "Fichier Excel créé",
+      modeEmploi: (nom: string) => [
+        `Liste à remplir pour le modèle « ${nom} » (Automat-Process)`,
+        "",
+        "1. Remplissez la feuille « Liste » : une ligne par personne, à partir de la ligne 2.",
+        "2. Ne modifiez pas les titres de la première ligne : ils relient chaque colonne au modèle.",
+        "3. Laissez vide une information absente (pas de tiret ni de « néant ») : elle n'apparaîtra pas sur le document.",
+        "4. Les cellules sont au format texte : les numéros gardent leurs zéros et leur présentation (0612345678, +237 6 12 34 56 78).",
+        "",
+        "Renvoyez ensuite ce fichier : il s'importe tel quel à l'étape Liste d'Automat-Process.",
+      ],
+    },
+    filtre: "Listes (Excel, CSV, ODS)",
+    aucuneListe: "Choisissez le fichier qui contient la liste des agents. Les numéros sont lus tels qu'Excel les affiche.",
+    feuille: "Feuille",
+    nbAgents: (n: number) => (n > 1 ? `${n} agents` : `${n} agent`),
+    correspondancesTitre: "Correspondances",
+    correspondancesAide: "Chaque information est reliée à une colonne de votre liste. Vérifiez, et corrigez si besoin.",
+    information: "Information",
+    colonne: "Colonne de la liste",
+    exemple1: "Exemple (1re ligne)",
+    choisir: "Choisir une colonne",
+    reliee: "Reliée",
+    aChoisir: "À choisir",
+    photos: {
+      titre: "Photos des agents",
+      aide: "Le dossier où se trouvent les photos : la liste donne le nom du fichier de chacune (avec ou sans extension). Un chemin complet est aussi accepté.",
+      choisir: "Choisir le dossier des photos…",
+      changer: "Changer de dossier…",
+      choisirTitre: "Dossier des photos des agents",
+      aucunDossier: "Aucun dossier choisi.",
+      chargement: (fait: number, total: number) => `Chargement des photos… ${fait} sur ${total}`,
+      trouvees: (n: number) => `${n} photo${n > 1 ? "s" : ""} trouvée${n > 1 ? "s" : ""}`,
+      manquantes: (n: number) => `${n} introuvable${n > 1 ? "s" : ""} ou illisible${n > 1 ? "s" : ""}`,
+      sansPhoto: (n: number) => `${n} agent${n > 1 ? "s" : ""} sans photo dans la liste`,
+      exemples: (noms: string[]) => `ex. ${noms.slice(0, 3).join(", ")}${noms.length > 3 ? "…" : ""}`,
+    },
+    quantite: {
+      titre: "Nombre de cartes par agent",
+      aide: "Une colonne de la liste peut donner la quantité de cartes de chacun (PDF de l'imprimeur et impression directe).",
+      aucune: "Une carte par agent",
+      total: (cartes: number) => `${cartes} carte${cartes > 1 ? "s" : ""} au total.`,
+      illisibles: (lignes: string) => `Quantité illisible, une seule carte : ${lignes}.`,
+    },
+    apercuTitre: "Aperçu de la liste",
+    lignesAffichees: (affichees: number, total: number) => `${affichees} premières lignes sur ${total}`,
+    vide: "Aucune ligne de données n'a été trouvée dans cette feuille.",
+    controle: {
+      titre: "Contrôle des données",
+      aide: "À corriger de préférence dans le fichier, puis à réimporter.",
+      aucune: "Aucune anomalie : les données sont prêtes.",
+      lignes: (numeros: number[]) => `${numeros.length > 1 ? "Lignes" : "Ligne"} ${numeros.slice(0, 12).join(", ")}${numeros.length > 12 ? "…" : ""}`,
+      exemple: (valeur: string) => `ex. « ${valeur} »`,
+      messages: {
+        "colonne-vide": (balise: string) => `La colonne choisie pour « ${balise} » est vide : vérifiez la correspondance.`,
+        doublon: (balise: string) => `Agent en double (même ${balise})`,
+        email: (balise: string, n: number) => `${n} e-mail${n > 1 ? "s" : ""} mal formé${n > 1 ? "s" : ""} (« ${balise} »)`,
+        telephone: (balise: string, n: number) => `${n} numéro${n > 1 ? "s" : ""} douteux (« ${balise} »)`,
+        vide: (balise: string, n: number, masquee: boolean) =>
+          `${n} agent${n > 1 ? "s" : ""} sans « ${balise} »${masquee ? ` : la ligne est masquée sur ${n > 1 ? "leur" : "sa"} carte` : ""}`,
+      },
+    },
+  },
+  erreur: "Une erreur est survenue",
+  // Formats prédéfinis, par identifiant (voir modele/formats.ts).
+  formats: {
+    "85x55": "Carte de visite 85 × 55 mm",
+    "90x50": "Carte de visite 90 × 50 mm",
+    us: "Carte américaine 88,9 × 50,8 mm",
+    cr80: "Badge PVC CR80 85,6 × 54 mm",
+    teams: "Fond d'écran Teams / Zoom 1920 × 1080 px",
+    linkedin: "Bannière LinkedIn 1584 × 396 px",
+    carre: "Image carrée 1080 × 1080 px",
+  } as Record<string, string>,
+  // Diagnostics d'un visuel (voir modele/formats.ts).
+  diagnostics: {
+    bordABord: (taille: string) => `Le visuel (${taille}) est imprimé bord à bord.`,
+    avecFondPerdu: (taille: string) => `Le visuel (${taille}) contient le fond perdu.`,
+    formatFini: (taille: string) => `Le visuel (${taille}) est au format fini : le fond perdu est complété à partir de ses bords.`,
+    visuelRecadre: "Les proportions du visuel diffèrent de la carte : il est recadré.",
+    imageParfaite: (pixels: string, dpi: number) => `Image de ${pixels} : environ ${dpi} dpi, parfait pour l'impression.`,
+    imageCorrecte: (pixels: string, dpi: number) => `Image de ${pixels} : environ ${dpi} dpi, correct pour une imprimante de bureau.`,
+    imageFaible: (pixels: string, dpi: number) => `Image de ${pixels} : environ ${dpi} dpi, trop faible pour l'impression (300 dpi conseillés).`,
+    imageFormatFini: "Image au format fini : le fond perdu est complété à partir de ses bords.",
+    imageRecadree: "Les proportions de l'image diffèrent de la carte : elle est recadrée.",
+    ecranGrande: (taille: string) => `Image de ${taille} : nette même en grande taille (2 400 px).`,
+    ecranMoyenne: (taille: string) => `Image de ${taille} : nette en taille moyenne (1 200 px).`,
+    ecranPetite: (taille: string) => `Image de ${taille} : un peu petite, les cartes numériques seront moins nettes.`,
+    vectoriel: "Visuel vectoriel : net à toutes les tailles.",
+    formatAssez: (taille: string) => `Image de ${taille} : assez grande pour ce format.`,
+    formatAgrandi: (taille: string, largeur: number, hauteur: number) =>
+      `Image de ${taille}, plus petite que le format (${largeur} × ${hauteur} px) : elle sera agrandie, donc moins nette.`,
+    imageRecadreeFormat: "Les proportions de l'image diffèrent du format : elle est recadrée.",
+    visuelRecadreFormat: "Les proportions du visuel diffèrent du format : il est recadré.",
+  },
+  // Informations proposées dans l'éditeur ; leurs balises sont reliées aux colonnes à l'étape Liste.
+  informations: [
+    { libelle: "Prénom NOM", modele: "{{Prénom}} {{NOM}}", taille_pt: 11, graisse: 700, transformations: { Prénom: "nom-propre", NOM: "majuscules" } },
+    { libelle: "Fonction", modele: "{{Fonction}}", taille_pt: 8, lignes_max: 2 },
+    { libelle: "Mobile", modele: "Mob. {{Mobile}}" },
+    { libelle: "Téléphone fixe", modele: "Tél. {{Fixe}}" },
+    { libelle: "E-mail", modele: "{{Email}}", transformations: { Email: "minuscules" } },
+    { libelle: "Adresse", modele: "{{Adresse}}", lignes_max: 2 },
+    { libelle: "Site web", modele: "{{Site}}" },
+    { libelle: "Autre information", modele: "{{Information}}" },
+  ] as InformationModele[],
+  /** Contenu d'office de la fiche contact d'un nouveau QR code. */
+  qrVcard: { prenom: "{{Prénom}}", nom: "{{NOM}}", fonction: "{{Fonction}}", organisation: "", mobile: "{{Mobile}}", fixe: "{{Fixe}}", email: "{{Email}}", site: "" },
+  /** Fiche contact du QR code d'exemple de l'éditeur. */
+  exempleQr: { prenom: "Prénom", nom: "NOM", email: "prenom.nom@exemple.com" },
+  /** Valeurs d'exemple de l'aperçu d'une signature, par nature d'information. */
+  exempleSignature: {
+    prenom: "Aïssatou",
+    nom: "DIALLO",
+    fonction: "Responsable Communication",
+    email: "a.diallo@exemple.com",
+    mobile: "+237 612 34 56 78",
+    fixe: "+237 222 33 44 55",
+    telephone: "+237 222 33 44 55",
+    direction: "Direction de la Communication",
+    site: "Douala",
+    matricule: "B102",
+    photo: "",
+  },
+  agentParDefaut: "Agent",
+  erreurs: {
+    svgMalForme: "Ce SVG est mal formé.",
+    svgSansTaille: "Impossible de connaître les dimensions de ce SVG (ni largeur, ni hauteur, ni viewBox).",
+    imageIllisible: "Cette image est illisible.",
+    logoImpossible: "Impossible de préparer le logo.",
+    copieRefusee: "La copie a été refusée.",
+    wordIllisible: "Ce document Word est illisible (XML invalide).",
+  },
+  langue: {
+    titre: "Langue",
+    choix: { fr: "Français", en: "English" },
+    confirmationTitre: "Changer de langue ?",
+    confirmation:
+      "L'application redémarre dans la langue choisie. Enregistrez d'abord le projet en cours : les modifications non enregistrées seraient perdues.",
+    confirmer: "Redémarrer en français",
+    annuler: "Annuler",
+  },
+  // Pages de signature remises aux agents (voir signatures/pages.ts). Les valeurs passées sont déjà échappées.
+  pagesSignature: {
+    langueHtml: "fr",
+    piedDePage: "Créée avec Automat-Process, une solution Eau sèche.",
+    copiee: "Copiée ! Collez-la maintenant dans votre messagerie (Ctrl+V).",
+    copieImpossible: "Copie impossible : sélectionnez la signature à la souris, puis Ctrl+C.",
+    copie: "Copié !",
+    titre: (nom: string) => `Signature e-mail de ${nom}`,
+    votreSignature: "Votre signature e-mail",
+    copier: "Copier la signature",
+    copierGmail: "Copier pour Gmail (sans le logo)",
+    copierCode: "Copier le code HTML",
+    copierTexte: "Copier le texte",
+    modeEmploi: (gmail: boolean, logo: string | null) => `
+<h2>Installer la signature</h2>
+<details open><summary>Outlook sur Windows (version classique)</summary><ol>
+<li>Cliquez sur <b>Copier la signature</b>.</li>
+<li>Dans Outlook : <b>Fichier</b> › <b>Options</b> › <b>Courrier</b> › <b>Signatures…</b></li>
+<li><b>Nouveau</b> : donnez un nom (par exemple « Signature »), puis collez dans la zone du bas (<kbd>Ctrl</kbd>+<kbd>V</kbd>).</li>
+<li>À droite, choisissez cette signature pour les <b>nouveaux messages</b> et pour les <b>réponses</b>, puis <b>OK</b>.</li></ol></details>
+<details><summary>Nouvel Outlook et Outlook sur le web</summary><ol>
+<li>Cliquez sur <b>Copier la signature</b>.</li>
+<li>Ouvrez les <b>Paramètres</b> (roue dentée) › <b>Comptes</b> › <b>Signatures</b>.</li>
+<li><b>Nouvelle signature</b> : donnez-lui un nom, collez (<kbd>Ctrl</kbd>+<kbd>V</kbd>), puis <b>Enregistrer</b>.</li>
+<li>Choisissez-la comme signature par défaut pour les nouveaux messages et les réponses, puis <b>Enregistrer</b>.</li></ol></details>
+<details><summary>Gmail</summary><ol>
+<li>Cliquez sur <b>${gmail ? "Copier pour Gmail" : "Copier la signature"}</b>.</li>
+<li>Dans Gmail : <b>Paramètres</b> (roue dentée) › <b>Voir tous les paramètres</b> › onglet <b>Général</b> › <b>Signature</b> › <b>Créer</b>.</li>
+<li>Collez (<kbd>Ctrl</kbd>+<kbd>V</kbd>).</li>${
+      logo
+        ? `<li>Pour ajouter le logo : dans l'éditeur de signature, bouton <b>Insérer une image</b> › <b>Importer</b>, puis choisissez le fichier <b>${logo}</b> fourni avec cette page.</li>`
+        : ""
+    }
+<li>Choisissez la signature par défaut, puis <b>Enregistrer les modifications</b> en bas de la page.</li></ol></details>
+<details><summary>Thunderbird</summary><ol>
+<li>Cliquez sur <b>Copier le code HTML</b>.</li>
+<li><b>Paramètres des comptes</b> › votre adresse : cochez <b>Utiliser HTML</b>, puis collez le code dans <b>Texte de signature</b>.</li></ol></details>
+<details><summary>Sur téléphone</summary>
+<p>Les applications de messagerie des téléphones n'acceptent qu'une signature en texte. Copiez-la, puis collez-la dans les réglages de l'application (Outlook : <b>Paramètres › Signature</b> ; Gmail : <b>Paramètres › votre compte › Signature mobile</b>).</p>`,
+    recapitulatif: {
+      titre: (nom: string) => `Signatures e-mail : ${nom}`,
+      entete: "Signatures e-mail",
+      nbAgents: (n: number) => `${n} agent${n > 1 ? "s" : ""}`,
+      envoyez: "Envoyez à chaque agent sa page : il l'ouvre dans son navigateur, copie sa signature et suit le mode d'emploi.",
+      logo: (fichier: string) => ` Joignez aussi le fichier <b>${fichier}</b> pour ceux qui utilisent Gmail.`,
+      agent: "Agent",
+      email: "E-mail",
+      ouvrir: "Ouvrir sa page",
+    },
+  },
+  // Kit Outlook (voir signatures/kit.ts) ; textesScript : bloc des messages du script, s'il faut le traduire.
+  kit: {
+    lanceur: "Installer ma signature.cmd",
+    remLanceur: "Installe votre signature e-mail dans Outlook (Windows).",
+    lisezMoi: "LISEZMOI.txt",
+    textesScript: null as string | null,
+    modeEmploi: (signature: string) => `Kit Outlook : signature « ${signature} »
+
+Pour chaque agent (Outlook classique sous Windows)
+1. Fermez Outlook.
+2. Double-cliquez sur « Installer ma signature.cmd ».
+3. Confirmez votre nom, ou tapez votre numéro ou une partie de votre nom.
+4. Rouvrez Outlook : la signature est ajoutée aux nouveaux messages et aux réponses de votre
+   compte. Vous pouvez toujours en choisir une autre (Fichier > Options > Courrier > Signatures).
+
+Si Windows affiche « Windows a protégé votre ordinateur », cliquez sur « Informations
+complémentaires », puis sur « Exécuter quand même ».
+
+Pour le service informatique (installation sans question, par exemple au démarrage de session)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer.ps1 -Choix prenom.nom@exemple.com
+-Choix accepte aussi le numéro ou le nom de l'agent.
+-Imposer verrouille la signature sur tous les comptes : l'agent ne peut plus la changer dans Outlook
+(relancer le kit sans -Imposer la déverrouille).
+-SansRegistre installe seulement les fichiers de la signature, sans toucher aux réglages d'Outlook.
+
+Le nouvel Outlook, Outlook sur le web et Gmail gardent leurs signatures en ligne : pour eux, utilisez
+la page de signature de chaque agent (copier-coller).
+
+Kit créé avec Automat-Process, une solution Eau sèche.
+`,
+  },
+};
+
+export type Textes = typeof fr;

@@ -24,6 +24,7 @@ import { signalerErreur } from "../commun/signalerErreur";
 import ExportBat from "./ExportBat";
 import ExportNumerique from "./ExportNumerique";
 import ImpressionDirecte from "./ImpressionDirecte";
+import { locale } from "../../textes";
 import { libellesCartes } from "./libelles";
 import type { Controle } from "./useControle";
 import { useMiseAJour } from "./useMiseAJour";
@@ -54,7 +55,7 @@ interface Props {
 }
 
 /** Date d'un export, lisible : « 4 novembre 2026 à 18:30 ». */
-const dateLisible = (iso: string) => new Date(iso).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" });
+const dateLisible = (iso: string) => new Date(iso).toLocaleString(locale, { dateStyle: "long", timeStyle: "short" });
 
 export default function EtapeDestination({ modele, agents, cles, quantites, colonneQuantite, numeriques, controle, onVoirCartes }: Props) {
   // Un badge PVC (sans fond perdu) s'imprime en général directement ; une carte de visite part chez l'imprimeur.
@@ -154,7 +155,7 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
     if (!chemin) return;
     setEnCours(true);
     try {
-      const date = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+      const date = new Date().toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
       await exporterBat(modele, cartes.map((agent) => ({ ...agent, libelle: libelleAgent(agent) })), modele.nom, date, chemin);
       notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.bat.cree, message: chemin });
     } catch (e) {

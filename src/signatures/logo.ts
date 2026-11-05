@@ -1,6 +1,7 @@
 // Logo intégré aux signatures : l'image choisie est réduite à la taille affichée (deux fois plus de
 // pixels pour les écrans haute définition), pour garder une signature légère.
 import type { LogoSignature } from "./modele";
+import { textes } from "../textes";
 
 /** Largeur maximale de l'image gardée comme source (px) : de quoi agrandir le logo sans perte. */
 const SOURCE_MAX = 800;
@@ -9,7 +10,7 @@ function charger(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Cette image est illisible."));
+    image.onerror = () => reject(new Error(textes.erreurs.imageIllisible));
     image.src = url;
   });
 }
@@ -22,7 +23,7 @@ async function redessiner(url: string, largeur: number): Promise<{ donnees: stri
   toile.width = Math.max(1, Math.round(largeur));
   toile.height = Math.max(1, Math.round(largeur * ratio));
   const contexte = toile.getContext("2d");
-  if (!contexte) throw new Error("Impossible de préparer le logo.");
+  if (!contexte) throw new Error(textes.erreurs.logoImpossible);
   contexte.imageSmoothingQuality = "high";
   contexte.drawImage(image, 0, 0, toile.width, toile.height);
   return { donnees: toile.toDataURL("image/png"), largeur: toile.width, hauteur: toile.height };

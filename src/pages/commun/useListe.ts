@@ -77,7 +77,9 @@ export function useListe(balises: string[]) {
     restaurer: (enregistrees: Correspondances, balisesDuProjet: string[]) => {
       const { [CLE_QUANTITE]: colonne, ...reste } = enregistrees;
       if (colonne !== undefined) setQuantite(colonne);
-      setCorrespondances(liste ? fusionner(balisesDuProjet, liste.colonnes, reste) : reste);
+      // Les autres réglages enregistrés avec le projet (« @… ») ne sont pas des balises.
+      const balises = Object.fromEntries(Object.entries(reste).filter(([cle]) => !cle.startsWith("@")));
+      setCorrespondances(liste ? fusionner(balisesDuProjet, liste.colonnes, balises) : balises);
     },
     /** Correspondances à enregistrer avec le projet, colonne des quantités comprise si elle a été choisie. */
     aEnregistrer: (): Correspondances => (quantite === undefined && !colonneQuantite ? correspondances : { ...correspondances, [CLE_QUANTITE]: quantite ?? colonneQuantite }),

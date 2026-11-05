@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ActionIcon, Alert, Button, Group, Loader, NumberInput, Select, Stack, Switch, Text, Tooltip } from "@mantine/core";
 import { IconInfoCircle, IconPrinter, IconRefresh } from "@tabler/icons-react";
 import { libelleAgent } from "../../donnees/agents";
+import { aUnVerso } from "../../modele/visuels";
 import { enErreurMoteur, imprimantes, type DonneesAgent, type Imprimante, type ModeleCarte, type ReglagesImpression } from "../../moteur";
 import { textes } from "../../textes";
 
@@ -47,7 +48,7 @@ export default function ImpressionDirecte({ modele, agents, enCours, onImprimer 
   useEffect(chercher, []);
 
   const choisie = liste?.find((i) => i.nom === nom) ?? null;
-  const avecVerso = Boolean(modele.fond_verso);
+  const avecVerso = aUnVerso(modele);
   const dosPossible = avecVerso && (choisie?.rectoVerso ?? true);
   const { largeur_mm, hauteur_mm } = modele.format;
   const cr80 = Math.abs(largeur_mm - 85.6) < 0.2 && Math.abs(hauteur_mm - 54) < 0.2;

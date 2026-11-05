@@ -2,7 +2,10 @@
 // chaque messagerie. Une page récapitule tous les agents. Les pages sont autonomes (aucun fichier
 // externe, aucune connexion) : on peut les envoyer par e-mail ou les déposer sur un partage.
 import { nomsUniques } from "../donnees/noms";
+import { textes } from "../textes";
 import { echapper } from "./html";
+
+const t = textes.pagesSignature;
 
 export interface PageAgent {
   /** Nom de l'agent (titre de la page). */
@@ -43,58 +46,34 @@ function copier(id){
   r.selectNodeContents(zone);s.removeAllRanges();s.addRange(r);
   var ok=false;try{ok=document.execCommand('copy');}catch(e){}
   s.removeAllRanges();
-  signaler(ok?'Copiée ! Collez-la maintenant dans votre messagerie (Ctrl+V).':'Copie impossible : sélectionnez la signature à la souris, puis Ctrl+C.');
+  signaler(ok?${JSON.stringify(t.copiee)}:${JSON.stringify(t.copieImpossible)});
 }
 function copierTexte(id){
   var texte=document.getElementById(id).textContent;
   function repli(){var t=document.createElement('textarea');t.value=texte;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();}
-  (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(texte):Promise.reject()).catch(repli).then(function(){signaler('Copié !');});
+  (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(texte):Promise.reject()).catch(repli).then(function(){signaler(${JSON.stringify(t.copie)});});
 }
 `;
 
 const page = (titre: string, corps: string) =>
-  `<!doctype html>\n<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
+  `<!doctype html>\n<html lang="${t.langueHtml}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">` +
   `<title>${echapper(titre)}</title><style>${STYLE}</style></head><body><main>${corps}` +
-  `<footer>Créée avec Automat-Process, une solution Eau sèche.</footer></main><script>${SCRIPT}</script></body></html>\n`;
+  `<footer>${t.piedDePage}</footer></main><script>${SCRIPT}</script></body></html>\n`;
 
 function modeEmploi(p: PageAgent): string {
-  const logoGmail = p.fichierLogo
-    ? `<li>Pour ajouter le logo : dans l'éditeur de signature, bouton <b>Insérer une image</b> › <b>Importer</b>, puis choisissez le fichier <b>${echapper(p.fichierLogo)}</b> fourni avec cette page.</li>`
-    : "";
-  return `
-<h2>Installer la signature</h2>
-<details open><summary>Outlook sur Windows (version classique)</summary><ol>
-<li>Cliquez sur <b>Copier la signature</b>.</li>
-<li>Dans Outlook : <b>Fichier</b> › <b>Options</b> › <b>Courrier</b> › <b>Signatures…</b></li>
-<li><b>Nouveau</b> : donnez un nom (par exemple « Signature »), puis collez dans la zone du bas (<kbd>Ctrl</kbd>+<kbd>V</kbd>).</li>
-<li>À droite, choisissez cette signature pour les <b>nouveaux messages</b> et pour les <b>réponses</b>, puis <b>OK</b>.</li></ol></details>
-<details><summary>Nouvel Outlook et Outlook sur le web</summary><ol>
-<li>Cliquez sur <b>Copier la signature</b>.</li>
-<li>Ouvrez les <b>Paramètres</b> (roue dentée) › <b>Comptes</b> › <b>Signatures</b>.</li>
-<li><b>Nouvelle signature</b> : donnez-lui un nom, collez (<kbd>Ctrl</kbd>+<kbd>V</kbd>), puis <b>Enregistrer</b>.</li>
-<li>Choisissez-la comme signature par défaut pour les nouveaux messages et les réponses, puis <b>Enregistrer</b>.</li></ol></details>
-<details><summary>Gmail</summary><ol>
-<li>Cliquez sur <b>${p.htmlGmail ? "Copier pour Gmail" : "Copier la signature"}</b>.</li>
-<li>Dans Gmail : <b>Paramètres</b> (roue dentée) › <b>Voir tous les paramètres</b> › onglet <b>Général</b> › <b>Signature</b> › <b>Créer</b>.</li>
-<li>Collez (<kbd>Ctrl</kbd>+<kbd>V</kbd>).</li>${logoGmail}
-<li>Choisissez la signature par défaut, puis <b>Enregistrer les modifications</b> en bas de la page.</li></ol></details>
-<details><summary>Thunderbird</summary><ol>
-<li>Cliquez sur <b>Copier le code HTML</b>.</li>
-<li><b>Paramètres des comptes</b> › votre adresse : cochez <b>Utiliser HTML</b>, puis collez le code dans <b>Texte de signature</b>.</li></ol></details>
-<details><summary>Sur téléphone</summary>
-<p>Les applications de messagerie des téléphones n'acceptent qu'une signature en texte. Copiez-la, puis collez-la dans les réglages de l'application (Outlook : <b>Paramètres › Signature</b> ; Gmail : <b>Paramètres › votre compte › Signature mobile</b>).</p>
-<pre id="texte">${echapper(p.texte)}</pre><div class="boutons"><button class="second" onclick="copierTexte('texte')">Copier le texte</button></div></details>`;
+  return `${t.modeEmploi(Boolean(p.htmlGmail), p.fichierLogo ? echapper(p.fichierLogo) : null)}
+<pre id="texte">${echapper(p.texte)}</pre><div class="boutons"><button class="second" onclick="copierTexte('texte')">${t.copierTexte}</button></div></details>`;
 }
 
 /** Page d'un agent : sa signature, les boutons de copie et le mode d'emploi. */
 export function pageAgent(p: PageAgent): string {
   const gmail = p.htmlGmail ? `<div id="signature-gmail" class="hors-ecran" aria-hidden="true">${p.htmlGmail}</div>` : "";
-  const boutonGmail = p.htmlGmail ? `<button class="second" onclick="copier('signature-gmail')">Copier pour Gmail (sans le logo)</button>` : "";
+  const boutonGmail = p.htmlGmail ? `<button class="second" onclick="copier('signature-gmail')">${t.copierGmail}</button>` : "";
   return page(
-    `Signature e-mail de ${p.nom}`,
-    `<h1>Votre signature e-mail</h1><p class="qui">${echapper(p.nom)}</p>
+    t.titre(p.nom),
+    `<h1>${t.votreSignature}</h1><p class="qui">${echapper(p.nom)}</p>
 <div class="cadre"><div id="signature">${p.html}</div></div>${gmail}
-<div class="boutons"><button onclick="copier('signature')">Copier la signature</button>${boutonGmail}<button class="second" onclick="copierTexte('code')">Copier le code HTML</button></div>
+<div class="boutons"><button onclick="copier('signature')">${t.copier}</button>${boutonGmail}<button class="second" onclick="copierTexte('code')">${t.copierCode}</button></div>
 <p id="etat" class="etat" role="status"></p>
 <pre id="code" class="hors-ecran" aria-hidden="true">${echapper(p.html)}</pre>
 ${modeEmploi(p)}`,
@@ -103,15 +82,16 @@ ${modeEmploi(p)}`,
 
 /** Page récapitulative : un lien vers la page de chaque agent. */
 export function pageRecapitulatif(nomModele: string, agents: { nom: string; fichier: string; email: string }[], fichierLogo: string | null): string {
+  const r = t.recapitulatif;
   const lignes = agents
-    .map((a) => `<tr><td>${echapper(a.nom)}</td><td>${echapper(a.email)}</td><td><a href="${encodeURI(a.fichier)}">Ouvrir sa page</a></td></tr>`)
+    .map((a) => `<tr><td>${echapper(a.nom)}</td><td>${echapper(a.email)}</td><td><a href="${encodeURI(a.fichier)}">${r.ouvrir}</a></td></tr>`)
     .join("\n");
-  const logo = fichierLogo ? ` Joignez aussi le fichier <b>${echapper(fichierLogo)}</b> pour ceux qui utilisent Gmail.` : "";
+  const logo = fichierLogo ? r.logo(echapper(fichierLogo)) : "";
   return page(
-    `Signatures e-mail : ${nomModele}`,
-    `<h1>Signatures e-mail</h1><p class="qui">${echapper(nomModele)} · ${agents.length} agent${agents.length > 1 ? "s" : ""}</p>
-<p>Envoyez à chaque agent sa page : il l'ouvre dans son navigateur, copie sa signature et suit le mode d'emploi.${logo}</p>
-<table class="liste"><thead><tr><th>Agent</th><th>E-mail</th><th></th></tr></thead><tbody>
+    r.titre(nomModele),
+    `<h1>${r.entete}</h1><p class="qui">${echapper(nomModele)} · ${r.nbAgents(agents.length)}</p>
+<p>${r.envoyez}${logo}</p>
+<table class="liste"><thead><tr><th>${r.agent}</th><th>${r.email}</th><th></th></tr></thead><tbody>
 ${lignes}
 </tbody></table>`,
   );

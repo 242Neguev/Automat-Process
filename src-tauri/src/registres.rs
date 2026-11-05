@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 use crate::moteur::ErreurMoteur;
+use crate::tr;
 
 /// Fichier du registre d'un modèle ; l'identifiant ne peut pas désigner un autre dossier.
 fn chemin(dossier: &Path, id: &str) -> Result<PathBuf, ErreurMoteur> {
@@ -16,8 +17,9 @@ fn chemin(dossier: &Path, id: &str) -> Result<PathBuf, ErreurMoteur> {
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
     if !valide {
-        return Err(ErreurMoteur::simple(format!(
-            "Identifiant de modèle invalide : {id}"
+        return Err(ErreurMoteur::simple(tr!(
+            "Identifiant de modèle invalide : {id}",
+            "Invalid template identifier: {id}"
         )));
     }
     Ok(dossier.join("registres").join(format!("{id}.json")))
@@ -28,8 +30,9 @@ pub fn lire(dossier: &Path, id: &str) -> Result<Option<Value>, ErreurMoteur> {
     match std::fs::read(chemin(dossier, id)?) {
         Ok(octets) => Ok(serde_json::from_slice(&octets).ok()),
         Err(erreur) if erreur.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(erreur) => Err(ErreurMoteur::simple(format!(
-            "Impossible de lire le registre des exports : {erreur}"
+        Err(erreur) => Err(ErreurMoteur::simple(tr!(
+            "Impossible de lire le registre des exports : {erreur}",
+            "Cannot read the export register: {erreur}"
         ))),
     }
 }
@@ -38,8 +41,9 @@ pub fn lire(dossier: &Path, id: &str) -> Result<Option<Value>, ErreurMoteur> {
 pub fn ecrire(dossier: &Path, id: &str, registre: &Value) -> Result<(), ErreurMoteur> {
     let chemin = chemin(dossier, id)?;
     let echec = |erreur: &dyn std::fmt::Display| {
-        ErreurMoteur::simple(format!(
-            "Impossible d'enregistrer le registre des exports : {erreur}"
+        ErreurMoteur::simple(tr!(
+            "Impossible d'enregistrer le registre des exports : {erreur}",
+            "Cannot save the export register: {erreur}"
         ))
     };
     if let Some(parent) = chemin.parent() {
@@ -54,9 +58,12 @@ pub fn ecrire(dossier: &Path, id: &str, registre: &Value) -> Result<(), ErreurMo
 /// Oublie les exports précédents d'un modèle.
 pub fn oublier(dossier: &Path, id: &str) -> Result<(), ErreurMoteur> {
     match std::fs::remove_file(chemin(dossier, id)?) {
-        Err(erreur) if erreur.kind() != std::io::ErrorKind::NotFound => Err(ErreurMoteur::simple(
-            format!("Impossible d'oublier les exports précédents : {erreur}"),
-        )),
+        Err(erreur) if erreur.kind() != std::io::ErrorKind::NotFound => {
+            Err(ErreurMoteur::simple(tr!(
+                "Impossible d'oublier les exports précédents : {erreur}",
+                "Cannot forget previous exports: {erreur}"
+            )))
+        }
         _ => Ok(()),
     }
 }
@@ -74,9 +81,7 @@ mod tests {
     use serde_json::json;
 
     fn dossier(nom: &str) -> PathBuf {
-        let dossier = std::env::temp_dir()
-            .join("automat-process-tests")
-            .join(nom);
+        let dossier = std::env::temp_dir().join("automat-process-tests").join(nom);
         let _ = std::fs::remove_dir_all(&dossier);
         dossier
     }

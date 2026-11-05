@@ -62,7 +62,32 @@ export interface ChampMasque {
   couleur: Couleur;
 }
 
-export type Champ = ChampTexte | ChampQr | ChampMasque;
+/** Cadre de la photo de chaque agent : le fichier est donné par une colonne de la liste. */
+export interface ChampPhoto {
+  id: string;
+  type: "photo";
+  x_mm: number;
+  y_mm: number;
+  largeur_mm: number;
+  hauteur_mm: number;
+  /** Balise de la colonne qui donne le fichier de la photo (nom, avec ou sans extension, ou chemin complet). */
+  balise: string;
+  forme: "rectangle" | "arrondi" | "cercle";
+}
+
+export type Champ = ChampTexte | ChampQr | ChampMasque | ChampPhoto;
+
+/** Variante du modèle (filiale, langue…) : ses visuels remplacent ceux du modèle, face par face. */
+export interface VarianteModele {
+  /** Identifiant stable (v1, v2…), pour ranger ses visuels. */
+  id: string;
+  /** Valeur de la colonne qui désigne la variante, ex. « Douala » (sans tenir compte des accents ni de la casse). */
+  valeur: string;
+  fond_recto?: string | null;
+  fond_verso?: string | null;
+  fond_recto_avec_fond_perdu?: boolean;
+  fond_verso_avec_fond_perdu?: boolean;
+}
 
 export interface ModeleCarte {
   /** Identifiant du modèle : le registre de ses exports (mise à jour incrémentale) est rangé sous ce nom. */
@@ -88,6 +113,24 @@ export interface ModeleCarte {
   champs: Champ[];
   /** Mode opérateur : le modèle ne se modifie plus, le projet s'ouvre à l'étape Liste. */
   verrouille?: boolean;
+  /** Variantes : le modèle décliné selon une colonne de la liste (balise), une valeur par variante. */
+  variantes?: { balise: string; valeurs: VarianteModele[] };
+}
+
+/** Recadrage d'une photo : point visé (fractions depuis son coin haut-gauche), amené au centre du cadre, et zoom (1 : la photo couvre juste le cadre). */
+export interface Recadrage {
+  centre_x: number;
+  centre_y: number;
+  zoom: number;
+}
+
+/** Photo d'un agent dans un cadre de la carte. */
+export interface PhotoAgent extends Recadrage {
+  chemin: string;
+  largeur_px: number;
+  hauteur_px: number;
+  /** Empreinte du nom de la photo : son recadrage fait à la main est rangé sous ce nom. */
+  cle: string;
 }
 
 /** Un agent prêt à être rendu : texte final de chaque champ et vCard du QR code. */
@@ -99,6 +142,10 @@ export interface DonneesAgent {
   liens?: Record<string, string>;
   /** Nom de l'agent, affiché sur le bon à tirer. */
   libelle?: string;
+  /** Rang de sa variante dans `modele.variantes.valeurs` ; aucune : les visuels du modèle. */
+  variante?: number;
+  /** Photo de chaque champ photo (par identifiant de champ). */
+  photos?: Record<string, PhotoAgent>;
 }
 
 export interface OptionsNumerique {
@@ -182,6 +229,8 @@ export interface ProjetOuvert {
 }
 
 export const infosMoteur = () => invoke<InfosMoteur>("infos_moteur");
+/** Langue des messages du cœur et des documents qu'il produit (bon à tirer, planches). */
+export const definirLangue = (langue: "fr" | "en") => invoke<void>("definir_langue", { langue });
 export const famillesPolices = () => invoke<string[]>("familles_polices");
 export const modeleDemo = () => invoke<ModeleCarte>("modele_demo");
 export const importerFond = (chemin: string) => invoke<FondImporte>("importer_fond", { chemin });
@@ -301,6 +350,30 @@ export const imprimantes = () => invoke<Imprimante[]>("imprimantes");
 export const imprimerCartes = (modele: ModeleCarte, agents: DonneesAgent[], imprimante: string, reglages: ReglagesImpression) =>
   invoke<boolean>("imprimer_cartes", { modele, agents, imprimante, reglages });
 
+/** Texte lu dans le visuel du recto par la reconnaissance de caractères (mm de la carte finie). */
+export interface TexteLu {
+  id: number;
+  texte: string;
+  /** Début de sa ligne de base. */
+  xMm: number;
+  yMm: number;
+  largeurMm: number;
+  taillePt: number;
+  /** Couleur mesurée du texte (#rrggbb). */
+  couleur: string;
+  /** Rectangle de l'encre : la zone à effacer. */
+  zone: Zone;
+}
+
+/** Textes d'exemple incrustés dans le visuel du recto (reconnaissance de caractères de Windows, hors ligne). */
+export const reconnaitreTextes = (modele: ModeleCarte) => invoke<TexteLu[]>("reconnaitre_textes", { modele });
+
+/**
+ * Effacement intelligent de zones du visuel du recto, quand c'est une image : le texte disparaît, le fond
+ * est reconstruit autour. Renvoie la nouvelle image (l'ancienne reste disponible pour annuler).
+ */
+export const effacerTexte = (modele: ModeleCarte, zones: Zone[], nomFichier: string) => invoke<FondImporte>("effacer_texte", { modele, zones, nomFichier });
+
 /** Couleur du visuel tout autour d'une zone : elle sert à effacer un texte incrusté. */
 export const couleurAutour = (modele: ModeleCarte, zone: Zone) => invoke<string>("couleur_autour", { modele, zone });
 
@@ -308,7 +381,7 @@ export const couleurAutour = (modele: ModeleCarte, zone: Zone) => invoke<string>
 export const retirerTextePdf = (chemin: string, id: number) =>
   invoke<{ texte: TexteVisuel; textes: TexteVisuel[] }>("retirer_texte_pdf", { chemin, id });
 
-export const enregistrerProjet = (chemin: string, document: Document, modele: unknown, correspondances: Record<string, string | null>, visuels: unknown) =>
+export const enregistrerProjet = (chemin: string, document: Document, modele: unknown, correspondances: Record<string, unknown>, visuels: unknown) =>
   invoke<void>("enregistrer_projet", { chemin, document, modele, correspondances, visuels });
 
 export const ouvrirProjet = (chemin: string) => invoke<ProjetOuvert>("ouvrir_projet", { chemin });
@@ -320,6 +393,23 @@ export const empreinteModele = (modele: ModeleCarte) => invoke<string>("empreint
 export const lireRegistre = (id: string) => invoke<unknown>("lire_registre", { id });
 export const ecrireRegistre = (id: string, registre: unknown) => invoke<void>("ecrire_registre", { id, registre });
 export const oublierRegistre = (id: string) => invoke<void>("oublier_registre", { id });
+
+/** Photo demandée par l'interface, telle que le cœur a pu la charger. */
+export interface PhotoChargee {
+  /** Valeur de la colonne (nom du fichier ou chemin). */
+  nom: string;
+  /** Chemin virtuel de la photo réduite ; `null` si elle manque. */
+  chemin: string | null;
+  largeurPx: number;
+  hauteurPx: number;
+  /** Visage repéré (Windows) : centre et hauteur, en fractions de la photo. */
+  visage: { x: number; y: number; hauteur: number } | null;
+  /** « introuvable », ou la raison de l'échec de lecture. */
+  erreur: string | null;
+}
+
+/** Charge les photos (cherchées dans `dossier` quand ce ne sont pas des chemins complets). */
+export const chargerPhotos = (dossier: string, noms: string[]) => invoke<PhotoChargee[]>("charger_photos", { dossier, noms });
 
 /** Contenu brut d'un fichier de liste choisi par l'utilisateur. */
 export const lireListe = (chemin: string) => invoke<ArrayBuffer>("lire_liste", { chemin });

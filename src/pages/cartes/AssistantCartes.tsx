@@ -4,7 +4,7 @@ import { balisesDuModele, construireAgent, ficheContact, liensAgent, valeursDeLi
 import { quantitesDe } from "../../donnees/quantite";
 import { identites, nouvelIdentifiant } from "../../donnees/registre";
 import { FORMATS, FORMATS_ECRAN } from "../../modele/formats";
-import { EMPLACEMENTS, pourEnregistrer, preparerVisuel, type Visuels } from "../../modele/visuels";
+import { pourEnregistrer, preparerVisuel, type Emplacement, type Visuels } from "../../modele/visuels";
 import { famillesPolices, modeleDemo, type ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import EtapeListe from "../commun/EtapeListe";
@@ -16,6 +16,7 @@ import EtapeModele, { type Source } from "./EtapeModele";
 import EtapeVerification, { type Filtre } from "./EtapeVerification";
 import { libellesCartes } from "./libelles";
 import { useControle } from "./useControle";
+import { usePhotos } from "./usePhotos";
 
 const t = textes.cartes;
 
@@ -67,9 +68,11 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
   const donnees = useListe(balises);
   const { liste, correspondances } = donnees;
 
+  // Photos des agents (cadres photo du modèle) : chargées depuis le dossier choisi à l'étape Liste.
+  const photos = usePhotos(modele, liste, correspondances);
   const agents = useMemo(
-    () => (modele && liste ? liste.lignes.map((ligne) => construireAgent(modele, ligne, correspondances)) : []),
-    [modele, liste, correspondances],
+    () => (modele && liste ? liste.lignes.map((ligne) => construireAgent(modele, ligne, correspondances, photos.contexte)) : []),
+    [modele, liste, correspondances, photos.contexte],
   );
   // Mise à jour incrémentale : identité de chaque agent d'une liste à la suivante (empreintes).
   const cles = useMemo(() => (liste ? identites(liste.lignes, liste.colonnes) : []), [liste]);
@@ -94,22 +97,26 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
   /** Enregistre le modèle, ses visuels et les correspondances (jamais les données des agents). */
   function enregistrer() {
     if (!modele) return;
-    const infos = Object.fromEntries(Object.entries(source === "perso" ? visuels : {}).map(([face, visuel]) => [face, pourEnregistrer(visuel)]));
-    return enregistrerSous(ecran ? "ecran" : "carte", modele.nom, modele, donnees.aEnregistrer(), infos);
+    const infos = Object.fromEntries(Object.entries(source === "perso" ? visuels : {}).flatMap(([face, visuel]) => (visuel ? [[face, pourEnregistrer(visuel)]] : [])));
+    // Avec les correspondances : le dossier des photos et leurs recadrages (jamais les photos elles-mêmes).
+    const reglages = photos.actives ? { "@photos": photos.aEnregistrer() } : {};
+    return enregistrerSous(ecran ? "ecran" : "carte", modele.nom, modele, { ...donnees.aEnregistrer(), ...reglages }, infos);
   }
 
   async function ouvrirFichierProjet() {
     const projet = await choisirProjet(ecran ? "ecran" : "carte");
     if (!projet) return;
     const modeleOuvert = projet.modele as ModeleCarte;
+    // Tous les visuels : ceux du modèle et ceux de ses variantes (« variante-v1-recto »…).
     const ouverts: Visuels = {};
-    for (const emplacement of EMPLACEMENTS) {
-      const fond = projet.visuels[emplacement];
-      if (fond) ouverts[emplacement] = preparerVisuel(fond, polices).visuel;
+    for (const [emplacement, fond] of Object.entries(projet.visuels)) {
+      if (fond) ouverts[emplacement as Emplacement] = preparerVisuel(fond, polices).visuel;
     }
     setModeles((m) => ({ ...m, perso: modeleOuvert }));
     setVisuels(ouverts);
     donnees.restaurer(projet.correspondances, balisesDuModele(modeleOuvert));
+    const reglagesPhotos = (projet.correspondances as Record<string, unknown>)["@photos"];
+    if (reglagesPhotos && typeof reglagesPhotos === "object") photos.restaurer(reglagesPhotos);
     setSource("perso");
     // Modèle verrouillé (mode opérateur) : on commence par la liste.
     setEtape(modeleOuvert.verrouille ? 1 : 0);
@@ -167,10 +174,20 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
             onFeuille={donnees.setFeuille}
             onCorrespondance={donnees.relier}
             quantite={ecran ? undefined : { colonne: donnees.colonneQuantite, onChange: donnees.choisirQuantite }}
+            photos={photos.actives ? photos : undefined}
           />
         </Stepper.Step>
         <Stepper.Step label={libelles.etapes.verification.titre} description={libelles.etapes.verification.description}>
-          {modele && <EtapeVerification modele={modele} agents={agents} controle={controle} filtre={filtre} onFiltre={setFiltre} />}
+          {modele && (
+            <EtapeVerification
+              modele={modele}
+              agents={agents}
+              controle={controle}
+              filtre={filtre}
+              onFiltre={setFiltre}
+              onRecadrer={photos.actives ? photos.recadrer : undefined}
+            />
+          )}
         </Stepper.Step>
         <Stepper.Step label={libelles.etapes.destination.titre} description={libelles.etapes.destination.description}>
           {modele && (

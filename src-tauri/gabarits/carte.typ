@@ -2,12 +2,18 @@
 // de la mosaïque, ou mesures de contrôle seules.
 // Fichiers virtuels : /projet.json (format, fonds, champs) et /agents.json (valeurs de chaque agent).
 // Entrées (sys.inputs) : mode = apercu | cartes | planches | mosaique | ecran | controle | bat ; agent et
-// face (aperçu) ; feuille = A4 | A3 | SRA3 ; titre et date (BAT) ; profil = impression | ecran (visuels).
+// face (aperçu) ; feuille = A4 | A3 | SRA3 ; titre et date (BAT) ; profil = impression | ecran (visuels) ;
+// langue = fr | en (textes du bon à tirer et des planches).
 // Les positions des champs sont en mm depuis le coin haut-gauche de la carte finie (hors fond perdu).
+// Variantes (filiale, langue…) : un agent peut avoir les visuels de sa variante ; photos : chaque agent
+// peut avoir une photo par champ photo, avec son recadrage.
 #let projet = json("/projet.json")
 #let agents = json("/agents.json")
+#let variantes = projet.at("variantes", default: none)
 #let entree(cle, defaut) = sys.inputs.at(cle, default: defaut)
 #let mode = entree("mode", "cartes")
+#let anglais = entree("langue", "fr") == "en"
+#let tr(francais, anglais_) = if anglais { anglais_ } else { francais }
 
 #let fp = projet.format.fond_perdu_mm * 1mm
 #let largeur = projet.format.largeur_mm * 1mm
@@ -136,28 +142,61 @@
   if fp > 0mm and mode in ("cartes", "planches") { prolonger-bords(chemin) }
   place(dx: fp, dy: fp, image(chemin, width: largeur, height: hauteur, fit: "cover"))
 }
-#let fond-verso = projet.at("fond_verso", default: none)
-#let avec-verso = fond-verso not in (none, "")
+// Les cartes ont un verso si le modèle ou l'une de ses variantes en a un ; un agent sans verso a alors
+// un verso blanc (une planche recto verso garde sa forme).
+#let a-un-verso(v) = v.at("fond_verso", default: none) not in (none, "")
+#let avec-verso = a-un-verso(projet) or (variantes != none and variantes.valeurs.any(a-un-verso))
+
+// Variante d'un agent : ses visuels remplacent ceux du modèle, face par face.
+#let variante(a) = {
+  let rang = a.at("variante", default: none)
+  if variantes == none or rang == none { none } else { variantes.valeurs.at(rang, default: none) }
+}
 
 // Profil « écran » (cartes numériques) : la version écran d'un visuel (RVB, souvent au format fini)
 // remplace celle de l'imprimeur quand le modèle en a une ; sinon, la version de l'imprimeur sert aussi.
+// Le visuel d'une variante sert aussi pour l'écran : il est propre à ses agents.
 #let profil = entree("profil", "impression")
-#let visuel(face) = {
+#let visuel(face, a) = {
+  let propre = variante(a)
+  let chemin = if propre == none { none } else { propre.at("fond_" + face, default: none) }
   let ecran = projet.at("fond_" + face + "_ecran", default: none)
-  if profil == "ecran" and ecran not in (none, "") {
+  if chemin not in (none, "") {
+    fond(chemin, propre.at("fond_" + face + "_avec_fond_perdu", default: true))
+  } else if profil == "ecran" and ecran not in (none, "") {
     fond(ecran, projet.at("fond_" + face + "_ecran_avec_fond_perdu", default: false))
   } else {
     fond(projet.at("fond_" + face, default: none), projet.at("fond_" + face + "_avec_fond_perdu", default: true))
   }
 }
 
+// Photo d'un agent dans son cadre : elle le couvre sans déformation (zoom 1), et le point visé de la photo
+// (centre_x, centre_y : fractions depuis son coin haut-gauche) vient au centre du cadre, sans laisser de vide.
+#let photo(f, p) = {
+  let w = f.largeur_mm * 1mm
+  let h = f.hauteur_mm * 1mm
+  let proportions = p.largeur_px / p.hauteur_px
+  let (iw, ih) = if proportions > w / h { (h * proportions, h) } else { (w, w / proportions) }
+  iw = iw * calc.max(1, p.zoom)
+  ih = ih * calc.max(1, p.zoom)
+  let dx = calc.max(w - iw, calc.min(0pt, w / 2 - p.centre_x * iw))
+  let dy = calc.max(h - ih, calc.min(0pt, h / 2 - p.centre_y * ih))
+  let rayon = if f.forme == "cercle" { calc.min(w, h) / 2 } else if f.forme == "arrondi" { calc.min(w, h) * 0.12 } else { 0pt }
+  box(width: w, height: h, clip: true, radius: rayon, place(dx: dx, dy: dy, image(p.chemin, width: iw, height: ih, fit: "stretch")))
+}
+
 // Carte complète, fond perdu compris (cw × ch).
 #let carte-recto(a) = box(width: cw, height: ch, clip: true, fill: white, {
-  place(visuel("recto"))
+  place(visuel("recto", a))
   // Zones effacées (texte d'exemple incrusté dans le visuel) : aplats sous les informations.
   for m in projet.champs.filter(f => f.type == "masque") {
     place(top + left, dx: fp + m.x_mm * 1mm, dy: fp + m.y_mm * 1mm,
       rect(width: m.largeur_mm * 1mm, height: m.hauteur_mm * 1mm, fill: couleur(m.couleur), stroke: none))
+  }
+  // Photos, sous les textes ; un agent sans photo garde le visuel tel quel à cet endroit.
+  for f in projet.champs.filter(f => f.type == "photo") {
+    let p = a.at("photos", default: (:)).at(f.id, default: none)
+    if p != none { place(top + left, dx: fp + f.x_mm * 1mm, dy: fp + f.y_mm * 1mm, photo(f, p)) }
   }
   textes-variables(a)
   // Pas de QR code quand l'agent n'a pas de vCard (aucune donnée de contact).
@@ -167,7 +206,7 @@
     }
   }
 })
-#let carte-verso() = box(width: cw, height: ch, clip: true, fill: white, visuel("verso"))
+#let carte-verso(a) = box(width: cw, height: ch, clip: true, fill: white, visuel("verso", a))
 
 // Page au format fini avec fond perdu natif : le PDF reçoit une TrimBox (zone de coupe) pour l'imprimeur.
 #let page-carte(contenu) = page(width: largeur, height: hauteur, margin: 0pt, bleed: fp, background: contenu)[]
@@ -186,35 +225,43 @@
 #let case = box(width: 3.2mm, height: 3.2mm, stroke: 0.5pt, baseline: 0.5mm)
 #let bat() = {
   let filigrane = place(center + horizon, rotate(-32deg,
-    text(86pt, weight: "bold", fill: ROUGE-BAT.transparentize(86%))[BON À TIRER]))
+    text(86pt, weight: "bold", fill: ROUGE-BAT.transparentize(86%), tr("BON À TIRER", "PROOF"))))
   set text(font: ("Arial", "Helvetica", "Liberation Sans", "DejaVu Sans"), size: 9pt)
   for a in agents {
     page(paper: "a4", margin: 14mm, foreground: filigrane, {
       grid(columns: (1fr, auto), align: (left, right),
-        text(15pt, weight: "bold", fill: ROUGE-BAT)[BON À TIRER],
+        text(15pt, weight: "bold", fill: ROUGE-BAT, tr("BON À TIRER", "PROOF")),
         text(9pt)[#entree("date", "")])
       v(1mm)
       text(11pt, weight: "bold")[#entree("titre", "")]
       linebreak()
-      [Carte de #a.at("libelle", default: a.id) · format #projet.format.largeur_mm × #projet.format.hauteur_mm mm · fond perdu #projet.format.fond_perdu_mm mm (pointillés : ligne de coupe)]
+      let largeur-mm = projet.format.largeur_mm
+      let hauteur-mm = projet.format.hauteur_mm
+      let fp-mm = projet.format.fond_perdu_mm
+      let qui = a.at("libelle", default: a.id)
+      tr([Carte de #qui · format #largeur-mm × #hauteur-mm mm · fond perdu #fp-mm mm (pointillés : ligne de coupe)],
+        [Card of #qui · #largeur-mm × #hauteur-mm mm format · #fp-mm mm bleed (dotted: cut line)])
       v(6mm)
       grid(columns: 2, column-gutter: 8mm,
-        avec-coupe(carte-recto(a), [Recto, taille réelle]),
-        if avec-verso { avec-coupe(carte-verso(), [Verso, taille réelle]) })
+        avec-coupe(carte-recto(a), tr([Recto, taille réelle], [Front, actual size])),
+        if avec-verso { avec-coupe(carte-verso(a), tr([Verso, taille réelle], [Back, actual size])) })
       v(6mm)
       // Agrandi jusqu'à 200 %, dans la place laissée par la page (largeur utile, environ 11 cm de haut).
       let echelle = calc.min(2.0, 182mm / cw, 110mm / ch)
       stack(spacing: 2mm, scale(echelle * 100%, reflow: true, carte-recto(a)),
-        text(8pt, fill: luma(90))[Recto agrandi à #calc.round(echelle * 100) %, pour la relecture])
+        text(8pt, fill: luma(90), tr([Recto agrandi à #calc.round(echelle * 100) %, pour la relecture],
+          [Front enlarged to #calc.round(echelle * 100)%, for proofreading])))
       v(1fr)
       block(width: 100%, stroke: 0.5pt + luma(120), inset: 4mm, radius: 2mm, {
-        text(10pt, weight: "bold")[Validation]
+        text(10pt, weight: "bold", tr("Validation", "Approval"))
         v(2mm)
-        [#case Bon pour accord #h(12mm) #case Bon pour accord après corrections #h(12mm) #case Refusé]
+        tr([#case Bon pour accord #h(12mm) #case Bon pour accord après corrections #h(12mm) #case Refusé],
+          [#case Approved #h(12mm) #case Approved after corrections #h(12mm) #case Rejected])
         v(5mm)
-        [Corrections : #box(width: 1fr, repeat[.])]
+        tr([Corrections : #box(width: 1fr, repeat[.])], [Corrections: #box(width: 1fr, repeat[.])])
         v(5mm)
-        [Date : #box(width: 45mm, repeat[.]) #h(10mm) Nom et signature : #box(width: 1fr, repeat[.])]
+        tr([Date : #box(width: 45mm, repeat[.]) #h(10mm) Nom et signature : #box(width: 1fr, repeat[.])],
+          [Date: #box(width: 45mm, repeat[.]) #h(10mm) Name and signature: #box(width: 1fr, repeat[.])])
       })
     })
   }
@@ -253,13 +300,15 @@
           let c = calc.rem(j, p.cols)
           if face == "VERSO" { c = p.cols - 1 - c } // miroir gauche-droite : feuille retournée autour de l'axe vertical
           let r = calc.quo(j, p.cols)
-          place(dx: ox + c * cw, dy: oy + r * ch, if face == "RECTO" { carte-recto(a) } else { carte-verso() })
+          place(dx: ox + c * cw, dy: oy + r * ch, if face == "RECTO" { carte-recto(a) } else { carte-verso(a) })
         }
         traits
-        place(bottom + center, dy: -3mm, text(font: "Arial", size: 6pt, fill: REPERAGE)[
-          Automat-Process · planche #(i + 1)/#lots.len() · #face · #lot.len() cartes ·
-          #projet.format.largeur_mm × #projet.format.hauteur_mm mm + fond perdu #projet.format.fond_perdu_mm mm
-        ])
+        let nom-face = if face == "RECTO" { tr("RECTO", "FRONT") } else { tr("VERSO", "BACK") }
+        let format = [#projet.format.largeur_mm × #projet.format.hauteur_mm mm]
+        place(bottom + center, dy: -3mm, text(font: "Arial", size: 6pt, fill: REPERAGE, tr(
+          [Automat-Process · planche #(i + 1)/#lots.len() · #nom-face · #lot.len() cartes · #format + fond perdu #projet.format.fond_perdu_mm mm],
+          [Automat-Process · sheet #(i + 1)/#lots.len() · #nom-face · #lot.len() cards · #format + #projet.format.fond_perdu_mm mm bleed],
+        )))
       })
     }
   }
@@ -267,11 +316,11 @@
 
 #if mode == "apercu" {
   let a = agents.at(int(entree("agent", "0")))
-  page-carte(if entree("face", "recto") == "verso" { carte-verso() } else { carte-recto(a) })
+  page-carte(if entree("face", "recto") == "verso" { carte-verso(a) } else { carte-recto(a) })
 } else if mode == "cartes" {
   for a in agents {
     page-carte(carte-recto(a))
-    if avec-verso { page-carte(carte-verso()) }
+    if avec-verso { page-carte(carte-verso(a)) }
   }
 } else if mode == "planches" {
   planches(FEUILLES.at(entree("feuille", "A4")))
@@ -282,7 +331,7 @@
   let ecran(contenu) = page(width: largeur, height: hauteur, margin: 0pt, place(dx: -fp, dy: -fp, contenu))
   for a in agents {
     ecran(carte-recto(a))
-    if avec-verso and entree("verso", "oui") == "oui" { ecran(carte-verso()) }
+    if avec-verso and entree("verso", "oui") == "oui" { ecran(carte-verso(a)) }
   }
 } else if mode == "bat" {
   bat()

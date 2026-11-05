@@ -1,6 +1,7 @@
 // Courriers Word. Le modèle .docx est préparé une fois : ses champs de publipostage (« Nom ») deviennent
 // des balises {{Nom}}, et les balises que Word a coupées en morceaux sont recollées. Il est ensuite
 // rempli pour chaque personne. Les parties d'un .docx sont du XML WordprocessingML (préfixe « w: »).
+import { textes } from "../textes";
 
 export const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const BALISE = /\{\{([^}]+)\}\}/g;
@@ -15,7 +16,7 @@ const estRelations = (chemin: string) => /^word\/_rels\/[^/]+\.rels$/.test(chemi
 
 export function lireXml(xml: string): XMLDocument {
   const doc = new DOMParser().parseFromString(xml, "application/xml");
-  if (doc.getElementsByTagName("parsererror").length > 0) throw new Error("Ce document Word est illisible (XML invalide).");
+  if (doc.getElementsByTagName("parsererror").length > 0) throw new Error(textes.erreurs.wordIllisible);
   return doc;
 }
 

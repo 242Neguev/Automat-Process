@@ -1,9 +1,11 @@
 // Construction des agents à rendre : chaque ligne de la liste donne le texte final de chaque champ du modèle.
-import type { Champ, ChampQr, ChampTexte, DonneesAgent, ModeleCarte } from "../moteur";
+import { recadrageAuto } from "../modele/champs";
+import type { Champ, ChampPhoto, ChampQr, ChampTexte, DonneesAgent, ModeleCarte, PhotoAgent, PhotoChargee, Recadrage } from "../moteur";
 import { textes } from "../textes";
-import { nature, type Correspondances, type Nature } from "./correspondances";
+import { nature, normaliser, type Correspondances, type Nature } from "./correspondances";
 import type { LigneListe } from "./liste";
 import { nettoyer, type Transformation } from "./nettoyage";
+import { empreinte } from "./registre";
 import { vcard, type ChampsVCard } from "./vcard";
 
 const BALISE = /\{\{([^}]+)\}\}/g;
@@ -11,13 +13,59 @@ const BALISE = /\{\{([^}]+)\}\}/g;
 const balisesDe = (texte: string) => [...texte.matchAll(BALISE)].map((m) => m[1].trim());
 const estTexte = (champ: Champ): champ is ChampTexte => champ.type === "texte";
 const estQr = (champ: Champ): champ is ChampQr => champ.type === "qr";
+const estPhoto = (champ: Champ): champ is ChampPhoto => champ.type === "photo";
 
-/** Balises utilisées par le modèle (textes et vCard), dans l'ordre d'apparition. */
+/** Balises utilisées par le modèle (textes, vCard, photos, variantes), dans l'ordre d'apparition. */
 export function balisesDuModele(modele: ModeleCarte): string[] {
   const textes = modele.champs.flatMap((champ): string[] =>
-    estTexte(champ) ? [champ.modele] : estQr(champ) ? Object.values(champ.vcard ?? {}).filter((t): t is string => Boolean(t)) : [],
+    estTexte(champ)
+      ? [champ.modele]
+      : estQr(champ)
+        ? Object.values(champ.vcard ?? {}).filter((t): t is string => Boolean(t))
+        : estPhoto(champ) && champ.balise.trim()
+          ? [`{{${champ.balise}}}`]
+          : [],
   );
+  if (modele.variantes?.balise.trim()) textes.push(`{{${modele.variantes.balise}}}`);
   return [...new Set(textes.flatMap(balisesDe))];
+}
+
+/** Rang de la variante d'une ligne : celle dont la valeur est celle de sa colonne (sans tenir compte des accents ni de la casse). */
+export function varianteDe(modele: ModeleCarte, ligne: LigneListe, correspondances: Correspondances): number | undefined {
+  const variantes = modele.variantes;
+  const colonne = variantes ? correspondances[variantes.balise.trim()] : null;
+  const valeur = colonne ? normaliser(ligne.valeurs[colonne] ?? "") : "";
+  if (!variantes || !valeur) return undefined;
+  const rang = variantes.valeurs.findIndex((v) => normaliser(v.valeur) === valeur);
+  return rang >= 0 ? rang : undefined;
+}
+
+/** Photos chargées (par nom, tel qu'écrit dans la liste) et recadrages faits à la main (par cadre et photo). */
+export interface Photos {
+  chargees: Map<string, PhotoChargee>;
+  recadrages: Record<string, Recadrage>;
+}
+
+/** Nom de la photo d'une ligne pour un cadre : la valeur brute de sa colonne (nom de fichier ou chemin). */
+export const nomPhoto = (champ: ChampPhoto, ligne: LigneListe, correspondances: Correspondances) => {
+  const colonne = correspondances[champ.balise.trim()];
+  return colonne ? (ligne.valeurs[colonne] ?? "").trim() : "";
+};
+
+/** Clé du recadrage d'une photo dans un cadre (le nom de la photo n'y figure que par son empreinte). */
+export const cleRecadrage = (champ: ChampPhoto, nom: string) => `${champ.id}:${empreinte(nom)}`;
+
+function photosDeLigne(modele: ModeleCarte, ligne: LigneListe, correspondances: Correspondances, photos: Photos): Record<string, PhotoAgent> | undefined {
+  const resultat: Record<string, PhotoAgent> = {};
+  for (const champ of modele.champs.filter(estPhoto)) {
+    const nom = nomPhoto(champ, ligne, correspondances);
+    const chargee = nom ? photos.chargees.get(nom) : undefined;
+    if (!chargee?.chemin) continue;
+    const cle = cleRecadrage(champ, nom);
+    const recadrage = photos.recadrages[cle] ?? recadrageAuto(champ, chargee);
+    resultat[champ.id] = { chemin: chargee.chemin, largeur_px: chargee.largeurPx, hauteur_px: chargee.hauteurPx, cle, ...recadrage };
+  }
+  return Object.keys(resultat).length > 0 ? resultat : undefined;
 }
 
 /**
@@ -43,25 +91,34 @@ export function valeursDeLigne(modele: { transformations?: Record<string, Transf
   );
 }
 
-export function construireAgent(modele: ModeleCarte, ligne: LigneListe, correspondances: Correspondances): DonneesAgent {
+export function construireAgent(modele: ModeleCarte, ligne: LigneListe, correspondances: Correspondances, photos?: Photos): DonneesAgent {
   const valeurs = valeursDeLigne(modele, ligne, correspondances);
   const champsQr = modele.champs.filter(estQr).find((champ) => champ.vcard);
   const contact =
     champsQr?.vcard &&
     (Object.fromEntries(Object.entries(champsQr.vcard).map(([cle, texte]) => [cle, remplir(texte ?? "", valeurs)])) as ChampsVCard);
+  const variante = varianteDe(modele, ligne, correspondances);
+  const photosAgent = photos ? photosDeLigne(modele, ligne, correspondances, photos) : undefined;
   return {
     id: `ligne ${ligne.numero}`,
     valeurs: Object.fromEntries(modele.champs.filter(estTexte).map((champ) => [champ.id, remplir(champ.modele, valeurs)])),
     vcard: contact ? vcard(contact) : undefined,
+    // Absents quand le modèle n'en a pas : la carte d'un agent garde la même empreinte qu'avant.
+    ...(variante !== undefined && { variante }),
+    ...(photosAgent && { photos: photosAgent }),
   };
 }
 
-/** Exemple d'agent montrant les balises elles-mêmes (et un QR code d'exemple), pour présenter le modèle. */
-export function agentBalises(modele: ModeleCarte): DonneesAgent {
+/**
+ * Exemple d'agent montrant les balises elles-mêmes (et un QR code d'exemple), pour présenter le
+ * modèle, avec les visuels de la variante `variante` s'il y a lieu.
+ */
+export function agentBalises(modele: ModeleCarte, variante?: number): DonneesAgent {
   return {
     id: "modèle",
     valeurs: Object.fromEntries(modele.champs.filter(estTexte).map((champ) => [champ.id, champ.modele])),
-    vcard: modele.champs.some(estQr) ? vcard({ prenom: "Prénom", nom: "NOM", email: "prenom.nom@exemple.com" }) : undefined,
+    vcard: modele.champs.some(estQr) ? vcard(textes.exempleQr) : undefined,
+    ...(variante !== undefined && { variante }),
   };
 }
 

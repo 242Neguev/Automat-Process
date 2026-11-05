@@ -57,10 +57,15 @@ function jsonStable(valeur: unknown): string {
   return JSON.stringify(valeur) ?? "null";
 }
 
-/** Empreinte de ce que montre la carte d'un agent (textes, QR code, variante, photo…). */
+/**
+ * Empreinte de ce que montre la carte d'un agent (textes, QR code, variante, photo…). Une photo compte
+ * par son nom et son recadrage : son chemin en mémoire change à chaque session.
+ */
 export function empreinteCarte(agent: DonneesAgent): string {
-  const { id: _id, libelle: _libelle, liens: _liens, ...carte } = agent;
-  return empreinte(jsonStable(carte));
+  const { id: _id, libelle: _libelle, liens: _liens, photos, ...carte } = agent;
+  const parNom =
+    photos && Object.fromEntries(Object.entries(photos).map(([champ, p]) => [champ, { cle: p.cle, centre_x: p.centre_x, centre_y: p.centre_y, zoom: p.zoom }]));
+  return empreinte(jsonStable(parNom ? { ...carte, photos: parNom } : carte));
 }
 
 // Ce qui identifie un agent d'une liste à la suivante, du plus sûr au moins sûr.

@@ -5,6 +5,7 @@ use qrcode::{Color, EcLevel, QrCode};
 use serde::Serialize;
 
 use crate::moteur::ErreurMoteur;
+use crate::tr;
 
 /// Un QR code prêt pour le gabarit : `n` modules de côté, segments `[x, y, longueur]`.
 #[derive(Debug, Serialize)]
@@ -15,8 +16,13 @@ pub struct CodeQr {
 
 /// Encode `texte` avec une correction d'erreur moyenne (niveau M, 15 %), adaptée à l'impression.
 pub fn encoder(texte: &str) -> Result<CodeQr, ErreurMoteur> {
-    let code = QrCode::with_error_correction_level(texte.as_bytes(), EcLevel::M)
-        .map_err(|erreur| ErreurMoteur::simple(format!("QR code impossible : {erreur}")))?;
+    let code =
+        QrCode::with_error_correction_level(texte.as_bytes(), EcLevel::M).map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "QR code impossible : {erreur}",
+                "QR code impossible: {erreur}"
+            ))
+        })?;
     let n = code.width();
     let couleurs = code.to_colors();
     let mut runs = Vec::new();

@@ -1,5 +1,6 @@
 import { useRef, useState, type KeyboardEvent, type PointerEvent as PointerEventReact } from "react";
-import { Box, Tooltip } from "@mantine/core";
+import { Box, Text, Tooltip } from "@mantine/core";
+import { IconUser } from "@tabler/icons-react";
 import { arrondir, boiteChamp } from "../../modele/champs";
 import { MARGE_SECURITE_MM, zonePersonne } from "../../modele/formats";
 import { aimanter, SEUIL_PX, type Repere } from "../../modele/reperes";
@@ -42,6 +43,16 @@ function appliquerGeste(champ: Champ, geste: Geste, dx: number, dy: number, larg
   }
   if (champ.type === "qr") return { taille_mm: arrondir(Math.max(8, champ.taille_mm + Math.max(dx, dy))) };
   if (champ.type === "masque") return { largeur_mm: arrondir(Math.max(1, champ.largeur_mm + dx)), hauteur_mm: arrondir(Math.max(1, champ.hauteur_mm + dy)) };
+  if (champ.type === "photo") {
+    const largeur = arrondir(Math.max(5, champ.largeur_mm + dx));
+    const hauteur = arrondir(Math.max(5, champ.hauteur_mm + dy));
+    // Une photo ronde garde un cadre carré.
+    if (champ.forme === "cercle") {
+      const cote = Math.max(largeur, hauteur);
+      return { largeur_mm: cote, hauteur_mm: cote };
+    }
+    return { largeur_mm: largeur, hauteur_mm: hauteur };
+  }
   // La poignée suit le bord droit : un texte centré s'élargit des deux côtés, un texte aligné à droite se décale.
   if (champ.ancre === "end") return { largeur_max_mm: arrondir(Math.max(10, champ.largeur_max_mm + dx)), x_mm: arrondir(champ.x_mm + dx) };
   const facteur = champ.ancre === "middle" ? 2 : 1;
@@ -195,6 +206,7 @@ export default function CoucheEdition({ modele, selection, outil, textesVisuel, 
       )}
       {champs.map((champ) => {
         const choisi = champ.id === selection && outil === "edition";
+        const photo = champ.type === "photo";
         return (
           <Box
             key={champ.id}
@@ -204,14 +216,27 @@ export default function CoucheEdition({ modele, selection, outil, textesVisuel, 
             style={{
               ...enPourcents(boiteChamp(champ), largeur_mm, hauteur_mm),
               border: choisi ? `1.5px solid ${COULEURS.eau}` : "1px dashed rgba(30, 110, 114, 0.6)",
-              background: choisi ? "rgba(30, 110, 114, 0.08)" : "transparent",
-              borderRadius: 2,
+              // Le cadre d'une photo se voit dans l'éditeur : l'aperçu du modèle n'a pas de photo.
+              background: choisi ? "rgba(30, 110, 114, 0.08)" : photo ? "rgba(30, 110, 114, 0.05)" : "transparent",
+              borderRadius: photo && champ.forme === "cercle" ? "50%" : photo && champ.forme === "arrondi" ? "12%" : 2,
+              display: photo ? "flex" : undefined,
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
               cursor: "move",
               // Pendant le tracé d'une zone ou le choix d'un texte, les champs ne captent pas la souris.
               pointerEvents: outil === "edition" ? "auto" : "none",
               opacity: outil === "edition" ? 1 : 0.4,
             }}
           >
+            {photo && (
+              <>
+                <IconUser size={20} stroke={1.3} color="rgba(30, 110, 114, 0.7)" />
+                <Text size="xs" c="rgba(30, 110, 114, 0.9)" ta="center" lh={1.1} style={{ pointerEvents: "none" }}>
+                  {`{{${champ.balise}}}`}
+                </Text>
+              </>
+            )}
             {choisi && (
               <Box
                 data-poignee

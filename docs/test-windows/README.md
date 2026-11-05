@@ -137,6 +137,21 @@ Pour aller plus loin :
    **Attendu** : refus, avec un message qui indique le bon module.
 3. Si vous en utilisez : refaire un export vers un dossier OneDrive et vers un partage réseau (`\\serveur\partage`).
 
+## 10. Version Pro : textes d'une image, photos, variantes, mise à jour, anglais
+
+La reconnaissance de caractères et la détection des visages sont celles de Windows : elles ne fonctionnent que sous Windows, hors ligne.
+
+1. **Textes d'une image** : dans **Cartes de visite**, **Mon modèle**, choisir comme recto une **image** (PNG ou JPG) qui contient un nom et une fonction d'exemple, par exemple un design exporté de Canva.
+   **Attendu** : les textes sont lus d'office et entourés d'orange ; cliquer sur le nom, puis **Prénom NOM** : le nom disparaît de l'image (le fond est reconstruit) et l'information prend sa place, à sa taille et dans sa couleur. **Annuler le dernier effacement** remet l'image d'avant. Sans le module « Reconnaissance optique de caractères » de la langue de Windows, un message l'indique.
+2. **Photos** : ajouter **Photo de l'agent**, le placer, puis à l'étape **Liste** relier « Photo » à une colonne qui contient le nom du fichier de chaque photo et **Choisir le dossier des photos…**.
+   **Attendu** : « N photos trouvées » ; à l'étape **Vérification**, chaque visage est centré dans son cadre ; zoom et position se règlent carte par carte.
+3. **Variantes** : sous les visuels, **Décliner le modèle selon une colonne**, information « Filiale », deux valeurs (par exemple « Douala » et « Abidjan ») avec chacune son recto. Relier « Filiale » à une colonne de la liste.
+   **Attendu** : chaque agent a le recto de sa filiale ; un agent d'une autre filiale garde celui du modèle.
+4. **Mise à jour et quantités** : exporter le PDF de l'imprimeur, modifier un agent et en ajouter un dans le fichier Excel, le réimporter, revenir à **Destination**.
+   **Attendu** : « Nouvelles et modifiées (2) » est proposé et n'exporte que ces deux cartes. Une colonne « Quantité » (par exemple 3) multiplie les cartes de l'agent sur les planches.
+5. **Anglais** : bouton ⓘ, **Langue** › **English**, confirmer.
+   **Attendu** : l'application redémarre en anglais : écrans, messages, bon à tirer (« PROOF »), pages de signature et kit Outlook (« Install my signature.cmd »). Revenir au français de la même façon.
+
 ## Résultats à renvoyer
 
 | Partie | Résultat (✅ / ❌) | Remarques, messages, captures |
@@ -151,6 +166,7 @@ Pour aller plus loin :
 | 7. Kit Outlook | | |
 | 8. Fond Teams | | |
 | 9. Projets et dossiers | | |
+| 10. Version Pro | | |
 
 Les parties 1, 4b, 6 et 7 sont désormais les plus importantes : ce sont celles qui n'ont pas pu être essayées jusqu'au bout (voir ci-dessous).
 

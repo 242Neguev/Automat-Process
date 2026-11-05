@@ -22,6 +22,13 @@ describe("empreintes", () => {
     expect(empreinteCarte(agent({ c1: "Aïssatou DIALLO", c2: "Directrice" }, "BEGIN:VCARD"))).not.toBe(empreinteCarte(carte));
     expect(empreinteCarte(agent({ c1: "Aïssatou DIALLO", c2: "Comptable" }))).not.toBe(empreinteCarte(carte));
   });
+
+  it("d'une carte avec photo : le nom et le recadrage comptent, pas le chemin en mémoire", () => {
+    const photo = (chemin: string, zoom = 1) => ({ chemin, largeur_px: 800, hauteur_px: 1000, cle: "p1:abc", centre_x: 0.5, centre_y: 0.4, zoom });
+    const carte = (chemin: string, zoom?: number) => ({ ...agent({ c1: "Aïssatou DIALLO" }), photos: { p1: photo(chemin, zoom) } });
+    expect(empreinteCarte(carte("/photos/3.jpg"))).toBe(empreinteCarte(carte("/photos/41.jpg")));
+    expect(empreinteCarte(carte("/photos/3.jpg", 1.5))).not.toBe(empreinteCarte(carte("/photos/3.jpg")));
+  });
 });
 
 describe("identité des agents d'une liste à l'autre", () => {

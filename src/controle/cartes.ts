@@ -2,7 +2,7 @@
 // problèmes compréhensibles, carte par carte, rangés du plus grave au moins grave.
 import { MARGE_SECURITE_MM } from "../modele/formats";
 import type { ChampQr, ChampTexte, DonneesAgent, MesureTexte, ModeleCarte } from "../moteur";
-import { textes } from "../textes";
+import { locale, textes } from "../textes";
 
 const t = textes.cartes.controle;
 
@@ -50,7 +50,7 @@ export function libelleChamp(champ: ChampTexte): string {
   return balises.length > 0 ? balises.join(" ") : champ.modele;
 }
 
-const nombre = (valeur: number) => valeur.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+const nombre = (valeur: number) => valeur.toLocaleString(locale, { maximumFractionDigits: 1 });
 
 type Boite = { gauche: number; droite: number; haut: number; bas: number };
 const chevauchent = (a: Boite, b: Boite) =>

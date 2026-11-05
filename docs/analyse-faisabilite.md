@@ -146,7 +146,7 @@ Ce mode est central, puisque les utilisateurs sont surtout non-graphistes et que
 |---|---|---|
 | PDF ou SVG | On clique sur le texte : il est retiré (méthode ciblée validée, couleurs intactes) et remplacé par un champ au même style | MVP |
 | Image, fond uni sous le texte | Outil **« Effacer »** : un aplat de la couleur du fond, prise à la pipette | MVP |
-| Image, fond dégradé ou photo | **Effacement intelligent** : le fond est reconstruit autour du texte | V2 |
+| Image, fond dégradé ou photo | **Effacement intelligent** : le fond est reconstruit autour du texte | V2 ✅ |
 | Image, en général | **Détection automatique du texte d'exemple** par la reconnaissance de caractères intégrée à Windows 10/11 (hors ligne). L'application propose les zones, la taille et la couleur ; l'utilisateur choisit la police. | V2 |
 | Maquette avec exemple et fond vierge fournis séparément | **Calque de référence** : la maquette s'affiche en transparence pour placer les champs exactement au même endroit | MVP |
 
@@ -402,9 +402,9 @@ Phases : **MVP** = première version, **V2** = version Pro, **V3** = commerciali
 | Projet `.automat` réutilisable ; modèles verrouillables (mode opérateur) | MVP |
 | Association automatique des colonnes ✅, nettoyage ✅, contrôle avant export | MVP |
 | Aperçu document par document, mosaïque, bouton « cas le plus long » | MVP |
-| Générer l'Excel vide à partir des balises du modèle (à envoyer aux RH) | V2 |
-| Mise à jour incrémentale (seulement les nouveaux et les modifiés) ; colonne Quantité | V2 |
-| Interface en anglais, mises à jour automatiques | V2 |
+| Générer l'Excel vide à partir des balises du modèle (à envoyer aux RH) ✅ | V2 |
+| Mise à jour incrémentale (seulement les nouveaux et les modifiés) ✅ ; colonne Quantité ✅ | V2 |
+| Interface en anglais ✅, mises à jour automatiques | V2 |
 | Licences et activation, signature de code, version macOS | V3 |
 
 ### Modèles
@@ -416,8 +416,8 @@ Phases : **MVP** = première version, **V2** = version Pro, **V3** = commerciali
 | Clic sur un texte d'exemple (PDF/SVG) ; outil « Effacer » sur fond uni | MVP |
 | Ajustement automatique du texte ✅, lignes vides masquées ✅, limite basse des blocs | MVP |
 | Deux fonds par modèle (impression et écran) | MVP |
-| Détection du texte d'exemple par reconnaissance de caractères ; effacement intelligent | V2 |
-| Variantes selon une colonne (filiale, langue…) ; verso variable ; photos avec recadrage | V2 |
+| Détection du texte d'exemple par reconnaissance de caractères ✅ ; effacement intelligent ✅ | V2 |
+| Variantes selon une colonne (filiale, langue…) ✅ ; verso variable ✅ ; photos avec recadrage ✅ | V2 |
 
 ### Impression
 

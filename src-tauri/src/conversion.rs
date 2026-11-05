@@ -13,7 +13,9 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+use crate::langue::texte;
 use crate::moteur::ErreurMoteur;
+use crate::tr;
 
 /// Logiciel qui a fait la conversion.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
@@ -32,10 +34,25 @@ pub struct Conversion {
     pub remarque: Option<String>,
 }
 
-const AUCUN: &str = "Ni Microsoft Word ni LibreOffice n'ont été trouvés sur cet ordinateur : les courriers ne peuvent pas être convertis en PDF (les documents Word restent disponibles).";
+fn aucun() -> &'static str {
+    texte(
+        "Ni Microsoft Word ni LibreOffice n'ont été trouvés sur cet ordinateur : les courriers ne peuvent pas être convertis en PDF (les documents Word restent disponibles).",
+        "Neither Microsoft Word nor LibreOffice was found on this computer: the letters cannot be converted to PDF (the Word documents remain available).",
+    )
+}
 #[cfg_attr(not(windows), allow(dead_code))]
-const WORD_BLOQUE: &str = "Microsoft Word ne répond pas : une fenêtre invisible le bloque sans doute (activation d'Office, premier lancement…). Ouvrez Word une fois à la main et fermez ses fenêtres (s'il propose le mode sans échec, répondez Non), puis relancez Automat-Process.";
-const LIBREOFFICE_BLOQUE: &str = "LibreOffice ne répond plus : la conversion a été arrêtée. Fermez LibreOffice s'il est ouvert, puis réessayez.";
+fn word_bloque() -> &'static str {
+    texte(
+        "Microsoft Word ne répond pas : une fenêtre invisible le bloque sans doute (activation d'Office, premier lancement…). Ouvrez Word une fois à la main et fermez ses fenêtres (s'il propose le mode sans échec, répondez Non), puis relancez Automat-Process.",
+        "Microsoft Word is not responding: an invisible window is probably blocking it (Office activation, first launch…). Open Word once by hand and close its windows (if it offers safe mode, answer No), then restart Automat-Process.",
+    )
+}
+fn libreoffice_bloque() -> &'static str {
+    texte(
+        "LibreOffice ne répond plus : la conversion a été arrêtée. Fermez LibreOffice s'il est ouvert, puis réessayez.",
+        "LibreOffice is no longer responding: the conversion was stopped. Close LibreOffice if it is open, then try again.",
+    )
+}
 
 /// Délais sans signe de vie au-delà desquels un logiciel est considéré comme bloqué. Le premier
 /// document de LibreOffice comprend son démarrage, long la première fois (création de son profil).
@@ -82,7 +99,10 @@ fn echec(contexte: &str) -> impl Fn(std::io::Error) -> ErreurMoteur + '_ {
 /// Convertit chaque document en PDF dans `dossier` (même nom, extension .pdf).
 pub fn en_pdf(documents: &[PathBuf], dossier: &Path) -> Result<Conversion, ErreurMoteur> {
     let _une_a_la_fois = UNE_A_LA_FOIS.lock().unwrap_or_else(PoisonError::into_inner);
-    std::fs::create_dir_all(dossier).map_err(echec("Dossier des PDF impossible à créer"))?;
+    std::fs::create_dir_all(dossier).map_err(echec(texte(
+        "Dossier des PDF impossible à créer",
+        "The PDF folder cannot be created",
+    )))?;
     let pdfs: Vec<PathBuf> = documents
         .iter()
         .map(|document| pdf_de(document, dossier))
@@ -108,7 +128,7 @@ pub fn en_pdf(documents: &[PathBuf], dossier: &Path) -> Result<Conversion, Erreu
     let Some(soffice) = libreoffice() else {
         // Sans LibreOffice pour prendre le relais, l'échec de Word est l'erreur à montrer.
         return Err(ErreurMoteur::simple(
-            remarque.unwrap_or_else(|| AUCUN.into()),
+            remarque.unwrap_or_else(|| aucun().into()),
         ));
     };
     avec_libreoffice(&soffice, documents, dossier)?;
@@ -122,8 +142,9 @@ fn resultat(
     remarque: Option<String>,
 ) -> Result<Conversion, ErreurMoteur> {
     if let Some(manquant) = pdfs.iter().find(|pdf| !pdf.exists()) {
-        return Err(ErreurMoteur::simple(format!(
+        return Err(ErreurMoteur::simple(tr!(
             "La conversion n'a pas produit « {} ».",
+            "The conversion did not produce “{}”.",
             manquant.display()
         )));
     }
@@ -158,8 +179,9 @@ fn avec_word(documents: &[PathBuf], pdfs: &[PathBuf]) -> ResultatWord {
         .and_then(|()| std::fs::write(&script, SCRIPT))
         .and_then(|()| std::fs::write(&liste, lignes.join("\r\n")));
     if let Err(erreur) = preparation {
-        return en_echec(format!(
-            "La conversion par Word n'a pas pu être préparée : {erreur}"
+        return en_echec(tr!(
+            "La conversion par Word n'a pas pu être préparée : {erreur}",
+            "The Word conversion could not be prepared: {erreur}"
         ));
     }
     let lancement = std::time::SystemTime::now();
@@ -187,18 +209,20 @@ fn avec_word(documents: &[PathBuf], pdfs: &[PathBuf]) -> ResultatWord {
         Ok(fin) => match fin.code {
             Some(0) => ResultatWord::Fait,
             Some(3) => ResultatWord::Absent,
-            _ => en_echec(format!(
+            _ => en_echec(tr!(
                 "Microsoft Word n'a pas pu convertir les courriers : {}",
+                "Microsoft Word could not convert the letters: {}",
                 fin.erreurs
             )),
         },
-        Err(Interruption::Erreur(erreur)) => {
-            en_echec(format!("PowerShell n'a pas pu être lancé : {erreur}"))
-        }
+        Err(Interruption::Erreur(erreur)) => en_echec(tr!(
+            "PowerShell n'a pas pu être lancé : {erreur}",
+            "PowerShell could not be started: {erreur}"
+        )),
         Err(Interruption::Bloque) => {
             arreter_word_lance_depuis(lancement);
             ResultatWord::Echec {
-                message: WORD_BLOQUE.into(),
+                message: word_bloque().into(),
                 bloque: true,
             }
         }
@@ -284,14 +308,16 @@ fn avec_libreoffice(
     };
     match surveiller(&mut commande, delai) {
         Ok(fin) if fin.code == Some(0) => Ok(()),
-        Ok(fin) => Err(ErreurMoteur::simple(format!(
+        Ok(fin) => Err(ErreurMoteur::simple(tr!(
             "LibreOffice n'a pas pu convertir les courriers : {}",
+            "LibreOffice could not convert the letters: {}",
             fin.erreurs
         ))),
-        Err(Interruption::Erreur(erreur)) => Err(ErreurMoteur::simple(format!(
-            "LibreOffice n'a pas pu être lancé : {erreur}"
+        Err(Interruption::Erreur(erreur)) => Err(ErreurMoteur::simple(tr!(
+            "LibreOffice n'a pas pu être lancé : {erreur}",
+            "LibreOffice could not be started: {erreur}"
         ))),
-        Err(Interruption::Bloque) => Err(ErreurMoteur::simple(LIBREOFFICE_BLOQUE)),
+        Err(Interruption::Bloque) => Err(ErreurMoteur::simple(libreoffice_bloque())),
     }
 }
 

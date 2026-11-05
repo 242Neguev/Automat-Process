@@ -13,6 +13,7 @@ import {
   ScrollArea,
   SegmentedControl,
   Select,
+  Slider,
   Stack,
   Text,
   Title,
@@ -22,7 +23,8 @@ import {
 import { IconAlertTriangle, IconChevronDown, IconChevronLeft, IconChevronRight, IconRulerMeasure } from "@tabler/icons-react";
 import { casLesPlusLongs, compter, graviteCarte, regrouper, type Groupe } from "../../controle/cartes";
 import { libelleAgent } from "../../donnees/agents";
-import type { DonneesAgent, Face, ModeleCarte } from "../../moteur";
+import { aUnVerso } from "../../modele/visuels";
+import type { ChampPhoto, DonneesAgent, Face, ModeleCarte, Recadrage } from "../../moteur";
 import { textes } from "../../textes";
 import ApercuCarte from "./ApercuCarte";
 import IconeGravite from "../commun/IconeGravite";
@@ -41,6 +43,66 @@ interface Props {
   controle: Controle;
   filtre: Filtre;
   onFiltre: (filtre: Filtre) => void;
+  /** Recadrage d'une photo à la main (`null` : retour au recadrage automatique). */
+  onRecadrer?: (cle: string, recadrage: Recadrage | null) => void;
+}
+
+/** Recadrage des photos de l'agent affiché : zoom et position, ou retour au recadrage automatique. */
+function RecadragePhotos({ modele, agent, onRecadrer }: { modele: ModeleCarte; agent: DonneesAgent; onRecadrer: (cle: string, recadrage: Recadrage | null) => void }) {
+  const t = libellesCartes(Boolean(modele.format.px)).verification.recadrage;
+  const cadres = modele.champs.filter((c): c is ChampPhoto => c.type === "photo");
+  return (
+    <Paper withBorder p="sm" data-recadrage>
+      <Stack gap="xs">
+        <Text size="sm" fw={500}>
+          {t.titre}
+        </Text>
+        {cadres.map((cadre) => {
+          const photo = agent.photos?.[cadre.id];
+          if (!photo) {
+            return (
+              <Text key={cadre.id} size="sm" c="dimmed">
+                {t.sansPhoto}
+              </Text>
+            );
+          }
+          const actuel: Recadrage = { centre_x: photo.centre_x, centre_y: photo.centre_y, zoom: photo.zoom };
+          const changer = (modification: Partial<Recadrage>) => onRecadrer(photo.cle, { ...actuel, ...modification });
+          // Réglé à la souris, appliqué au relâchement : l'aperçu n'est recalculé qu'une fois.
+          const reglage = (libelle: string, cle: keyof Recadrage, min: number, max: number, pas: number, format: (v: number) => string) => (
+            <div>
+              <Text size="xs" mb={2}>
+                {libelle}
+              </Text>
+              <Slider
+                key={`${agent.id}:${photo.cle}:${actuel[cle]}`}
+                aria-label={libelle}
+                min={min}
+                max={max}
+                step={pas}
+                defaultValue={actuel[cle]}
+                label={format}
+                onChangeEnd={(valeur) => changer({ [cle]: valeur })}
+              />
+            </div>
+          );
+          return (
+            <Stack key={cadre.id} gap={6}>
+              {reglage(t.zoom, "zoom", 1, 3, 0.05, (v) => `${Math.round(v * 100)} %`)}
+              {reglage(t.horizontal, "centre_x", 0, 1, 0.01, (v) => `${Math.round(v * 100)} %`)}
+              {reglage(t.vertical, "centre_y", 0, 1, 0.01, (v) => `${Math.round(v * 100)} %`)}
+              <Button size="compact-xs" variant="subtle" style={{ alignSelf: "flex-start" }} onClick={() => onRecadrer(photo.cle, null)}>
+                {t.auto}
+              </Button>
+            </Stack>
+          );
+        })}
+        <Text size="xs" c="dimmed">
+          {t.aide}
+        </Text>
+      </Stack>
+    </Paper>
+  );
 }
 
 /** Résumé du contrôle : nombre de cartes à corriger ou à vérifier, et problèmes cliquables (filtre). */
@@ -96,7 +158,7 @@ function Resume({ ecran, controle, groupes, filtre, onFiltre }: { ecran: boolean
   );
 }
 
-export default function EtapeVerification({ modele, agents, controle, filtre, onFiltre }: Props) {
+export default function EtapeVerification({ modele, agents, controle, filtre, onFiltre, onRecadrer }: Props) {
   const ecran = Boolean(modele.format.px);
   const t = libellesCartes(ecran).verification;
   const [choisi, setChoisi] = useState<string | null>(null);
@@ -176,7 +238,7 @@ export default function EtapeVerification({ modele, agents, controle, filtre, on
       ) : (
         <Group align="flex-start" gap="lg" wrap="nowrap">
           <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
-            <ApercuCarte modele={modele} agent={courant} face={modele.fond_verso ? face : "recto"} />
+            <ApercuCarte modele={modele} agent={courant} face={aUnVerso(modele) ? face : "recto"} />
             <Group justify="space-between">
               <Group gap="xs">
                 <Tooltip label={t.precedent}>
@@ -199,7 +261,7 @@ export default function EtapeVerification({ modele, agents, controle, filtre, on
                   </ActionIcon>
                 </Tooltip>
               </Group>
-              {modele.fond_verso && (
+              {aUnVerso(modele) && (
                 <SegmentedControl
                   value={face}
                   onChange={(valeur) => setFace(valeur as Face)}
@@ -223,6 +285,7 @@ export default function EtapeVerification({ modele, agents, controle, filtre, on
                 )}
               </List>
             )}
+            {onRecadrer && courant && <RecadragePhotos modele={modele} agent={courant} onRecadrer={onRecadrer} />}
           </Stack>
 
           <Paper withBorder p="sm" w={320} style={{ flexShrink: 0 }}>

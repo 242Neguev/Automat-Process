@@ -11,6 +11,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::moteur::ErreurMoteur;
+use crate::tr;
 
 const MM_PAR_POINT: f64 = 25.4 / 72.0;
 const IDENTITE: Matrice = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
@@ -35,7 +36,10 @@ pub struct TextePdf {
 }
 
 fn erreur_pdf(erreur: lopdf::Error) -> ErreurMoteur {
-    ErreurMoteur::simple(format!("Ce PDF n'a pas pu être lu : {erreur}"))
+    ErreurMoteur::simple(tr!(
+        "Ce PDF n'a pas pu être lu : {erreur}",
+        "This PDF could not be read: {erreur}"
+    ))
 }
 
 fn multiplier(a: &Matrice, b: &Matrice) -> Matrice {
@@ -277,10 +281,12 @@ struct AnalysePage {
 
 /// Lignes de texte de la première page, avec les instructions qui les affichent.
 fn analyser(document: &Document) -> Result<AnalysePage, ErreurMoteur> {
-    let page = *document
-        .get_pages()
-        .get(&1)
-        .ok_or_else(|| ErreurMoteur::simple("Ce PDF ne contient aucune page."))?;
+    let page = *document.get_pages().get(&1).ok_or_else(|| {
+        ErreurMoteur::simple(tr!(
+            "Ce PDF ne contient aucune page.",
+            "This PDF has no pages."
+        ))
+    })?;
     let polices: BTreeMap<Vec<u8>, Police> = document
         .get_page_fonts(page)
         .map_err(erreur_pdf)?
@@ -497,9 +503,12 @@ pub fn retirer(pdf: &[u8], ids: &[usize]) -> Result<Vec<u8>, ErreurMoteur> {
         .map_err(erreur_pdf)?;
     document.compress();
     let mut sortie = Vec::new();
-    document
-        .save_to(&mut sortie)
-        .map_err(|e| ErreurMoteur::simple(format!("Le PDF nettoyé n'a pas pu être écrit : {e}")))?;
+    document.save_to(&mut sortie).map_err(|e| {
+        ErreurMoteur::simple(tr!(
+            "Le PDF nettoyé n'a pas pu être écrit : {e}",
+            "The cleaned PDF could not be written: {e}"
+        ))
+    })?;
     Ok(sortie)
 }
 

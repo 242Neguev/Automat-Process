@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Group, Paper, ScrollArea, SegmentedControl, Stack, Text, Title } from "@mantine/core";
+import { Badge, Button, Group, Paper, ScrollArea, SegmentedControl, Select, Stack, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconAlertTriangle, IconArrowsMove, IconEraser, IconPlus, IconQrcode, IconReplace, IconSparkles } from "@tabler/icons-react";
+import { IconAlertTriangle, IconArrowBackUp, IconArrowsMove, IconEraser, IconPlus, IconQrcode, IconReplace, IconScan, IconSparkles, IconUser } from "@tabler/icons-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { agentBalises, balisesDuModele } from "../../donnees/agents";
 import type { Transformation } from "../../donnees/nettoyage";
 import {
+  baliseLue,
   boiteTexteVisuel,
   champDepuisTexte,
+  champDepuisTexteLu,
   INFORMATIONS,
   nouveauChampTexte,
   nouveauQr,
+  nouvellePhoto,
   nouvelId,
   reserverPlaceQr,
   transformationsParDefaut,
@@ -18,10 +21,12 @@ import {
 } from "../../modele/champs";
 import { contientFondPerdu, FORMATS, FORMATS_ECRAN } from "../../modele/formats";
 import { analyserSvg, retirerTexteSvg } from "../../modele/svg";
-import { preparerVisuel, type Emplacement, type Visuel, type Visuels } from "../../modele/visuels";
+import { aUnVerso, preparerVisuel, type Visuel, type Visuels } from "../../modele/visuels";
 import {
   couleurAutour,
+  effacerTexte,
   importerFond,
+  reconnaitreTextes,
   remplacerFond,
   retirerTextePdf,
   type Champ,
@@ -30,6 +35,7 @@ import {
   type ChampTexte,
   type Face,
   type ModeleCarte,
+  type TexteLu,
   type TexteVisuel,
   type Zone,
 } from "../../moteur";
@@ -39,13 +45,18 @@ import { BandeauVerrou } from "../commun/verrou";
 import ApercuCarte, { CalqueReference } from "./ApercuCarte";
 import CoucheEdition, { type Outil, type TexteCliquable } from "./CoucheEdition";
 import { libellesCartes } from "./libelles";
+import PanneauVariantes from "./PanneauVariantes";
 import PanneauVisuels from "./PanneauVisuels";
 import ProprietesChamp from "./ProprietesChamp";
 
 export type Source = "demo" | "perso";
 type Information = (typeof INFORMATIONS)[number];
 /** Visuels secondaires : versions écran des faces et calque de référence. */
-export type Secondaire = Exclude<Emplacement, Face>;
+export type Secondaire = "recto_ecran" | "verso_ecran" | "calque";
+/** Texte d'exemple choisi pour être remplacé : un texte du visuel (PDF, SVG) ou un texte lu dans une image. */
+type Choix = { genre: "visuel"; texte: TexteVisuel } | { genre: "lu"; texte: TexteLu };
+/** Choix « visuels du modèle » de l'aperçu des variantes. */
+const MODELE = "\u0000modele";
 
 const ICONES_OUTILS: Record<Outil, typeof IconArrowsMove> = { edition: IconArrowsMove, remplacer: IconReplace, effacer: IconEraser };
 
@@ -90,6 +101,14 @@ function RecapitulatifModele({ modele, visuels }: { modele: ModeleCarte; visuels
             {noms.join(", ")}
           </Text>
         )}
+        {modele.variantes && modele.variantes.valeurs.length > 0 && (
+          <Text size="sm" data-recapitulatif-variantes>
+            <Text span fw={500}>
+              {t.variantes.titre} ({modele.variantes.balise}) :{" "}
+            </Text>
+            {modele.variantes.valeurs.map((v, rang) => v.valeur.trim() || t.variantes.nommee(rang + 1)).join(", ")}
+          </Text>
+        )}
         {balises.length > 0 && (
           <>
             <Text size="sm" fw={500}>
@@ -128,8 +147,15 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
   const [face, setFace] = useState<Face>("recto");
   const [selection, setSelection] = useState<string | null>(null);
   const [outil, setOutil] = useState<Outil>("edition");
-  const [texteChoisi, setTexteChoisi] = useState<TexteVisuel | null>(null);
+  const [texteChoisi, setTexteChoisi] = useState<Choix | null>(null);
   const [occupe, setOccupe] = useState(false);
+  // Textes lus dans le visuel du recto (reconnaissance de caractères) : `null` tant qu'ils ne l'ont pas été.
+  const [textesLus, setTextesLus] = useState<TexteLu[] | null>(null);
+  const [lecture, setLecture] = useState(false);
+  // Lecture automatique des textes d'un visuel qui vient d'être importé.
+  const [aLire, setALire] = useState(false);
+  // Effacements intelligents : les visuels d'avant, pour annuler.
+  const [historique, setHistorique] = useState<Visuel[]>([]);
   // Calque de référence : posé sur la carte, à demi transparent (réglages de la session).
   const [calqueVisible, setCalqueVisible] = useState(true);
   const [opaciteCalque, setOpaciteCalque] = useState(50);
@@ -138,28 +164,57 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
   useEffect(() => {
     modeleRecent.current = modele;
   }, [modele]);
+  const visuelsRecents = useRef(visuels);
+  useEffect(() => {
+    visuelsRecents.current = visuels;
+  }, [visuels]);
+  useEffect(() => {
+    if (aLire && modele.fond_recto) {
+      setALire(false);
+      void lireTextes(true);
+    }
+  }, [aLire, modele.fond_recto]); // `lireTextes` lit le modèle le plus récent
 
-  const agent = useMemo(() => agentBalises(modele), [modele]);
+  // Variantes : l'aperçu montre les visuels de la variante choisie (ou ceux du modèle).
+  const [varianteApercu, setVarianteApercu] = useState<string>(MODELE);
+  const rangApercu = modele.variantes?.valeurs.findIndex((v) => v.id === varianteApercu) ?? -1;
+  const agent = useMemo(() => agentBalises(modele, rangApercu >= 0 ? rangApercu : undefined), [modele, rangApercu]);
   const choisi = modele.champs.find((champ) => champ.id === selection) ?? null;
-  const faceAffichee = modele.fond_verso ? face : "recto";
+  const faceAffichee = aUnVerso(modele) ? face : "recto";
   const avecOutils = faceAffichee === "recto" && Boolean(modele.fond_recto);
   const outilActif: Outil = avecOutils ? outil : "edition";
   const recto = visuels.recto;
   const placementRecto = placement(recto, modele.fond_recto_avec_fond_perdu);
-  const textesCliquables: TexteCliquable[] =
-    recto && placementRecto
+  // Textes d'un PDF ou d'un SVG, et textes lus dans une image (numérotés à part, en négatif).
+  const textesCliquables: TexteCliquable[] = [
+    ...(recto && placementRecto
       ? recto.textes.map((texte) => ({ id: texte.id, texte: texte.texte, boite: boiteTexteVisuel(texte, placementRecto, modele.format) }))
-      : [];
+      : []),
+    ...(textesLus ?? []).map((texte) => ({
+      id: -1 - texte.id,
+      texte: texte.texte,
+      boite: { x: texte.zone.x_mm, y: texte.zone.y_mm, largeur: texte.zone.largeur_mm, hauteur: texte.zone.hauteur_mm },
+    })),
+  ];
+  const image = recto?.genre === "image";
   const aide = verrouille
     ? ""
     : faceAffichee === "verso"
       ? t.versoSansChamps
       : outilActif === "remplacer"
-        ? textesCliquables.length > 0
-          ? t.aideRemplacer
-          : t.aucunTexte
+        ? lecture
+          ? t.lectureTextes
+          : (textesLus?.length ?? 0) > 0
+            ? t.textesLus(textesLus!.length)
+            : textesCliquables.length > 0
+              ? t.aideRemplacer
+              : textesLus
+                ? t.aucunTexteLu
+                : t.aucunTexte
         : outilActif === "effacer"
-          ? t.aideEffacer
+          ? image
+            ? t.aideEffacerImage
+            : t.aideEffacer
           : t.aideEditeur;
 
   /**
@@ -204,6 +259,49 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
     setSelection(champ.id);
   }
 
+  function ajouterPhoto() {
+    const photo = nouvellePhoto(modele);
+    onModele((m) => ({ ...m, champs: [...m.champs, photo] }));
+    setSelection(photo.id);
+  }
+
+  /** Visuel propre à une variante, pour une face ; ses balises éventuelles sont retirées comme ailleurs. */
+  async function importerVariante(id: string, faceVisuel: Face) {
+    const chemin = await open({ multiple: false, directory: false, filters: [{ name: t.filtreVisuels, extensions: ["pdf", "svg", "png", "jpg", "jpeg"] }] });
+    if (typeof chemin !== "string") return;
+    try {
+      const { visuel, svgNettoye } = preparerVisuel(await importerFond(chemin), polices);
+      if (svgNettoye) await remplacerFond(visuel.chemin, svgNettoye);
+      const avecFondPerdu = contientFondPerdu(visuel, modele.format);
+      onVisuels((v) => ({ ...v, [`variante-${id}-${faceVisuel}`]: visuel }));
+      onModele((m) => ({
+        ...m,
+        variantes: m.variantes && {
+          ...m.variantes,
+          valeurs: m.variantes.valeurs.map((v) =>
+            v.id === id ? { ...v, [`fond_${faceVisuel}`]: visuel.chemin, [`fond_${faceVisuel}_avec_fond_perdu`]: avecFondPerdu } : v,
+          ),
+        },
+      }));
+      setVarianteApercu(id);
+      setFace(faceVisuel);
+    } catch (e) {
+      signalerErreur(e);
+    }
+  }
+
+  function retirerVariante(id: string, faceVisuel: Face) {
+    onVisuels((v) => {
+      const reste = { ...v };
+      delete reste[`variante-${id}-${faceVisuel}`];
+      return reste;
+    });
+    onModele((m) => ({
+      ...m,
+      variantes: m.variantes && { ...m.variantes, valeurs: m.variantes.valeurs.map((v) => (v.id === id ? { ...v, [`fond_${faceVisuel}`]: null } : v)) },
+    }));
+  }
+
   function ajouterQr() {
     const existant = modele.champs.find((champ) => champ.type === "qr");
     if (existant) return setSelection(existant.id);
@@ -236,6 +334,12 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
       setFace(faceVisuel);
       // Des textes d'exemple dans le visuel du recto : on propose aussitôt de les remplacer.
       changerOutil(faceVisuel === "recto" && detectes.length === 0 && visuel.textes.length > 0 ? "remplacer" : "edition");
+      if (faceVisuel === "recto") {
+        setTextesLus(null);
+        setHistorique([]);
+        // Un visuel sans texte lisible (image, PDF aplati, SVG aux textes vectorisés) : on lit ses textes.
+        if (balises.length === 0 && visuel.textes.length === 0) setALire(true);
+      }
     } catch (e) {
       signalerErreur(e);
     }
@@ -258,6 +362,10 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
     }));
     setFace("recto");
     changerOutil("edition");
+    if (faceVisuel === "recto") {
+      setTextesLus(null);
+      setHistorique([]);
+    }
   }
 
   /** Version écran d'une face, ou calque de référence : ni informations à placer, ni textes à remplacer. */
@@ -311,17 +419,102 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
         return avecChamps(m, [{ ...champ, lignes_max: information.lignes_max ?? 1 }], information.transformations);
       });
       setTexteChoisi(null);
-      if (restants.length === 0) changerOutil("edition");
+      if (restants.length === 0 && !textesLus?.length) changerOutil("edition");
     });
 
-  /** Recouvre une zone du visuel d'un aplat de la couleur qui l'entoure. */
+  /**
+   * Efface des zones du visuel du recto. Une image est reconstruite autour du texte (effacement
+   * intelligent, annulable) ; un visuel vectoriel reçoit un aplat de la couleur qui entoure chaque zone.
+   * Renvoie les aplats créés.
+   */
+  async function effacerZones(zones: Zone[]): Promise<ChampMasque[]> {
+    const visuel = visuelsRecents.current.recto;
+    if (visuel?.genre === "image") {
+      const nouveau = await effacerTexte(modeleRecent.current, zones, visuel.nomFichier);
+      setHistorique((h) => [...h, visuel]);
+      onVisuels((v) => (v.recto ? { ...v, recto: { ...v.recto, chemin: nouveau.chemin, largeurPx: nouveau.largeurPx, hauteurPx: nouveau.hauteurPx } } : v));
+      onModele((m) => ({ ...m, fond_recto: nouveau.chemin }));
+      return [];
+    }
+    const masques: ChampMasque[] = [];
+    for (const zone of zones) {
+      const couleur = await couleurAutour(modeleRecent.current, zone);
+      masques.push({ id: nouvelId([...modeleRecent.current.champs, ...masques]), type: "masque", ...zone, couleur: { rgb: couleur } });
+    }
+    onModele((m) => ({ ...m, champs: [...m.champs, ...masques] }));
+    return masques;
+  }
+
+  /** Efface la zone tracée à la souris (outil « Effacer une zone »). */
   const effacer = (zone: Zone) =>
     uneSeuleFois(async () => {
-      const couleur = await couleurAutour(modeleRecent.current, zone);
-      const masque: ChampMasque = { id: nouvelId(modeleRecent.current.champs), type: "masque", ...zone, couleur: { rgb: couleur } };
-      onModele((m) => ({ ...m, champs: [...m.champs, masque] }));
-      setSelection(masque.id);
+      const [masque] = await effacerZones([zone]);
+      if (masque) setSelection(masque.id);
     });
+
+  /** Annule le dernier effacement intelligent : le visuel d'avant revient (les informations restent). */
+  function annulerEffacement() {
+    const precedent = historique[historique.length - 1];
+    if (!precedent) return;
+    setHistorique((h) => h.slice(0, -1));
+    onVisuels((v) => ({ ...v, recto: precedent }));
+    onModele((m) => ({ ...m, fond_recto: precedent.chemin }));
+  }
+
+  /** Un texte lu dans le visuel devient une information au même endroit ; le texte est effacé. */
+  const remplacerLu = (texte: TexteLu, information: Information) =>
+    uneSeuleFois(async () => {
+      await effacerZones([texte.zone]);
+      onModele((m) => {
+        const champ = champDepuisTexteLu(texte, information.modele, m.format, m.champs, polices);
+        return avecChamps(m, [{ ...champ, lignes_max: information.lignes_max ?? 1 }], information.transformations);
+      });
+      setTexteChoisi(null);
+      const restants = (textesLus ?? []).filter((lu) => lu.id !== texte.id);
+      setTextesLus(restants);
+      if (restants.length === 0 && (recto?.textes.length ?? 0) === 0) changerOutil("edition");
+    });
+
+  const remplacer = (choix: Choix, information: Information) => (choix.genre === "lu" ? remplacerLu(choix.texte, information) : remplacerTexte(choix.texte, information));
+
+  /**
+   * Lit les textes du visuel du recto (reconnaissance de caractères de Windows). Les balises {{…}}
+   * écrites dans l'image deviennent aussitôt des informations ; les autres textes sont proposés au
+   * remplacement. Une lecture automatique échoue en silence (hors de Windows, langue sans module).
+   */
+  async function lireTextes(automatique = false) {
+    if (occupe) return;
+    setOccupe(true);
+    setLecture(true);
+    try {
+      const lus = await reconnaitreTextes(modeleRecent.current);
+      const balises = lus.flatMap((texte) => {
+        const nom = baliseLue(texte.texte);
+        return nom ? [{ texte, nom }] : [];
+      });
+      if (balises.length > 0) {
+        await effacerZones(balises.map(({ texte }) => texte.zone));
+        onModele((m) => {
+          const nouveaux: ChampTexte[] = [];
+          for (const { texte, nom } of balises) nouveaux.push(champDepuisTexteLu(texte, `{{${nom}}}`, m.format, [...m.champs, ...nouveaux], polices));
+          return avecChamps(m, nouveaux);
+        });
+        notifications.show({ color: "teal", icon: <IconSparkles size={18} />, title: visuelsRecents.current.recto?.nomFichier, message: t.balisesDetectees(balises.length) });
+      }
+      const exemples = lus.filter((texte) => !baliseLue(texte.texte));
+      setTextesLus(exemples);
+      if (exemples.length > 0) {
+        setOutil("remplacer");
+        setTexteChoisi(null);
+        setSelection(null);
+      }
+    } catch (e) {
+      if (!automatique) signalerErreur(e);
+    } finally {
+      setLecture(false);
+      setOccupe(false);
+    }
+  }
 
   const mesurerCouleur = (id: string) =>
     uneSeuleFois(async () => {
@@ -369,6 +562,20 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
               })}
             />
           )}
+          {modele.variantes && modele.variantes.valeurs.length > 0 && (
+            <Select
+              size="xs"
+              w={320}
+              label={t.variantes.apercu}
+              value={rangApercu >= 0 ? varianteApercu : MODELE}
+              allowDeselect={false}
+              data={[
+                { value: MODELE, label: t.variantes.modele },
+                ...modele.variantes.valeurs.map((v, rang) => ({ value: v.id, label: v.valeur.trim() || t.variantes.nommee(rang + 1) })),
+              ]}
+              onChange={(valeur) => valeur && setVarianteApercu(valeur)}
+            />
+          )}
           <ApercuCarte modele={modele} agent={agent} face={faceAffichee}>
             {faceAffichee === "recto" && !verrouille && modele.fond_calque && calqueVisible && <CalqueReference modele={modele} opacite={opaciteCalque} />}
             {faceAffichee === "recto" && !verrouille && (
@@ -381,15 +588,33 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
                 onChamp={modifierChamp}
                 onSupprimer={supprimerChamp}
                 onZone={effacer}
-                onTexteVisuel={(id) => setTexteChoisi(recto?.textes.find((texte) => texte.id === id) ?? null)}
+                onTexteVisuel={(id) => {
+                  const lu = id < 0 ? textesLus?.find((texte) => texte.id === -1 - id) : undefined;
+                  const duVisuel = id >= 0 ? recto?.textes.find((texte) => texte.id === id) : undefined;
+                  setTexteChoisi(lu ? { genre: "lu", texte: lu } : duVisuel ? { genre: "visuel", texte: duVisuel } : null);
+                }}
               />
             )}
           </ApercuCarte>
+          {!verrouille && faceAffichee === "recto" && modele.fond_recto && (historique.length > 0 || (outilActif === "remplacer" && textesLus === null && !recto?.textes.length)) && (
+            <Group gap="xs">
+              {outilActif === "remplacer" && textesLus === null && !recto?.textes.length && (
+                <Button size="compact-xs" variant="light" leftSection={<IconScan size={14} />} loading={lecture} onClick={() => lireTextes()}>
+                  {t.lireTextes}
+                </Button>
+              )}
+              {historique.length > 0 && (
+                <Button size="compact-xs" variant="subtle" leftSection={<IconArrowBackUp size={14} />} disabled={occupe} onClick={annulerEffacement}>
+                  {t.annulerEffacement}
+                </Button>
+              )}
+            </Group>
+          )}
           <Group justify="space-between" wrap="nowrap">
             <Text size="xs" c="dimmed">
               {aide}
             </Text>
-            {modele.fond_verso && (
+            {aUnVerso(modele) && (
               <SegmentedControl
                 style={{ flexShrink: 0 }}
                 value={faceAffichee}
@@ -433,6 +658,9 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
                     <Button size="compact-sm" variant="light" leftSection={<IconQrcode size={14} />} onClick={ajouterQr}>
                       {t.ajouterQr}
                     </Button>
+                    <Button size="compact-sm" variant="light" leftSection={<IconUser size={14} />} onClick={ajouterPhoto}>
+                      {t.ajouterPhoto}
+                    </Button>
                   </Group>
                   {balisesDuModele(modele).length > 0 && (
                     <>
@@ -453,10 +681,10 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
               {texteChoisi ? (
                 <Paper withBorder p="md" style={{ borderColor: "#e8590c" }}>
                   <Stack gap="sm">
-                    <Title order={5}>{t.remplacerPar(texteChoisi.texte)}</Title>
+                    <Title order={5}>{t.remplacerPar(texteChoisi.texte.texte)}</Title>
                     <Group gap={6}>
                       {INFORMATIONS.map((information) => (
-                        <Button key={information.libelle} size="compact-sm" variant="light" disabled={occupe} onClick={() => remplacerTexte(texteChoisi, information)}>
+                        <Button key={information.libelle} size="compact-sm" variant="light" disabled={occupe} onClick={() => remplacer(texteChoisi, information)}>
                           {information.libelle}
                         </Button>
                       ))}
@@ -479,6 +707,7 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
                 />
               ) : (
                 source === "perso" && (
+                  <>
                   <PanneauVisuels
                     nom={modele.nom}
                     onNom={(nom) => onModele((m) => ({ ...m, nom }))}
@@ -493,6 +722,15 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
                     onRetirerSecondaire={retirerSecondaire}
                     calque={{ visible: calqueVisible, opacite: opaciteCalque, onVisible: setCalqueVisible, onOpacite: setOpaciteCalque }}
                   />
+                  <PanneauVariantes
+                    variantes={modele.variantes}
+                    faces={modele.format.px ? ["recto"] : ["recto", "verso"]}
+                    visuels={visuels}
+                    onVariantes={(modification) => onModele((m) => ({ ...m, variantes: modification(m.variantes) }))}
+                    onImporter={importerVariante}
+                    onRetirer={retirerVariante}
+                  />
+                  </>
                 )
               )}
             </Stack>

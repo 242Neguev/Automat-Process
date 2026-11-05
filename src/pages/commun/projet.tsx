@@ -11,7 +11,7 @@ const t = textes.projet;
 const FILTRE = [{ name: t.filtre, extensions: ["automat"] }];
 
 /** Enregistre un projet sous le nom de son modèle ; les données des agents n'y sont jamais copiées. */
-export async function enregistrerSous(document: Document, nom: string, modele: unknown, correspondances: Record<string, string | null>, visuels: unknown = {}) {
+export async function enregistrerSous(document: Document, nom: string, modele: unknown, correspondances: Record<string, unknown>, visuels: unknown = {}) {
   const propre = nom.replace(/[\\/:*?"<>|]/g, "-").trim() || t.nomParDefaut[document];
   const chemin = await save({ defaultPath: `${propre}.automat`, filters: FILTRE });
   if (!chemin) return;

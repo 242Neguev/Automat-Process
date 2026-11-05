@@ -15,6 +15,7 @@ use typst::{Library, LibraryExt, World, WorldExt};
 use typst_kit::fonts::{self, FontStore};
 use typst_layout::{Page, PagedDocument};
 
+use crate::tr;
 use monde::Monde;
 
 /// Version de Typst intégrée (doit suivre celle fixée dans Cargo.toml).
@@ -84,7 +85,10 @@ impl Document {
             return Ok(Vec::new());
         };
         let illisible = |cause: String| {
-            ErreurMoteur::simple(format!("Mesure « {etiquette} » illisible : {cause}"))
+            ErreurMoteur::simple(tr!(
+                "Mesure « {etiquette} » illisible : {cause}",
+                "Unreadable measure “{etiquette}”: {cause}"
+            ))
         };
         self.0
             .introspector()
@@ -109,7 +113,12 @@ impl Document {
     pub fn png(&self, index: usize, pixels_par_point: f64) -> Result<Vec<u8>, ErreurMoteur> {
         self.image(index, pixels_par_point)?
             .encode_png()
-            .map_err(|erreur| ErreurMoteur::simple(format!("Encodage PNG impossible : {erreur}")))
+            .map_err(|erreur| {
+                ErreurMoteur::simple(tr!(
+                    "Encodage PNG impossible : {erreur}",
+                    "PNG encoding failed: {erreur}"
+                ))
+            })
     }
 
     /// Pixels d'une page, sans le fond perdu : (largeur, hauteur, RVBA ligne par ligne).
@@ -143,10 +152,13 @@ impl Document {
     }
 
     fn page(&self, index: usize) -> Result<&Page, ErreurMoteur> {
-        self.0
-            .pages()
-            .get(index)
-            .ok_or_else(|| ErreurMoteur::simple(format!("La page {} n'existe pas.", index + 1)))
+        self.0.pages().get(index).ok_or_else(|| {
+            ErreurMoteur::simple(tr!(
+                "La page {} n'existe pas.",
+                "Page {} does not exist.",
+                index + 1
+            ))
+        })
     }
 }
 
@@ -186,7 +198,11 @@ impl ErreurMoteur {
             })
             .collect();
         Self {
-            message: "Le document n'a pas pu être généré.".into(),
+            message: crate::langue::texte(
+                "Le document n'a pas pu être généré.",
+                "The document could not be generated.",
+            )
+            .into(),
             details,
         }
     }

@@ -9,12 +9,14 @@ import { controlerCartes, enErreurMoteur, type DonneesAgent, type ErreurMoteur, 
  */
 export function useControle(modele: ModeleCarte | null, agents: DonneesAgent[], actif: boolean) {
   const [resultat, setResultat] = useState<{ cle: string; mesures: MesureTexte[] | null; erreur: ErreurMoteur | null } | null>(null);
-  const cle = actif && modele && agents.length > 0 ? JSON.stringify([modele, agents]) : "";
+  // Les photos (et leur recadrage) ne changent pas la mise en page des textes : elles n'y entrent pas.
+  const textes = useMemo(() => agents.map(({ photos: _photos, ...agent }) => agent), [agents]);
+  const cle = actif && modele && agents.length > 0 ? JSON.stringify([modele, textes]) : "";
 
   useEffect(() => {
     if (!cle || resultat?.cle === cle) return;
     let actuel = true;
-    controlerCartes(modele!, agents).then(
+    controlerCartes(modele!, textes).then(
       (mesures) => actuel && setResultat({ cle, mesures, erreur: null }),
       (e) => actuel && setResultat({ cle, mesures: null, erreur: enErreurMoteur(e) }),
     );
