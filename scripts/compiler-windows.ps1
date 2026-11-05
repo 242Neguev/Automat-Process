@@ -122,13 +122,25 @@ $dossierCompilation = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else 
 
 # Chaque compilation en parallèle peut demander 1 à 2 Go : avec peu de mémoire, on en lance moins
 # (sinon le compilateur s'arrête net, avec le code 0xC0000409).
+$memoireGo = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
 if (-not $env:CARGO_BUILD_JOBS) {
-    $memoireGo = (Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB
     $taches = [int][math]::Max(1, [math]::Min([Environment]::ProcessorCount, [math]::Floor($memoireGo / 3)))
     if ($taches -lt [Environment]::ProcessorCount) {
         $env:CARGO_BUILD_JOBS = "$taches"
         Write-Host "Mémoire de $([math]::Round($memoireGo)) Go : $taches compilations en parallèle."
     }
+}
+
+# Le paquet windows (reconnaissance de caractères, détection des visages), optimisé d'un seul tenant comme le
+# veut le profil (codegen-units = 1), dépasse à lui seul la mémoire libre d'un PC de 8 Go (« rustc-LLVM ERROR:
+# out of memory »). En dessous de 12 Go, on le découpe en 16 parties optimisées au niveau 1 : ce paquet ne fait
+# qu'appeler Windows, et l'optimisation finale de l'application (LTO) ne change pas. Ce sont des options de
+# cargo : elles suivent le second « -- ».
+$optionsCargo = @()
+if ($memoireGo -lt 12) {
+    $optionsCargo = @('--', '--config', 'profile.release.package.windows.codegen-units=16',
+        '--config', 'profile.release.package.windows.opt-level=1')
+    Write-Host 'Paquet windows compilé en 16 parties, pour tenir dans la mémoire du PC.'
 }
 
 # npm.cmd et non npm : appelé avec « & » depuis un script, le npm.ps1 de npm 10 tronque la commande
@@ -144,7 +156,7 @@ if ($Msi) {
     $formats = 'nsis,msi'
 }
 Write-Etape "Compilation de l'application (la première fois : 10 à 20 minutes)"
-& npm.cmd run tauri build -- --bundles $formats
+& npm.cmd run tauri build -- --bundles $formats @optionsCargo
 if ($LASTEXITCODE -ne 0) {
     Exit-AvecErreur 'la compilation a échoué : voir les messages ci-dessus.'
 }
