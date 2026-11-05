@@ -10,6 +10,12 @@ Les outils PDF (fusionner, séparer, organiser, protéger, diffuser) forment dep
 - 🧪 [Prototype de validation](prototype/README.md)
 - 🪟 [Fiche de test sous Windows](docs/test-windows/README.md)
 
+## Télécharger
+
+L'installateur Windows de la dernière version se trouve sur la page [**Releases**](https://github.com/242Neguev/Automat-Process/releases) du projet. Automat-Process est un logiciel libre et gratuit, sous [licence MIT](LICENSE).
+
+> L'installateur n'est pas encore signé : Windows affiche l'avertissement « Windows a protégé votre ordinateur ». Il faut cliquer sur **Informations complémentaires**, puis sur **Exécuter quand même**. Voir la [politique de signature du code](#politique-de-signature-du-code-code-signing-policy).
+
 ## État actuel
 
 Version 0.2.0 : les quatre modules et la Version Pro (variantes et photos, mise à jour incrémentale, reconnaissance du texte, interface en anglais) sont disponibles. L'application a été compilée, installée par son installateur et essayée sous Windows 11 les 4 et 5 novembre 2026 ([résultats](docs/test-windows/README.md#résultats-du-4-novembre-2026)) : il reste à essayer une imprimante à badges et Outlook avec un compte de messagerie.
@@ -76,15 +82,13 @@ La première compilation Rust est longue (plusieurs minutes) ; les suivantes son
 
 ### Option 1 : GitHub Actions (rien à installer)
 
-> ⚠️ **Bloquée pour l'instant** : GitHub ne lance pas les builds du dépôt privé tant que la facturation du compte n'est pas régularisée (*Settings > Billing and plans*). Une fois réglée, il suffit de relancer les exécutions depuis l'onglet **Actions**.
-
 1. Ouvrir le dépôt sur GitHub.
 2. Ouvrir l'onglet **Actions**, choisir **Installateur Windows**, puis **Run workflow**.
 3. À la fin de l'exécution (environ 20 à 30 minutes), télécharger les **artefacts** : l'installateur `.exe` (NSIS) et le `.msi`.
 
-Pour publier une version, il suffit d'envoyer un tag : `git tag v0.2.0 && git push origin v0.2.0`. Une **publication GitHub en brouillon** est alors créée avec les installateurs attachés.
+Pour publier une version, il suffit d'envoyer un tag : `git tag v0.2.0 && git push origin v0.2.0`. Une **publication GitHub en brouillon** est alors créée avec les installateurs attachés : il reste à l'essayer, puis à la publier.
 
-> Les vérifications tournent sur Windows à chaque envoi sur `main`. Sur un dépôt **privé**, GitHub décompte les minutes Windows double. Pour les économiser, l'installateur n'est construit qu'à la demande ou sur un tag.
+> Les vérifications tournent sous Windows à chaque envoi sur `main` et pour chaque pull request. L'installateur n'est construit qu'à la demande ou sur un tag.
 
 ### Option 2 : compiler sur un PC Windows (un double-clic)
 
@@ -101,7 +105,7 @@ Pour publier une version, il suffit d'envoyer un tag : `git tag v0.2.0 && git pu
 
 Pour produire aussi un `.msi`, lancer `scripts\compiler-windows.cmd -Msi` dans un terminal.
 
-> L'exécutable n'est pas encore signé : Windows affiche l'avertissement « Windows a protégé votre ordinateur ». Il faut cliquer sur **Informations complémentaires**, puis sur **Exécuter quand même**. La signature de code est prévue avant la commercialisation.
+> L'exécutable n'est pas encore signé : Windows affiche l'avertissement « Windows a protégé votre ordinateur ». Il faut cliquer sur **Informations complémentaires**, puis sur **Exécuter quand même**. Seuls les installateurs compilés par GitHub Actions seront signés, par SignPath Foundation, qui signe gratuitement les logiciels libres : voir la [politique de signature du code](#politique-de-signature-du-code-code-signing-policy).
 
 ## Organisation du code
 
@@ -137,4 +141,32 @@ prototype/               Prototype de validation (jetable)
 .github/workflows/       Vérifications et installateur Windows
 ```
 
-Toutes les dépendances sont sous licences permissives (MIT, Apache-2.0, BSD), ce qui permet la commercialisation.
+## Licence
+
+Automat-Process est un logiciel libre, publié sous **licence MIT** ([LICENSE](LICENSE)) : chacun peut l'utiliser, le copier, le modifier et le redistribuer, à condition de conserver la mention de copyright et le texte de la licence. © 2026 Eau sèche.
+
+Les bibliothèques utilisées gardent leur propre licence, toutes libres (MIT, Apache-2.0, BSD, MPL-2.0, Zlib, Unicode…), de même que les polices intégrées au moteur Typst.
+
+La licence porte sur le code et les fichiers du projet. Elle ne donne pas le droit d'utiliser le nom ou le logo d'Eau sèche pour présenter un autre produit, ou une version modifiée, comme venant d'Eau sèche.
+
+## Politique de signature du code (Code signing policy)
+
+Les installateurs seront signés gratuitement par [SignPath Foundation](https://signpath.org), qui signe les logiciels libres, dès que le projet aura été accepté. D'ici là, ils ne sont pas signés.
+
+*Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).*
+
+- Seules les versions compilées automatiquement depuis ce dépôt, par GitHub Actions, seront signées, chacune après une approbation manuelle.
+- **Auteurs et relecteurs** (*committers and reviewers*) : Eau sèche ([@242Neguev](https://github.com/242Neguev)). Toute contribution proposée par une autre personne (pull request) est relue avant d'être acceptée.
+- **Approbation des signatures** (*approvers*) : Eau sèche ([@242Neguev](https://github.com/242Neguev)).
+
+### Confidentialité (Privacy policy)
+
+Automat-Process ne transmet aucune information à d'autres systèmes en réseau, sauf à la demande expresse de l'utilisateur ou de la personne qui l'installe ou l'utilise.
+*This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.*
+
+En pratique :
+
+- les modèles, les listes d'agents et les documents produits sont traités sur l'ordinateur, sans compte, sans publicité ni statistiques d'utilisation : l'application ne se connecte à aucun serveur ;
+- les signatures e-mail sont copiées ou installées par chaque agent dans sa propre messagerie ; le kit Outlook ne modifie que les signatures d'Outlook, sur l'ordinateur où l'agent le lance ;
+- les conversions en PDF par Microsoft Word ou LibreOffice se font sur l'ordinateur, par ces logiciels ;
+- la reconnaissance de caractères et la détection des visages sont celles de Windows, hors ligne.
