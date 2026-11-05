@@ -12,7 +12,7 @@ Les outils PDF (fusionner, séparer, organiser, protéger, diffuser) forment dep
 
 ## État actuel
 
-Les quatre modules sont disponibles. L'application a été compilée, installée par son installateur et essayée sous Windows 11 le 4 novembre 2026 ([résultats](docs/test-windows/README.md#résultats-du-4-novembre-2026)) : il reste à essayer une imprimante à badges et Outlook avec un compte de messagerie.
+Version 0.2.0 : les quatre modules et la Version Pro (variantes et photos, mise à jour incrémentale, reconnaissance du texte, interface en anglais) sont disponibles. L'application a été compilée, installée par son installateur et essayée sous Windows 11 les 4 et 5 novembre 2026 ([résultats](docs/test-windows/README.md#résultats-du-4-novembre-2026)) : il reste à essayer une imprimante à badges et Outlook avec un compte de messagerie.
 
 | Fonction | État |
 |---|---|
