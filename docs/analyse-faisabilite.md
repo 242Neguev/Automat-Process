@@ -2,7 +2,7 @@
 
 **Documents personnalisés à partir d'un modèle et d'une liste : cartes de visite imprimées et numériques, signatures e-mail, documents Word**
 
-*Version 2, 29 octobre 2026, mise à jour le 4 novembre 2026. Elle intègre les décisions prises le 29 octobre (§ 2). Statut : validée ; phases 0 et 1 livrées, version Pro (phase 2) en partie ; premiers essais sous Windows le 4 novembre 2026. Éditeur : Eau sèche.*
+*Version 2, 29 octobre 2026, mise à jour le 5 novembre 2026. Elle intègre les décisions prises le 29 octobre (§ 2). Statut : validée ; phases 0 et 1 livrées, version Pro (phase 2) en partie ; premiers essais sous Windows le 4 novembre 2026 ; logiciel libre sous licence MIT depuis le 5 novembre 2026 (§ 5.12). Éditeur : Eau sèche.*
 
 ---
 
@@ -41,7 +41,7 @@ Les décisions techniques importantes, déjà validées par le prototype :
 | Exports numériques | Carte image, fiche vCard, fond Teams/Zoom, carte numérique en ligne | Profil de sortie « écran » à côté du profil « impression » |
 | Documents Word | Un `.docx` par personne, un PDF par personne, un document fusionné, fusion et séparation de PDF | Un module Word et des outils PDF |
 | Première version (MVP) | **Cartes imprimées et signatures e-mail** | MVP plus long d'environ deux semaines |
-| Diffusion | Usage interne d'abord, **vente ensuite** | Préparer la commercialisation dès le départ (§ 5.12) |
+| Diffusion | Usage interne d'abord, **vente ensuite**. Depuis le 5 novembre 2026 : **logiciel libre et gratuit** (licence MIT) | Code public ; signature gratuite par SignPath Foundation (§ 5.12) |
 | Technique | **Tauri 2 + React + TypeScript + Typst** | Phase 0 lancée |
 | Messageries ciblées | Microsoft 365 / Outlook, Google Workspace / Gmail, Thunderbird, webmails | Compatibilité la plus large possible |
 | Hébergement des images de signature | Aucun pour l'instant | MVP : signatures HTML sans image, ou kit Outlook avec images intégrées. Le rendu « image » et les logos dans Gmail attendront un hébergement. |
@@ -278,6 +278,8 @@ L'aperçu se met à jour en temps réel.
 
 ### 5.12 Distribution Windows et préparation à la vente
 
+> **Décision du 5 novembre 2026** : Automat-Process devient un **logiciel libre et gratuit**, sous licence MIT, dont le code est public. La vente de licences est abandonnée, et avec elle le module de licence et d'activation. Les installateurs compilés par GitHub Actions seront signés gratuitement par SignPath Foundation, qui signe les logiciels libres (voir la politique de signature du code dans le README). Le reste de cette section vaut toujours pour la distribution.
+
 **Distribution :**
 
 - **Windows 10 et 11, 64 bits.** Installateur `.exe` ou `.msi`, version portable possible. Le composant WebView2 est déjà présent sur Windows 10/11 ; s'il manque, l'installateur l'ajoute.
@@ -290,9 +292,9 @@ L'aperçu se met à jour en temps réel.
 - des dépendances sous licences permissives uniquement (MIT, Apache, BSD ; aucune dépendance AGPL) ;
 - les textes de l'interface regroupés en un seul endroit, pour la traduction (français d'abord, anglais ensuite) ;
 - aucune donnée ni aucun logo client inscrit dans le code ;
-- une place prévue dans l'architecture pour un futur module de licence et d'activation.
+- ~~une place prévue dans l'architecture pour un futur module de licence et d'activation~~ (sans objet depuis le passage en logiciel libre).
 
-**Avant la vente :** un **certificat de signature de code** (quelques centaines d'euros par an), pour éviter l'avertissement SmartScreen « Windows a protégé votre ordinateur ».
+**Signature de code**, contre l'avertissement SmartScreen « Windows a protégé votre ordinateur » : prévue d'abord avec un certificat payant (quelques centaines d'euros par an), elle sera faite gratuitement par SignPath Foundation depuis le passage en logiciel libre ; Windows affichera alors « SignPath Foundation » comme éditeur.
 
 ---
 
@@ -405,7 +407,7 @@ Phases : **MVP** = première version, **V2** = version Pro, **V3** = commerciali
 | Générer l'Excel vide à partir des balises du modèle (à envoyer aux RH) ✅ | V2 |
 | Mise à jour incrémentale (seulement les nouveaux et les modifiés) ✅ ; colonne Quantité ✅ | V2 |
 | Interface en anglais ✅, mises à jour automatiques | V2 |
-| Licences et activation, signature de code, version macOS | V3 |
+| ~~Licences et activation~~ (sans objet : logiciel libre), signature de code (SignPath Foundation), version macOS | V3 |
 
 ### Modèles
 
@@ -461,7 +463,7 @@ Durées **indicatives**, en temps de développement assisté.
 | **0. Socle** (en cours) | Application Tauri + React, moteur Typst intégré, aperçu et export d'une carte de démonstration, build Windows automatique | ≈ 1 semaine |
 | **1. MVP** | Cartes imprimées (modèles, balises, placement manuel, Excel, contrôle, PDF/PNG, planches, PVC), carte image et vCard, **signatures e-mail** (trois rendus, copier-coller) | ≈ 5 à 7 semaines |
 | **2. Version Pro** | Module Word et outils PDF, kit Outlook, fond Teams/Zoom, carte en ligne, reconnaissance de caractères et effacement intelligent, variantes, BAT, mise à jour incrémentale, interface anglaise | ≈ 5 à 6 semaines |
-| **3. Commercialisation** | Signatures centralisées (Workspace, 365), licences et activation, signature de code, version macOS, autres documents (badges d'événement, attestations…), automatisation (dossier surveillé) | Selon les priorités |
+| **3. Commercialisation** | Signatures centralisées (Workspace, 365), ~~licences et activation~~, signature de code (SignPath Foundation), version macOS, autres documents (badges d'événement, attestations…), automatisation (dossier surveillé) | Selon les priorités |
 
 ---
 
