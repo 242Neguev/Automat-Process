@@ -156,16 +156,18 @@ if ($Msi) {
     $formats = 'nsis,msi'
 }
 Write-Etape "Compilation de l'application (la première fois : 10 à 20 minutes)"
+$debutCompilation = Get-Date
 & npm.cmd run tauri build -- --bundles $formats @optionsCargo
 if ($LASTEXITCODE -ne 0) {
     Exit-AvecErreur 'la compilation a échoué : voir les messages ci-dessus.'
 }
 
+# Seulement les installateurs de cette compilation : ceux des versions précédentes restent dans le dossier.
 $dossierBundles = Join-Path $dossierCompilation 'release\bundle'
 $installateurs = @(Get-ChildItem -Path $dossierBundles -Recurse -Include '*.exe', '*.msi' -ErrorAction SilentlyContinue |
-    Where-Object { $_.Directory.Name -in @('nsis', 'msi') })
+    Where-Object { $_.Directory.Name -in @('nsis', 'msi') -and $_.LastWriteTime -ge $debutCompilation })
 if ($installateurs.Count -eq 0) {
-    Exit-AvecErreur "aucun installateur trouvé dans $dossierBundles."
+    Exit-AvecErreur "aucun installateur produit dans $dossierBundles."
 }
 
 Write-Etape 'Terminé : installateurs produits'
