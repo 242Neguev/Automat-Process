@@ -68,9 +68,10 @@ pub fn lire_lignes(rvba: &[u8], largeur: u32, hauteur: u32) -> Result<Vec<LigneL
             return Ok(Vec::new());
         }
         // Windows attend des pixels BGRA.
-        let bgra: Vec<u8> = rvba
-            .chunks_exact(4)
-            .flat_map(|p| [p[2], p[1], p[0], p[3]])
+        let (pixels, _) = rvba.as_chunks::<4>();
+        let bgra: Vec<u8> = pixels
+            .iter()
+            .flat_map(|&[r, v, b, a]| [b, v, r, a])
             .collect();
         let ecrivain = DataWriter::new()?;
         ecrivain.WriteBytes(&bgra)?;
