@@ -16,7 +16,10 @@ use crate::fonds::{FondImporte, Fonds, TexteRetire};
 use crate::impression::{self, Imprimante, Reglages};
 use crate::moteur::{ErreurMoteur, Moteur, VERSION_TYPST};
 use crate::outils_pdf;
+use crate::photos::{PhotoChargee, Photos};
 use crate::projet_fichier::{self, ProjetOuvert};
+use crate::registres;
+use crate::tr;
 use crate::word::{self, Courrier};
 
 /// Le moteur est préparé en arrière-plan dès le démarrage (recensement des polices) ;
@@ -40,7 +43,12 @@ async fn executer<T: Send + 'static>(
     let cellule = etat.0.clone();
     tauri::async_runtime::spawn_blocking(move || travail(cellule.wait()))
         .await
-        .map_err(|erreur| ErreurMoteur::simple(format!("Le calcul a été interrompu : {erreur}")))?
+        .map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "Le calcul a été interrompu : {erreur}",
+                "The calculation was interrupted: {erreur}"
+            ))
+        })?
 }
 
 #[derive(Serialize)]
@@ -81,7 +89,12 @@ pub async fn importer_fond(
     let fonds = Arc::clone(&fonds);
     tauri::async_runtime::spawn_blocking(move || fonds.importer(&chemin))
         .await
-        .map_err(|erreur| ErreurMoteur::simple(format!("Import interrompu : {erreur}")))?
+        .map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "Import interrompu : {erreur}",
+                "Import interrupted: {erreur}"
+            ))
+        })?
 }
 
 /// Remplace un SVG importé par sa version sans balises, préparée par l'interface.
@@ -129,7 +142,10 @@ pub async fn exporter_cartes(
     executer(&etat, move |moteur| {
         let pdf = cartes::exporter(moteur, &projet, &agents, sortie, feuille)?;
         std::fs::write(&chemin, pdf).map_err(|erreur| {
-            ErreurMoteur::simple(format!("Impossible d'enregistrer « {chemin} » : {erreur}"))
+            ErreurMoteur::simple(tr!(
+                "Impossible d'enregistrer « {chemin} » : {erreur}",
+                "Cannot save “{chemin}”: {erreur}"
+            ))
         })
     })
     .await
@@ -190,7 +206,10 @@ pub async fn exporter_bat(
     executer(&etat, move |moteur| {
         let pdf = cartes::bon_a_tirer(moteur, &projet, &agents, &titre, &date)?;
         std::fs::write(&chemin, pdf).map_err(|erreur| {
-            ErreurMoteur::simple(format!("Impossible d'enregistrer « {chemin} » : {erreur}"))
+            ErreurMoteur::simple(tr!(
+                "Impossible d'enregistrer « {chemin} » : {erreur}",
+                "Cannot save “{chemin}”: {erreur}"
+            ))
         })
     })
     .await
@@ -243,7 +262,10 @@ async fn en_arriere_plan<T: Send + 'static>(
     tauri::async_runtime::spawn_blocking(travail)
         .await
         .map_err(|erreur| {
-            ErreurMoteur::simple(format!("Le traitement a été interrompu : {erreur}"))
+            ErreurMoteur::simple(tr!(
+                "Le traitement a été interrompu : {erreur}",
+                "The processing was interrupted: {erreur}"
+            ))
         })?
 }
 
@@ -257,7 +279,10 @@ pub async fn fusionner_pdf(chemins: Vec<String>, sortie: String) -> Result<(), E
             .collect::<Result<Vec<_>, ErreurMoteur>>()?;
         let pdf = outils_pdf::fusionner(&sources)?;
         std::fs::write(&sortie, pdf).map_err(|erreur| {
-            ErreurMoteur::simple(format!("Impossible d'enregistrer « {sortie} » : {erreur}"))
+            ErreurMoteur::simple(tr!(
+                "Impossible d'enregistrer « {sortie} » : {erreur}",
+                "Cannot save “{sortie}”: {erreur}"
+            ))
         })
     })
     .await
@@ -300,8 +325,9 @@ pub async fn ecrire_courriers(
 }
 
 fn sous_dossier_de(dossier: &str, sous_dossier: &str) -> Result<std::path::PathBuf, ErreurMoteur> {
-    let nom = fichiers::nom_sur(sous_dossier)
-        .ok_or_else(|| ErreurMoteur::simple("Nom de dossier invalide."))?;
+    let nom = fichiers::nom_sur(sous_dossier).ok_or_else(|| {
+        ErreurMoteur::simple(tr!("Nom de dossier invalide.", "Invalid folder name."))
+    })?;
     Ok(Path::new(dossier).join(nom))
 }
 
@@ -313,7 +339,10 @@ pub fn dossier_temporaire() -> Result<String, ErreurMoteur> {
     let dossier =
         std::env::temp_dir().join(format!("automat-process-{}-{numero}", std::process::id()));
     std::fs::create_dir_all(&dossier).map_err(|e| {
-        ErreurMoteur::simple(format!("Dossier temporaire impossible à créer : {e}"))
+        ErreurMoteur::simple(tr!(
+            "Dossier temporaire impossible à créer : {e}",
+            "The temporary folder cannot be created: {e}"
+        ))
     })?;
     Ok(dossier.to_string_lossy().into_owned())
 }
@@ -380,8 +409,9 @@ pub async fn apercu_courrier(
                 &travail,
             )?;
             let conversion = conversion::en_pdf(&documents, &travail)?;
-            let pdf = std::fs::read(&conversion.pdfs[0])
-                .map_err(|e| ErreurMoteur::simple(format!("PDF illisible : {e}")))?;
+            let pdf = std::fs::read(&conversion.pdfs[0]).map_err(|e| {
+                ErreurMoteur::simple(tr!("PDF illisible : {e}", "Unreadable PDF: {e}"))
+            })?;
             Ok(ApercuCourrier {
                 pages: outils_pdf::rendre_pages(moteur, pdf)?,
                 convertisseur: conversion.convertisseur,
@@ -399,7 +429,12 @@ pub async fn apercu_courrier(
 pub async fn imprimantes() -> Result<Vec<Imprimante>, ErreurMoteur> {
     tauri::async_runtime::spawn_blocking(impression::imprimantes)
         .await
-        .map_err(|erreur| ErreurMoteur::simple(format!("Recherche interrompue : {erreur}")))?
+        .map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "Recherche interrompue : {erreur}",
+                "Search interrupted: {erreur}"
+            ))
+        })?
         .map_err(ErreurMoteur::simple)
 }
 
@@ -435,7 +470,12 @@ pub async fn lire_liste(chemin: String) -> Result<Response, ErreurMoteur> {
 pub async fn lire_fichier(chemin: String, nature: Nature) -> Result<Response, ErreurMoteur> {
     tauri::async_runtime::spawn_blocking(move || fichiers::lire(&chemin, nature).map(Response::new))
         .await
-        .map_err(|erreur| ErreurMoteur::simple(format!("Lecture interrompue : {erreur}")))?
+        .map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "Lecture interrompue : {erreur}",
+                "Reading interrupted: {erreur}"
+            ))
+        })?
 }
 
 /// Enregistre un classeur Excel préparé par l'interface (liste vide à faire remplir) dans `chemin`,
@@ -444,12 +484,16 @@ pub async fn lire_fichier(chemin: String, nature: Nature) -> Result<Response, Er
 pub async fn enregistrer_classeur(chemin: String, octets: Vec<u8>) -> Result<(), ErreurMoteur> {
     en_arriere_plan(move || {
         if !chemin.to_lowercase().ends_with(".xlsx") {
-            return Err(ErreurMoteur::simple(
+            return Err(ErreurMoteur::simple(tr!(
                 "Le classeur doit être enregistré au format Excel (.xlsx).",
-            ));
+                "The workbook must be saved in Excel format (.xlsx)."
+            )));
         }
         std::fs::write(&chemin, octets).map_err(|erreur| {
-            ErreurMoteur::simple(format!("Impossible d'enregistrer « {chemin} » : {erreur}"))
+            ErreurMoteur::simple(tr!(
+                "Impossible d'enregistrer « {chemin} » : {erreur}",
+                "Cannot save “{chemin}”: {erreur}"
+            ))
         })
     })
     .await
@@ -466,7 +510,12 @@ pub async fn ecrire_fichiers(
         fichiers::ecrire(&dossier, &sous_dossier, &fichiers)
     })
     .await
-    .map_err(|erreur| ErreurMoteur::simple(format!("Écriture interrompue : {erreur}")))?
+    .map_err(|erreur| {
+        ErreurMoteur::simple(tr!(
+            "Écriture interrompue : {erreur}",
+            "Writing interrupted: {erreur}"
+        ))
+    })?
 }
 
 /// Couleur du visuel autour d'une zone : elle sert à effacer un texte incrusté sur un fond uni.
@@ -509,7 +558,12 @@ pub async fn enregistrer_projet(
         )
     })
     .await
-    .map_err(|erreur| ErreurMoteur::simple(format!("Enregistrement interrompu : {erreur}")))?
+    .map_err(|erreur| {
+        ErreurMoteur::simple(tr!(
+            "Enregistrement interrompu : {erreur}",
+            "Saving interrupted: {erreur}"
+        ))
+    })?
 }
 
 #[tauri::command]
@@ -520,7 +574,12 @@ pub async fn ouvrir_projet(
     let fonds = Arc::clone(&fonds);
     tauri::async_runtime::spawn_blocking(move || projet_fichier::ouvrir(&chemin, &fonds))
         .await
-        .map_err(|erreur| ErreurMoteur::simple(format!("Ouverture interrompue : {erreur}")))?
+        .map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "Ouverture interrompue : {erreur}",
+                "Opening interrupted: {erreur}"
+            ))
+        })?
 }
 
 /// Retire un texte d'exemple d'un visuel PDF ; l'interface en fait un champ au même endroit.
@@ -533,5 +592,133 @@ pub async fn retirer_texte_pdf(
     let fonds = Arc::clone(&fonds);
     tauri::async_runtime::spawn_blocking(move || fonds.retirer_texte_pdf(&chemin, id))
         .await
-        .map_err(|erreur| ErreurMoteur::simple(format!("Traitement interrompu : {erreur}")))?
+        .map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "Traitement interrompu : {erreur}",
+                "Processing interrupted: {erreur}"
+            ))
+        })?
+}
+
+/// Empreinte du modèle tel qu'il s'imprime (mise à jour incrémentale : s'il change, toutes les cartes
+/// sont à refaire).
+#[tauri::command]
+pub async fn empreinte_modele(
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+) -> Result<String, ErreurMoteur> {
+    let fichiers = fonds.fichiers();
+    tauri::async_runtime::spawn_blocking(move || cartes::empreinte_modele(&modele, &fichiers))
+        .await
+        .map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "Calcul interrompu : {erreur}",
+                "Calculation interrupted: {erreur}"
+            ))
+        })
+}
+
+/// Dossier de données de l'application (registres des exports).
+fn dossier_donnees(app: &tauri::AppHandle) -> Result<std::path::PathBuf, ErreurMoteur> {
+    use tauri::Manager;
+    app.path().app_data_dir().map_err(|erreur| {
+        ErreurMoteur::simple(tr!(
+            "Dossier de données de l'application introuvable : {erreur}",
+            "The application data folder cannot be found: {erreur}"
+        ))
+    })
+}
+
+/// Registre des exports d'un modèle (empreintes seulement), s'il existe.
+#[tauri::command]
+pub async fn lire_registre(
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<Option<serde_json::Value>, ErreurMoteur> {
+    registres::lire(&dossier_donnees(&app)?, &id)
+}
+
+#[tauri::command]
+pub async fn ecrire_registre(
+    app: tauri::AppHandle,
+    id: String,
+    registre: serde_json::Value,
+) -> Result<(), ErreurMoteur> {
+    registres::ecrire(&dossier_donnees(&app)?, &id, &registre)
+}
+
+#[tauri::command]
+pub async fn oublier_registre(app: tauri::AppHandle, id: String) -> Result<(), ErreurMoteur> {
+    registres::oublier(&dossier_donnees(&app)?, &id)
+}
+
+/// Photos des agents (noms de fichiers ou chemins lus dans la liste), cherchées dans `dossier`,
+/// réduites et gardées en mémoire ; le visage de chacune est repéré sous Windows.
+#[tauri::command]
+pub async fn charger_photos(
+    fonds: State<'_, Arc<Fonds>>,
+    photos: State<'_, Arc<Photos>>,
+    dossier: String,
+    noms: Vec<String>,
+) -> Result<Vec<PhotoChargee>, ErreurMoteur> {
+    let fonds = Arc::clone(&fonds);
+    let photos = Arc::clone(&photos);
+    tauri::async_runtime::spawn_blocking(move || photos.charger(&fonds, &dossier, &noms))
+        .await
+        .map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "Chargement interrompu : {erreur}",
+                "Loading interrupted: {erreur}"
+            ))
+        })
+}
+
+/// Textes d'exemple incrustés dans le visuel du recto, lus par la reconnaissance de caractères de Windows.
+#[tauri::command]
+pub async fn reconnaitre_textes(
+    etat: State<'_, EtatMoteur>,
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+) -> Result<Vec<crate::ocr::TexteLu>, ErreurMoteur> {
+    let projet = Projet {
+        modele,
+        fonds: fonds.fichiers(),
+    };
+    executer(&etat, move |moteur| {
+        cartes::reconnaitre_textes(moteur, &projet)
+    })
+    .await
+}
+
+/// Effacement intelligent de zones du visuel du recto (une image) : la nouvelle image est gardée dans la
+/// réserve des fonds sous un nouveau chemin, l'ancienne reste disponible (annulation).
+#[tauri::command]
+pub async fn effacer_texte(
+    fonds: State<'_, Arc<Fonds>>,
+    modele: serde_json::Value,
+    zones: Vec<Zone>,
+    nom_fichier: String,
+) -> Result<FondImporte, ErreurMoteur> {
+    let fonds = Arc::clone(&fonds);
+    tauri::async_runtime::spawn_blocking(move || {
+        let projet = Projet {
+            modele,
+            fonds: fonds.fichiers(),
+        };
+        let (octets, extension) = cartes::effacer_texte(&projet, &zones)?;
+        fonds.ajouter(octets, extension, nom_fichier)
+    })
+    .await
+    .map_err(|erreur| {
+        ErreurMoteur::simple(tr!(
+            "Effacement interrompu : {erreur}",
+            "Erasing interrupted: {erreur}"
+        ))
+    })?
+}
+
+/// Langue de l'interface (« fr » ou « en ») : celle des messages du cœur et des documents produits.
+#[tauri::command]
+pub fn definir_langue(langue: String) {
+    crate::langue::definir(&langue);
 }

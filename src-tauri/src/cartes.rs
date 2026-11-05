@@ -8,10 +8,13 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 use typst::foundations::Bytes;
 
+use crate::effacement;
 use crate::fichiers::{self, FichierAEcrire};
 use crate::impression;
 use crate::moteur::{Document, ErreurMoteur, Fichiers, Moteur};
+use crate::ocr;
 use crate::qr::{self, CodeQr};
+use crate::tr;
 
 const GABARIT_CARTE: &str = include_str!("../gabarits/carte.typ");
 const MM_PAR_POINT: f64 = 25.4 / 72.0;
@@ -47,6 +50,24 @@ pub struct DonneesAgent {
     /// Nom de l'agent, pour le bon à tirer.
     #[serde(default)]
     pub libelle: Option<String>,
+    /// Rang de sa variante dans `modele.variantes.valeurs` ; aucune : les visuels du modèle.
+    #[serde(default)]
+    pub variante: Option<usize>,
+    /// Photo de chaque champ photo du modèle (par identifiant de champ), avec son recadrage.
+    #[serde(default)]
+    pub photos: HashMap<String, PhotoAgent>,
+}
+
+/// Photo d'un agent dans un cadre de la carte. Le recadrage vise un point de la photo (fractions
+/// depuis son coin haut-gauche), amené au centre du cadre ; un zoom de 1 couvre juste le cadre.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PhotoAgent {
+    pub chemin: String,
+    pub largeur_px: f64,
+    pub hauteur_px: f64,
+    pub centre_x: f64,
+    pub centre_y: f64,
+    pub zoom: f64,
 }
 
 /// Un agent tel que le lit le gabarit dans /agents.json.
@@ -57,6 +78,8 @@ struct AgentGabarit<'a> {
     qr: Option<CodeQr>,
     liens: &'a HashMap<String, String>,
     libelle: Option<&'a str>,
+    variante: Option<usize>,
+    photos: &'a HashMap<String, PhotoAgent>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -109,8 +132,73 @@ pub fn fichier_demo(chemin: &str) -> Option<Bytes> {
     FICHIERS_DEMO.get(chemin).cloned()
 }
 
+/// Empreinte du modèle tel qu'il s'imprime, pour la mise à jour incrémentale : format, champs, mises
+/// en forme et contenu des visuels (leur chemin virtuel change à chaque ouverture du projet). Le nom,
+/// l'identifiant, le verrou et le calque de référence (jamais imprimé) n'y entrent pas.
+pub fn empreinte_modele(modele: &serde_json::Value, fonds: &Fichiers) -> String {
+    use serde_json::Value;
+    fn canonique(valeur: &Value, fonds: &Fichiers, sortie: &mut String) {
+        match valeur {
+            Value::String(texte) => {
+                let contenu = fonds
+                    .get(texte.as_str())
+                    .cloned()
+                    .or_else(|| fichier_demo(texte));
+                match contenu {
+                    Some(octets) => sortie.push_str(&format!(
+                        "\"#{:016x}\"",
+                        crate::registres::fnv1a(&octets[..])
+                    )),
+                    None => sortie.push_str(&valeur.to_string()),
+                }
+            }
+            Value::Array(elements) => {
+                sortie.push('[');
+                for (i, element) in elements.iter().enumerate() {
+                    if i > 0 {
+                        sortie.push(',');
+                    }
+                    canonique(element, fonds, sortie);
+                }
+                sortie.push(']');
+            }
+            // Clés triées : l'ordre dans lequel l'interface a construit l'objet ne compte pas.
+            Value::Object(objet) => {
+                let mut cles: Vec<&String> = objet.keys().collect();
+                cles.sort();
+                sortie.push('{');
+                for (i, cle) in cles.into_iter().enumerate() {
+                    if i > 0 {
+                        sortie.push(',');
+                    }
+                    sortie.push_str(&Value::String(cle.clone()).to_string());
+                    sortie.push(':');
+                    canonique(&objet[cle], fonds, sortie);
+                }
+                sortie.push('}');
+            }
+            autre => sortie.push_str(&autre.to_string()),
+        }
+    }
+    let mut modele = modele.clone();
+    if let Some(objet) = modele.as_object_mut() {
+        for cle in [
+            "nom",
+            "id",
+            "verrouille",
+            "fond_calque",
+            "fond_calque_avec_fond_perdu",
+        ] {
+            objet.remove(cle);
+        }
+    }
+    let mut texte = String::new();
+    canonique(&modele, fonds, &mut texte);
+    format!("{:016x}", crate::registres::fnv1a(texte.as_bytes()))
+}
+
 /// Zone de la carte finie, en mm depuis son coin haut-gauche.
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub struct Zone {
     pub x_mm: f64,
     pub y_mm: f64,
@@ -137,6 +225,8 @@ pub fn couleur_autour(
         vcard: None,
         liens: HashMap::new(),
         libelle: None,
+        variante: None,
+        photos: HashMap::new(),
     };
     const PIXELS_PAR_POINT: f64 = 3.0;
     let entrees = [("mode", "apercu"), ("agent", "0"), ("face", "recto")];
@@ -186,6 +276,153 @@ pub fn couleur_autour(
     ))
 }
 
+/// Rendu RVBA du visuel du recto seul (sans les informations, mais avec les zones effacées) : largeur,
+/// hauteur et pixels de la carte finie.
+fn rendre_visuel(
+    moteur: &Moteur,
+    projet: &Projet,
+    pixels_par_point: f64,
+) -> Result<(u32, u32, Vec<u8>), ErreurMoteur> {
+    let mut visuel_seul = projet.modele.clone();
+    let masques: Vec<serde_json::Value> = projet.modele["champs"]
+        .as_array()
+        .map(|champs| {
+            champs
+                .iter()
+                .filter(|c| c["type"] == "masque")
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default();
+    visuel_seul["champs"] = serde_json::Value::Array(masques);
+    let projet = Projet {
+        modele: visuel_seul,
+        fonds: projet.fonds.clone(),
+    };
+    let agent = DonneesAgent {
+        id: "visuel".into(),
+        valeurs: HashMap::new(),
+        vcard: None,
+        liens: HashMap::new(),
+        libelle: None,
+        variante: None,
+        photos: HashMap::new(),
+    };
+    let entrees = [("mode", "apercu"), ("agent", "0"), ("face", "recto")];
+    compiler(moteur, &projet, std::slice::from_ref(&agent), &entrees)?.pixels(0, pixels_par_point)
+}
+
+/// Textes d'exemple incrustés dans le visuel du recto, lus par la reconnaissance de caractères de
+/// Windows sur son rendu (environ 2 400 pixels de large) ; positions en mm de la carte finie.
+pub fn reconnaitre_textes(
+    moteur: &Moteur,
+    projet: &Projet,
+) -> Result<Vec<ocr::TexteLu>, ErreurMoteur> {
+    let largeur_pt = projet.modele["format"]["largeur_mm"]
+        .as_f64()
+        .unwrap_or(85.0)
+        / MM_PAR_POINT;
+    let pixels_par_point = (2400.0 / largeur_pt).clamp(1.0, 8.0);
+    let (largeur, hauteur, rvba) = rendre_visuel(moteur, projet, pixels_par_point)?;
+    ocr::reconnaitre(&rvba, largeur, hauteur, pixels_par_point / MM_PAR_POINT)
+        .map_err(ErreurMoteur::simple)
+}
+
+/// Effacement intelligent de zones (mm de la carte finie) du visuel du recto, quand c'est une image :
+/// renvoie la nouvelle image (même format) et son extension. Le texte est repeint à partir du fond qui
+/// l'entoure ; le reste de l'image est intact.
+pub fn effacer_texte(
+    projet: &Projet,
+    zones: &[Zone],
+) -> Result<(Vec<u8>, &'static str), ErreurMoteur> {
+    use image::{DynamicImage, ImageDecoder, ImageReader};
+    let chemin = projet.modele["fond_recto"].as_str().unwrap_or_default();
+    let extension = chemin.rsplit('.').next().unwrap_or_default().to_lowercase();
+    let png = extension == "png";
+    if !png && extension != "jpg" && extension != "jpeg" {
+        return Err(ErreurMoteur::simple(tr!(
+            "L'effacement intelligent ne s'applique qu'aux visuels en image (PNG, JPG).",
+            "Smart erase only applies to image designs (PNG, JPG)."
+        )));
+    }
+    let octets = projet.fonds.get(chemin).cloned().ok_or_else(|| {
+        ErreurMoteur::simple(tr!("Visuel inconnu : {chemin}", "Unknown design: {chemin}"))
+    })?;
+    let illisible = |erreur: &dyn std::fmt::Display| {
+        ErreurMoteur::simple(tr!(
+            "Image du visuel illisible : {erreur}",
+            "The design image cannot be read: {erreur}"
+        ))
+    };
+    let mut decodeur = ImageReader::new(std::io::Cursor::new(&octets[..]))
+        .with_guessed_format()
+        .map_err(|e| illisible(&e))?
+        .into_decoder()
+        .map_err(|e| illisible(&e))?;
+    let orientation = decodeur
+        .orientation()
+        .unwrap_or(image::metadata::Orientation::NoTransforms);
+    let mut image = DynamicImage::from_decoder(decodeur).map_err(|e| illisible(&e))?;
+    image.apply_orientation(orientation);
+    let mut rvba = image.to_rgba8();
+    let (largeur_px, hauteur_px) = (f64::from(rvba.width()), f64::from(rvba.height()));
+
+    // Pose du visuel, comme dans le gabarit : il couvre (« cover », centré) la carte avec son fond perdu,
+    // ou la carte finie s'il est au format fini.
+    let format = &projet.modele["format"];
+    let mesure = |cle: &str| format[cle].as_f64().unwrap_or(0.0);
+    let (largeur, hauteur, fond_perdu) = (
+        mesure("largeur_mm"),
+        mesure("hauteur_mm"),
+        mesure("fond_perdu_mm"),
+    );
+    let avec_fond_perdu = projet.modele["fond_recto_avec_fond_perdu"]
+        .as_bool()
+        .unwrap_or(true);
+    let (zone_l, zone_h, origine) = if avec_fond_perdu {
+        (
+            largeur + 2.0 * fond_perdu,
+            hauteur + 2.0 * fond_perdu,
+            -fond_perdu,
+        )
+    } else {
+        (largeur, hauteur, 0.0)
+    };
+    let mm_par_px = (zone_l / largeur_px).max(zone_h / hauteur_px);
+    let gauche = (zone_l - largeur_px * mm_par_px) / 2.0 + origine;
+    let haut = (zone_h - hauteur_px * mm_par_px) / 2.0 + origine;
+    let rectangles: Vec<effacement::Rectangle> = zones
+        .iter()
+        .map(|zone| {
+            let px = |mm: f64, debut: f64, max: f64| ((mm - debut) / mm_par_px).clamp(0.0, max);
+            effacement::Rectangle {
+                x0: (px(zone.x_mm, gauche, largeur_px) - 1.0).max(0.0).floor() as u32,
+                y0: (px(zone.y_mm, haut, hauteur_px) - 1.0).max(0.0).floor() as u32,
+                x1: (px(zone.x_mm + zone.largeur_mm, gauche, largeur_px) + 1.0).ceil() as u32,
+                y1: (px(zone.y_mm + zone.hauteur_mm, haut, hauteur_px) + 1.0).ceil() as u32,
+            }
+        })
+        .collect();
+    effacement::effacer(&mut rvba, &rectangles);
+
+    let mut sortie = Vec::new();
+    let image = DynamicImage::ImageRgba8(rvba);
+    if png {
+        image
+            .write_to(
+                &mut std::io::Cursor::new(&mut sortie),
+                image::ImageFormat::Png,
+            )
+            .map_err(|e| illisible(&e))?;
+        Ok((sortie, "png"))
+    } else {
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut sortie, 95)
+            .encode_image(&image.to_rgb8())
+            .map_err(|e| illisible(&e))?;
+        Ok((sortie, "jpg"))
+    }
+}
+
 /// Le modèle décrit par l'interface et les visuels importés auxquels il fait référence.
 pub struct Projet {
     pub modele: serde_json::Value,
@@ -216,7 +453,10 @@ pub fn exporter(
     feuille: Feuille,
 ) -> Result<Vec<u8>, ErreurMoteur> {
     if agents.is_empty() {
-        return Err(ErreurMoteur::simple("La liste ne contient aucun agent."));
+        return Err(ErreurMoteur::simple(tr!(
+            "La liste ne contient aucun agent.",
+            "The list contains no one."
+        )));
     }
     let mode = match sortie {
         Sortie::Cartes => "cartes",
@@ -292,14 +532,34 @@ fn jpeg(
     let mut sortie = Vec::new();
     image::codecs::jpeg::JpegEncoder::new_with_quality(&mut sortie, qualite)
         .encode(&rvb, largeur, hauteur, image::ExtendedColorType::Rgb8)
-        .map_err(|erreur| ErreurMoteur::simple(format!("Image JPEG impossible : {erreur}")))?;
+        .map_err(|erreur| {
+            ErreurMoteur::simple(tr!(
+                "Image JPEG impossible : {erreur}",
+                "JPEG image failed: {erreur}"
+            ))
+        })?;
     Ok(sortie)
 }
 
+/// Les cartes ont un verso si le modèle ou l'une de ses variantes en a un (un agent sans verso
+/// reçoit alors un verso blanc).
 fn avec_verso(projet: &Projet) -> bool {
-    projet.modele["fond_verso"]
+    let verso = |valeur: &serde_json::Value| {
+        valeur["fond_verso"]
+            .as_str()
+            .is_some_and(|chemin| !chemin.is_empty())
+    };
+    verso(&projet.modele)
+        || projet.modele["variantes"]["valeurs"]
+            .as_array()
+            .is_some_and(|valeurs| valeurs.iter().any(verso))
+}
+
+/// Nom d'une variante du modèle (« Douala »), pour nommer son verso.
+fn nom_variante(projet: &Projet, rang: usize) -> Option<String> {
+    projet.modele["variantes"]["valeurs"][rang]["valeur"]
         .as_str()
-        .is_some_and(|chemin| !chemin.is_empty())
+        .map(str::to_owned)
 }
 
 /// Cartes numériques, dans un nouveau dossier dont le chemin est renvoyé : une image PNG ou JPG
@@ -318,7 +578,10 @@ pub fn exporter_numerique(
     sous_dossier: &str,
 ) -> Result<String, ErreurMoteur> {
     if agents.is_empty() || noms.len() != agents.len() {
-        return Err(ErreurMoteur::simple("La liste ne contient aucun agent."));
+        return Err(ErreurMoteur::simple(tr!(
+            "La liste ne contient aucun agent.",
+            "The list contains no one."
+        )));
     }
     let verso = options.verso && avec_verso(projet);
     let fichier = |nom: String, octets: Vec<u8>| FichierAEcrire {
@@ -365,8 +628,28 @@ pub fn exporter_numerique(
                 ("face", "verso"),
                 profil,
             ];
-            let document = compiler(moteur, projet, &agents[..1], &entrees)?;
-            fichiers.push(fichier(format!("_Verso.{extension}"), image(&document, 0)?));
+            // Le verso est le même pour tous les agents d'une variante : un fichier par variante.
+            let mut variantes: Vec<Option<usize>> = Vec::new();
+            for agent in agents {
+                if !variantes.contains(&agent.variante) {
+                    variantes.push(agent.variante);
+                }
+            }
+            for variante in variantes {
+                let agent = agents
+                    .iter()
+                    .find(|agent| agent.variante == variante)
+                    .expect("variante d'un agent");
+                let document = compiler(moteur, projet, std::slice::from_ref(agent), &entrees)?;
+                let nom = match variante.and_then(|rang| nom_variante(projet, rang)) {
+                    Some(variante) => format!(
+                        "_Verso - {}",
+                        fichiers::nom_sur(&variante).unwrap_or_default()
+                    ),
+                    None => "_Verso".to_string(),
+                };
+                fichiers.push(fichier(format!("{nom}.{extension}"), image(&document, 0)?));
+            }
         }
     }
     for (fiche, nom) in fiches.iter().zip(noms) {
@@ -390,7 +673,10 @@ pub fn bon_a_tirer(
     date: &str,
 ) -> Result<Vec<u8>, ErreurMoteur> {
     if agents.is_empty() {
-        return Err(ErreurMoteur::simple("Aucune carte à faire valider."));
+        return Err(ErreurMoteur::simple(tr!(
+            "Aucune carte à faire valider.",
+            "No card to approve."
+        )));
     }
     let entrees = [("mode", "bat"), ("titre", titre), ("date", date)];
     compiler(moteur, projet, agents, &entrees)?.pdf()
@@ -406,7 +692,10 @@ pub fn imprimer(
     reglages: impression::Reglages,
 ) -> Result<bool, ErreurMoteur> {
     if agents.is_empty() {
-        return Err(ErreurMoteur::simple("Aucune carte à imprimer."));
+        return Err(ErreurMoteur::simple(tr!(
+            "Aucune carte à imprimer.",
+            "No card to print."
+        )));
     }
     let document = compiler(moteur, projet, agents, &[("mode", "cartes")])?;
     let faces = impression::faces(agents.len(), avec_verso(projet), reglages);
@@ -447,18 +736,29 @@ fn compiler(
                 qr: vcard.map(qr::encoder).transpose()?,
                 liens: &agent.liens,
                 libelle: agent.libelle.as_deref(),
+                variante: agent.variante,
+                photos: &agent.photos,
             })
         })
         .collect::<Result<Vec<_>, ErreurMoteur>>()?;
-    let illisible =
-        |erreur: serde_json::Error| ErreurMoteur::simple(format!("Données illisibles : {erreur}"));
+    let illisible = |erreur: serde_json::Error| {
+        ErreurMoteur::simple(tr!(
+            "Données illisibles : {erreur}",
+            "Unreadable data: {erreur}"
+        ))
+    };
     let mut fichiers = FICHIERS_DEMO.clone();
     fichiers.extend(projet.fonds.iter().map(|(c, o)| (c.clone(), o.clone())));
     let modele = serde_json::to_vec(&projet.modele).map_err(illisible)?;
     fichiers.insert("/projet.json".into(), Bytes::new(modele));
     let agents = serde_json::to_vec(&agents).map_err(illisible)?;
     fichiers.insert("/agents.json".into(), Bytes::new(agents));
-    moteur.compiler(GABARIT_CARTE, &fichiers, entrees)
+    // Textes du bon à tirer et des planches dans la langue de l'interface (sauf langue imposée).
+    let mut entrees = entrees.to_vec();
+    if !entrees.iter().any(|(cle, _)| *cle == "langue") {
+        entrees.push(("langue", crate::langue::code()));
+    }
+    moteur.compiler(GABARIT_CARTE, &fichiers, &entrees)
 }
 
 #[cfg(test)]
@@ -483,6 +783,8 @@ mod tests {
                 .then(|| "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Aïssatou DIALLO\r\nEND:VCARD".into()),
             liens: HashMap::new(),
             libelle: None,
+            variante: None,
+            photos: HashMap::new(),
         }
     }
 
@@ -692,7 +994,29 @@ mod tests {
         assert_eq!(document.get_pages().len(), 2);
         let texte = document.extract_text(&[1]).unwrap();
         assert!(texte.contains("Aïssatou DIALLO") && texte.contains("Cartes 2026"));
+        assert!(texte.contains("BON") && texte.contains("Bon pour accord"));
         assert!(bon_a_tirer(&moteur, &projet_demo(), &[], "", "").is_err());
+
+        // En anglais (langue imposée au gabarit : la langue du cœur reste celle des autres tests).
+        let entrees = [
+            ("mode", "bat"),
+            ("titre", "Cards 2026"),
+            ("date", "4 November 2026"),
+            ("langue", "en"),
+        ];
+        let pdf = compiler(&moteur, &projet_demo(), &agents, &entrees)
+            .unwrap()
+            .pdf()
+            .unwrap();
+        let texte = lopdf::Document::load_mem(&pdf)
+            .unwrap()
+            .extract_text(&[1])
+            .unwrap();
+        assert!(
+            texte.contains("PROOF") && texte.contains("Approved after corrections"),
+            "{texte}"
+        );
+        assert!(!texte.contains("Bon pour accord"));
     }
 
     #[test]
@@ -822,5 +1146,263 @@ mod tests {
         }))
         .unwrap();
         assert!(agent.vcard.is_none());
+    }
+
+    /// Mise à jour incrémentale : un projet rouvert (visuels sous d'autres chemins virtuels, clés dans
+    /// un autre ordre) garde l'empreinte de son modèle ; un autre visuel ou un champ déplacé la change.
+    #[test]
+    fn empreinte_du_modele_independante_des_chemins_virtuels() {
+        let projet = projet_importe();
+        let empreinte = empreinte_modele(&projet.modele, &projet.fonds);
+        assert_eq!(empreinte.len(), 16);
+        let mut rouvert = serde_json::json!({ "champs": projet.modele["champs"].clone() });
+        for (cle, valeur) in projet.modele.as_object().unwrap().iter().rev() {
+            rouvert[cle] = valeur.clone();
+        }
+        rouvert["fond_recto"] = "/fonds/7.png".into();
+        rouvert["nom"] = "Autre nom".into();
+        rouvert["verrouille"] = true.into();
+        let meme_visuel = Fichiers::from([(
+            "/fonds/7.png".to_string(),
+            projet.fonds["/fonds/1.png"].clone(),
+        )]);
+        assert_eq!(empreinte_modele(&rouvert, &meme_visuel), empreinte);
+
+        let autre_visuel = Fichiers::from([(
+            "/fonds/7.png".to_string(),
+            Bytes::new(&include_bytes!("../icons/32x32.png")[..]),
+        )]);
+        assert_ne!(empreinte_modele(&rouvert, &autre_visuel), empreinte);
+        let mut deplace = projet.modele.clone();
+        deplace["champs"][0]["x_mm"] = 7.into();
+        assert_ne!(empreinte_modele(&deplace, &projet.fonds), empreinte);
+    }
+
+    /// Image PNG unie, pour reconnaître un visuel ou une photo à la couleur d'un pixel.
+    fn uni(largeur: u32, hauteur: u32, (r, v, b): (u8, u8, u8)) -> Bytes {
+        let mut image = tiny_skia::Pixmap::new(largeur, hauteur).unwrap();
+        image.fill(tiny_skia::Color::from_rgba8(r, v, b, 255));
+        Bytes::new(image.encode_png().unwrap())
+    }
+
+    /// Couleur d'un pixel (à `x_mm`, `y_mm` de la carte finie) de la page `page` d'un document.
+    fn couleur(document: &Document, page: usize, x_mm: f64, y_mm: f64) -> (u8, u8, u8) {
+        let pixels_par_point = 2.0;
+        let (largeur, _, rvba) = document.pixels(page, pixels_par_point).unwrap();
+        let px = |mm: f64| (mm / MM_PAR_POINT * pixels_par_point) as u32;
+        let i = ((px(y_mm) * largeur + px(x_mm)) * 4) as usize;
+        (rvba[i], rvba[i + 1], rvba[i + 2])
+    }
+
+    const BLEU: (u8, u8, u8) = (0, 0, 255);
+    const ROUGE: (u8, u8, u8) = (255, 0, 0);
+    const VERT: (u8, u8, u8) = (0, 160, 0);
+
+    /// Modèle aux visuels unis : bleu pour le modèle, rouge pour la variante « Douala » (recto et verso).
+    fn projet_a_variantes() -> Projet {
+        let mut projet = projet_importe();
+        projet
+            .fonds
+            .insert("/fonds/1.png".into(), uni(85, 55, BLEU));
+        projet
+            .fonds
+            .insert("/fonds/2.png".into(), uni(85, 55, ROUGE));
+        projet
+            .fonds
+            .insert("/fonds/3.png".into(), uni(85, 55, VERT));
+        projet.modele["fond_recto_avec_fond_perdu"] = false.into();
+        projet.modele["variantes"] = serde_json::json!({ "balise": "Filiale", "valeurs": [
+            { "id": "v1", "valeur": "Douala", "fond_recto": "/fonds/2.png", "fond_recto_avec_fond_perdu": false,
+              "fond_verso": "/fonds/3.png", "fond_verso_avec_fond_perdu": false },
+            { "id": "v2", "valeur": "Abidjan" },
+        ] });
+        projet
+    }
+
+    /// Variantes : chaque agent a le recto et le verso de sa variante ; sans variante (ou pour une
+    /// variante sans visuel), ceux du modèle ; un verso blanc quand le modèle n'en a pas.
+    #[test]
+    fn chaque_agent_a_les_visuels_de_sa_variante() {
+        let moteur = Moteur::nouveau();
+        let projet = projet_a_variantes();
+        let mut douala = agent(0, false);
+        douala.variante = Some(0);
+        let mut abidjan = agent(1, false);
+        abidjan.variante = Some(1);
+        let agents = [douala, abidjan, agent(2, false)];
+        let cartes = compiler(&moteur, &projet, &agents, &[("mode", "cartes")]).unwrap();
+        // Un verso pour chaque carte, puisqu'une variante en a un.
+        assert_eq!(cartes.nb_pages(), 6);
+        let coin = |page| couleur(&cartes, page, 1.0, 1.0);
+        assert_eq!(coin(0), ROUGE);
+        assert_eq!(coin(1), VERT);
+        assert_eq!(coin(2), BLEU);
+        assert_eq!(coin(3), (255, 255, 255));
+        assert_eq!(coin(4), BLEU);
+        assert!(avec_verso(&projet));
+        assert!(!avec_verso(&projet_importe()));
+    }
+
+    /// Cartes numériques : le verso, le même pour les agents d'une variante, est fourni une fois par variante.
+    #[test]
+    fn cartes_numeriques_un_verso_par_variante() {
+        let moteur = Moteur::nouveau();
+        let mut projet = projet_a_variantes();
+        projet.modele["fond_verso"] = "/fonds/1.png".into();
+        let mut douala = agent(0, false);
+        douala.variante = Some(0);
+        let agents = [douala, agent(1, false), agent(2, false)];
+        let noms = ["A", "B", "C"].map(String::from);
+        let dossier = std::env::temp_dir()
+            .join("automat-process-tests")
+            .join("numerique-variantes");
+        let _ = std::fs::remove_dir_all(&dossier);
+        let options = OptionsNumerique {
+            format: FormatNumerique::Png,
+            largeur_px: 300,
+            verso: true,
+        };
+        let cree = exporter_numerique(
+            &moteur,
+            &projet,
+            &agents,
+            &noms,
+            &[],
+            options,
+            dossier.to_str().unwrap(),
+            "png",
+        )
+        .unwrap();
+        let cree = std::path::Path::new(&cree);
+        assert!(cree.join("_Verso.png").exists());
+        assert!(cree.join("_Verso - Douala.png").exists());
+        assert_eq!(std::fs::read_dir(cree).unwrap().count(), 5);
+    }
+
+    /// Photos : la photo couvre son cadre (recadrée, jamais déformée), sous les textes ; un agent sans
+    /// photo garde le visuel à cet endroit.
+    #[test]
+    fn photo_recadree_dans_son_cadre() {
+        let moteur = Moteur::nouveau();
+        let mut projet = projet_a_variantes();
+        projet.modele["variantes"] = serde_json::Value::Null;
+        // Photo en paysage (rouge à gauche, vert à droite) dans un cadre carré de 20 mm, rond.
+        let mut image = tiny_skia::Pixmap::new(200, 100).unwrap();
+        image.fill(tiny_skia::Color::from_rgba8(255, 0, 0, 255));
+        let vert = tiny_skia::Paint {
+            shader: tiny_skia::Shader::SolidColor(tiny_skia::Color::from_rgba8(0, 160, 0, 255)),
+            ..Default::default()
+        };
+        image.fill_rect(
+            tiny_skia::Rect::from_xywh(100.0, 0.0, 100.0, 100.0).unwrap(),
+            &vert,
+            tiny_skia::Transform::identity(),
+            None,
+        );
+        projet.fonds.insert(
+            "/photos/9.png".into(),
+            Bytes::new(image.encode_png().unwrap()),
+        );
+        projet.modele["champs"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": "p1", "type": "photo", "x_mm": 50, "y_mm": 10, "largeur_mm": 20, "hauteur_mm": 20,
+                "balise": "Photo", "forme": "cercle"
+            }));
+        let photo = |centre_x| PhotoAgent {
+            chemin: "/photos/9.png".into(),
+            largeur_px: 200.0,
+            hauteur_px: 100.0,
+            centre_x,
+            centre_y: 0.5,
+            zoom: 1.0,
+        };
+        let mut a_gauche = agent(0, false);
+        a_gauche.photos.insert("p1".into(), photo(0.0));
+        let mut a_droite = agent(1, false);
+        a_droite.photos.insert("p1".into(), photo(0.8));
+        let agents = [a_gauche, a_droite, agent(2, false)];
+        let cartes = compiler(&moteur, &projet, &agents, &[("mode", "mosaique")]).unwrap();
+        // Centre du cadre : la moitié gauche (rouge) visée, puis la droite (verte) ; sans photo, le visuel.
+        assert_eq!(couleur(&cartes, 0, 60.0, 20.0), ROUGE);
+        assert_eq!(couleur(&cartes, 1, 60.0, 20.0), VERT);
+        assert_eq!(couleur(&cartes, 2, 60.0, 20.0), BLEU);
+        // Cadre rond : son coin reste le visuel.
+        assert_eq!(couleur(&cartes, 0, 50.5, 10.5), BLEU);
+        // Hors du cadre, le visuel.
+        assert_eq!(couleur(&cartes, 0, 75.0, 20.0), BLEU);
+    }
+
+    /// Reconnaissance de caractères (Windows) : « EXEMPLE SA » du visuel de démonstration (SVG : Arial
+    /// gras 9 pt, bleu nuit, en x = 54 pt, ligne de base à 40,3 pt, fond perdu de 3 mm) est lu à sa
+    /// place, à sa taille et dans sa couleur. Sans le module de langue de Windows, le test s'arrête là.
+    #[cfg(windows)]
+    #[test]
+    fn lit_les_textes_du_visuel_de_demonstration() {
+        let moteur = Moteur::nouveau();
+        let textes = match reconnaitre_textes(&moteur, &projet_demo()) {
+            Ok(textes) => textes,
+            Err(erreur) => {
+                eprintln!(
+                    "Reconnaissance de caractères indisponible : {}",
+                    erreur.message
+                );
+                return;
+            }
+        };
+        let lu = textes
+            .iter()
+            .find(|t| t.texte.to_uppercase().contains("EXEMPLE SA"))
+            .unwrap_or_else(|| panic!("« EXEMPLE SA » non lu : {textes:?}"));
+        let mm = |pt: f64| pt * MM_PAR_POINT - 3.0;
+        assert!((lu.x_mm - mm(54.0)).abs() < 1.0, "{lu:?}");
+        assert!((lu.y_mm - mm(40.3)).abs() < 0.8, "{lu:?}");
+        assert!((lu.taille_pt - 9.0).abs() < 1.0, "{lu:?}");
+        let canal = |i: usize| i64::from_str_radix(&lu.couleur[i..i + 2], 16).unwrap();
+        let attendu = [0x1d, 0x35, 0x57];
+        assert!(
+            (0..3).all(|c| (canal(1 + 2 * c) - attendu[c]).abs() < 30),
+            "{lu:?}"
+        );
+        assert!(
+            lu.zone.largeur_mm > 15.0 && lu.zone.hauteur_mm > 2.0,
+            "{lu:?}"
+        );
+    }
+
+    /// Effacement intelligent d'un texte dans un visuel en image : seul le texte est repeint ; un
+    /// visuel vectoriel est refusé (il garde l'aplat de couleur).
+    #[test]
+    fn efface_un_texte_d_un_visuel_en_image() {
+        // Visuel au format fini (85 × 55 mm à 10 px par mm), bleu nuit, avec un « texte » blanc.
+        let mut image = tiny_skia::Pixmap::new(850, 550).unwrap();
+        image.fill(tiny_skia::Color::from_rgba8(29, 53, 87, 255));
+        let blanc = tiny_skia::Paint {
+            shader: tiny_skia::Shader::SolidColor(tiny_skia::Color::WHITE),
+            ..Default::default()
+        };
+        for x in (200..400).step_by(14) {
+            let trait_ = tiny_skia::Rect::from_xywh(x as f32, 290.0, 6.0, 22.0).unwrap();
+            image.fill_rect(trait_, &blanc, tiny_skia::Transform::identity(), None);
+        }
+        let mut projet = projet_importe();
+        projet.fonds.insert(
+            "/fonds/1.png".into(),
+            Bytes::new(image.encode_png().unwrap()),
+        );
+        projet.modele["fond_recto_avec_fond_perdu"] = false.into();
+        let zone = Zone {
+            x_mm: 19.0,
+            y_mm: 28.0,
+            largeur_mm: 22.0,
+            hauteur_mm: 4.0,
+        };
+        let (octets, extension) = effacer_texte(&projet, &[zone]).unwrap();
+        assert_eq!(extension, "png");
+        let efface = image::load_from_memory(&octets).unwrap().to_rgba8();
+        assert_eq!(efface.dimensions(), (850, 550));
+        assert!(efface.pixels().all(|p| p.0 == [29, 53, 87, 255]));
+        assert!(effacer_texte(&projet_demo(), &[zone]).is_err());
     }
 }

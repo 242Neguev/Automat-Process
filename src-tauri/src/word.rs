@@ -11,6 +11,7 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 use crate::fichiers;
 use crate::moteur::ErreurMoteur;
+use crate::tr;
 
 /// Parties lues dans le modèle : celles qui portent du texte, les réglages, les relations (liens) et
 /// la liste des types de contenu (un modèle .dotx devient un document ordinaire).
@@ -25,7 +26,10 @@ fn a_lire(chemin: &str) -> bool {
 }
 
 fn illisible(_: impl std::fmt::Display) -> ErreurMoteur {
-    ErreurMoteur::simple("Ce fichier n'est pas un document Word (.docx) lisible.")
+    ErreurMoteur::simple(tr!(
+        "Ce fichier n'est pas un document Word (.docx) lisible.",
+        "This file is not a readable Word document (.docx)."
+    ))
 }
 
 /// Parties XML à remplir d'un modèle Word.
@@ -62,7 +66,10 @@ pub fn ecrire(
     dossier: &Path,
 ) -> Result<Vec<PathBuf>, ErreurMoteur> {
     let echec = |erreur: &dyn std::fmt::Display| {
-        ErreurMoteur::simple(format!("Le courrier n'a pas pu être écrit : {erreur}"))
+        ErreurMoteur::simple(tr!(
+            "Le courrier n'a pas pu être écrit : {erreur}",
+            "The letter could not be written: {erreur}"
+        ))
     };
     std::fs::create_dir_all(dossier).map_err(|e| echec(&e))?;
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);

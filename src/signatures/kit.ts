@@ -3,6 +3,7 @@
 // classique (fichiers dans %APPDATA%\Microsoft\Signatures, signature par défaut).
 import { nomsUniques } from "../donnees/noms";
 import type { FichierAEcrire } from "../moteur";
+import { textes } from "../textes";
 import { echapper } from "./html";
 import scriptInstallation from "./kit/installer.ps1?raw";
 
@@ -16,8 +17,9 @@ export interface AgentKit {
 const BOM = "﻿";
 const crlf = (texte: string) => texte.replace(/\r?\n/g, "\r\n");
 
+const t = textes.kit;
 const LANCEUR = crlf(`@echo off
-rem Installe votre signature e-mail dans Outlook (Windows).
+rem ${t.remLanceur}
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer.ps1"
 echo.
 pause
@@ -62,31 +64,13 @@ export function extraireImages(html: string, prefixe: string): { html: string; i
 const pageOutlook = (nom: string, html: string) =>
   `<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>${echapper(nom)}</title></head><body>${html}</body></html>\r\n`;
 
-function lisezMoi(signature: string): string {
-  return `Kit Outlook : signature « ${signature} »
-
-Pour chaque agent (Outlook classique sous Windows)
-1. Fermez Outlook.
-2. Double-cliquez sur « Installer ma signature.cmd ».
-3. Confirmez votre nom, ou tapez votre numéro ou une partie de votre nom.
-4. Rouvrez Outlook : la signature est ajoutée aux nouveaux messages et aux réponses de votre
-   compte. Vous pouvez toujours en choisir une autre (Fichier > Options > Courrier > Signatures).
-
-Si Windows affiche « Windows a protégé votre ordinateur », cliquez sur « Informations
-complémentaires », puis sur « Exécuter quand même ».
-
-Pour le service informatique (installation sans question, par exemple au démarrage de session)
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer.ps1 -Choix prenom.nom@exemple.com
--Choix accepte aussi le numéro ou le nom de l'agent.
--Imposer verrouille la signature sur tous les comptes : l'agent ne peut plus la changer dans Outlook
-(relancer le kit sans -Imposer la déverrouille).
--SansRegistre installe seulement les fichiers de la signature, sans toucher aux réglages d'Outlook.
-
-Le nouvel Outlook, Outlook sur le web et Gmail gardent leurs signatures en ligne : pour eux, utilisez
-la page de signature de chaque agent (copier-coller).
-
-Kit créé avec Automat-Process, une solution Eau sèche.
-`;
+/**
+ * Script d'installation dans la langue du kit : le bloc de ses messages (entre « # --- Textes » et
+ * « # --- Fin des textes --- ») est remplacé par sa traduction, s'il y en a une.
+ */
+export function traduireScript(script: string, textesScript: string | null): string {
+  if (!textesScript) return script;
+  return script.replace(/(# --- Textes[^\n]*\n)[\s\S]*?(# --- Fin des textes ---)/, (_, debut: string, fin: string) => `${debut}${textesScript.replace(/\r?\n/g, "\n")}\n${fin}`);
 }
 
 /**
@@ -118,8 +102,8 @@ export function construireKit(nomSignature: string, agents: AgentKit[]): Fichier
     config.agents.push({ numero: i + 1, nom: agent.nom, email: agent.email, dossier });
   });
   fichiers.push({ nom: "kit.json", texte: JSON.stringify(config, null, 2) });
-  fichiers.push({ nom: "installer.ps1", texte: BOM + crlf(scriptInstallation.replace(/^﻿/, "")) });
-  fichiers.push({ nom: "Installer ma signature.cmd", texte: LANCEUR });
-  fichiers.push({ nom: "LISEZMOI.txt", texte: BOM + crlf(lisezMoi(signature)) });
+  fichiers.push({ nom: "installer.ps1", texte: BOM + crlf(traduireScript(scriptInstallation.replace(/^﻿/, ""), t.textesScript)) });
+  fichiers.push({ nom: t.lanceur, texte: LANCEUR });
+  fichiers.push({ nom: t.lisezMoi, texte: BOM + crlf(t.modeEmploi(signature)) });
   return fichiers;
 }

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Group, Stack, Stepper, Text, Title } from "@mantine/core";
-import { balisesDuModele, construireAgent, ficheContact, liensAgent, valeursDeLigne } from "../../donnees/agents";
+import { balisesDuModele, construireAgent, ficheContact, liensAgent, photosManquantes, valeursDeLigne } from "../../donnees/agents";
+import { quantitesDe } from "../../donnees/quantite";
+import { identites, nouvelIdentifiant } from "../../donnees/registre";
 import { FORMATS, FORMATS_ECRAN } from "../../modele/formats";
-import { EMPLACEMENTS, pourEnregistrer, preparerVisuel, type Visuels } from "../../modele/visuels";
+import { pourEnregistrer, preparerVisuel, type Emplacement, type Visuels } from "../../modele/visuels";
 import { famillesPolices, modeleDemo, type ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import EtapeListe from "../commun/EtapeListe";
@@ -14,13 +16,22 @@ import EtapeModele, { type Source } from "./EtapeModele";
 import EtapeVerification, { type Filtre } from "./EtapeVerification";
 import { libellesCartes } from "./libelles";
 import { useControle } from "./useControle";
+import { usePhotos } from "./usePhotos";
 
 const t = textes.cartes;
 
 /** Modèle vierge : carte de visite, ou fond d'écran pour les visuels numériques. */
 function modeleVierge(ecran: boolean): ModeleCarte {
   const { largeur_mm, hauteur_mm, fond_perdu_mm, px } = ecran ? FORMATS_ECRAN[0] : FORMATS[0];
-  return { nom: ecran ? textes.ecran.nomModele : t.modele.nomPerso, format: { largeur_mm, hauteur_mm, fond_perdu_mm, px }, fond_recto: null, fond_verso: null, transformations: {}, champs: [] };
+  return {
+    id: nouvelIdentifiant(),
+    nom: ecran ? textes.ecran.nomModele : t.modele.nomPerso,
+    format: { largeur_mm, hauteur_mm, fond_perdu_mm, px },
+    fond_recto: null,
+    fond_verso: null,
+    transformations: {},
+    champs: [],
+  };
 }
 
 /**
@@ -50,17 +61,24 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
     famillesPolices().then(setPolices, signalerErreur);
   }, []);
   useEffect(() => {
-    if (source === "demo" && !modeles.demo) modeleDemo().then((demo) => setModeles((m) => ({ ...m, demo })), signalerErreur);
+    if (source === "demo" && !modeles.demo) modeleDemo().then((demo) => setModeles((m) => ({ ...m, demo: { ...demo, id: "demo", nom: t.modele.nomDemo } })), signalerErreur);
   }, [source, modeles.demo]);
 
   const balises = useMemo(() => (modele ? balisesDuModele(modele) : []), [modele]);
   const donnees = useListe(balises);
   const { liste, correspondances } = donnees;
 
+  // Photos des agents (cadres photo du modèle) : chargées depuis le dossier choisi à l'étape Liste.
+  const photos = usePhotos(modele, liste, correspondances);
   const agents = useMemo(
-    () => (modele && liste ? liste.lignes.map((ligne) => construireAgent(modele, ligne, correspondances)) : []),
-    [modele, liste, correspondances],
+    () => (modele && liste ? liste.lignes.map((ligne) => construireAgent(modele, ligne, correspondances, photos.contexte)) : []),
+    [modele, liste, correspondances, photos.contexte],
   );
+  // Mise à jour incrémentale : identité de chaque agent d'une liste à la suivante (empreintes).
+  const cles = useMemo(() => (liste ? identites(liste.lignes, liste.colonnes) : []), [liste]);
+  // Nombre de cartes de chaque agent (colonne « Quantité »), pour les cartes imprimées seulement.
+  const colonneQuantite = ecran ? null : donnees.colonneQuantite;
+  const quantites = useMemo(() => (liste ? quantitesDe(liste.lignes, colonneQuantite) : []), [liste, colonneQuantite]);
   // Cartes numériques : liens cliquables et fiche contact, calculés seulement à l'étape Destination.
   const numeriques = useMemo(() => {
     if (etape < 3 || !modele || !liste) return [];
@@ -69,8 +87,13 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
       return { liens: liensAgent(modele, valeurs), fiche: ficheContact(modele, valeurs) };
     });
   }, [etape, modele, liste, correspondances]);
+  // Photos demandées par la liste mais introuvables (une fois le chargement fini) : signalées au contrôle.
+  const manquantes = useMemo(
+    () => (modele && liste && !photos.progression ? photosManquantes(modele, liste.lignes, correspondances, agents) : undefined),
+    [modele, liste, correspondances, agents, photos.progression],
+  );
   // Le contrôle des cartes sert à la vérification et à l'export.
-  const controle = useControle(modele, agents, etape >= 2);
+  const controle = useControle(modele, agents, etape >= 2, manquantes);
   const exemple = useMemo(
     () => (modele && liste?.lignes[0] ? valeursDeLigne(modele, liste.lignes[0], correspondances) : {}),
     [modele, liste, correspondances],
@@ -79,22 +102,26 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
   /** Enregistre le modèle, ses visuels et les correspondances (jamais les données des agents). */
   function enregistrer() {
     if (!modele) return;
-    const infos = Object.fromEntries(Object.entries(source === "perso" ? visuels : {}).map(([face, visuel]) => [face, pourEnregistrer(visuel)]));
-    return enregistrerSous(ecran ? "ecran" : "carte", modele.nom, modele, correspondances, infos);
+    const infos = Object.fromEntries(Object.entries(source === "perso" ? visuels : {}).flatMap(([face, visuel]) => (visuel ? [[face, pourEnregistrer(visuel)]] : [])));
+    // Avec les correspondances : le dossier des photos et leurs recadrages (jamais les photos elles-mêmes).
+    const reglages = photos.actives ? { "@photos": photos.aEnregistrer() } : {};
+    return enregistrerSous(ecran ? "ecran" : "carte", modele.nom, modele, { ...donnees.aEnregistrer(), ...reglages }, infos);
   }
 
   async function ouvrirFichierProjet() {
     const projet = await choisirProjet(ecran ? "ecran" : "carte");
     if (!projet) return;
     const modeleOuvert = projet.modele as ModeleCarte;
+    // Tous les visuels : ceux du modèle et ceux de ses variantes (« variante-v1-recto »…).
     const ouverts: Visuels = {};
-    for (const emplacement of EMPLACEMENTS) {
-      const fond = projet.visuels[emplacement];
-      if (fond) ouverts[emplacement] = preparerVisuel(fond, polices).visuel;
+    for (const [emplacement, fond] of Object.entries(projet.visuels)) {
+      if (fond) ouverts[emplacement as Emplacement] = preparerVisuel(fond, polices).visuel;
     }
     setModeles((m) => ({ ...m, perso: modeleOuvert }));
     setVisuels(ouverts);
     donnees.restaurer(projet.correspondances, balisesDuModele(modeleOuvert));
+    const reglagesPhotos = (projet.correspondances as Record<string, unknown>)["@photos"];
+    if (reglagesPhotos && typeof reglagesPhotos === "object") photos.restaurer(reglagesPhotos);
     setSource("perso");
     // Modèle verrouillé (mode opérateur) : on commence par la liste.
     setEtape(modeleOuvert.verrouille ? 1 : 0);
@@ -151,16 +178,30 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
             onExemple={donnees.utiliserExemple}
             onFeuille={donnees.setFeuille}
             onCorrespondance={donnees.relier}
+            quantite={ecran ? undefined : { colonne: donnees.colonneQuantite, onChange: donnees.choisirQuantite }}
+            photos={photos.actives ? photos : undefined}
           />
         </Stepper.Step>
         <Stepper.Step label={libelles.etapes.verification.titre} description={libelles.etapes.verification.description}>
-          {modele && <EtapeVerification modele={modele} agents={agents} controle={controle} filtre={filtre} onFiltre={setFiltre} />}
+          {modele && (
+            <EtapeVerification
+              modele={modele}
+              agents={agents}
+              controle={controle}
+              filtre={filtre}
+              onFiltre={setFiltre}
+              onRecadrer={photos.actives ? photos.recadrer : undefined}
+            />
+          )}
         </Stepper.Step>
         <Stepper.Step label={libelles.etapes.destination.titre} description={libelles.etapes.destination.description}>
           {modele && (
             <EtapeDestination
               modele={modele}
               agents={agents}
+              cles={cles}
+              quantites={quantites}
+              colonneQuantite={colonneQuantite}
               numeriques={numeriques}
               controle={controle}
               onVoirCartes={() => {

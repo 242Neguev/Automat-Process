@@ -12,6 +12,7 @@ use typst::foundations::Bytes;
 
 use crate::moteur::{ErreurMoteur, Fichiers};
 use crate::pdf_textes::{self, TextePdf};
+use crate::tr;
 
 const TAILLE_MAX: u64 = 50 * 1024 * 1024;
 const MM_PAR_POINT: f64 = 25.4 / 72.0;
@@ -74,10 +75,16 @@ impl Fonds {
             .unwrap_or_default();
         genre_de(&extension)?;
         let illisible = |erreur: std::io::Error| {
-            ErreurMoteur::simple(format!("Impossible de lire « {chemin_disque} » : {erreur}"))
+            ErreurMoteur::simple(tr!(
+                "Impossible de lire « {chemin_disque} » : {erreur}",
+                "Cannot read “{chemin_disque}”: {erreur}"
+            ))
         };
         if std::fs::metadata(chemin).map_err(illisible)?.len() > TAILLE_MAX {
-            return Err(ErreurMoteur::simple("Le visuel dépasse 50 Mo."));
+            return Err(ErreurMoteur::simple(tr!(
+                "Le visuel dépasse 50 Mo.",
+                "The design is larger than 50 MB."
+            )));
         }
         let octets = std::fs::read(chemin).map_err(illisible)?;
         let nom_fichier = chemin
@@ -126,9 +133,25 @@ impl Fonds {
         Ok(fond)
     }
 
+    /// Garde en mémoire la photo (JPEG) d'un agent ; renvoie son chemin virtuel (« /photos/3.jpg »).
+    pub fn ajouter_photo(&self, jpeg: Vec<u8>) -> String {
+        let numero = self.compteur.fetch_add(1, Ordering::Relaxed) + 1;
+        let chemin = format!("/photos/{numero}.jpg");
+        self.fichiers
+            .lock()
+            .expect("réserve des fonds")
+            .insert(chemin.clone(), Bytes::new(jpeg));
+        chemin
+    }
+
     /// Retire une ligne de texte d'un visuel PDF (texte d'exemple remplacé par un champ).
     pub fn retirer_texte_pdf(&self, chemin: &str, id: usize) -> Result<TexteRetire, ErreurMoteur> {
-        let inconnu = || ErreurMoteur::simple(format!("Visuel PDF inconnu : {chemin}"));
+        let inconnu = || {
+            ErreurMoteur::simple(tr!(
+                "Visuel PDF inconnu : {chemin}",
+                "Unknown PDF design: {chemin}"
+            ))
+        };
         let octets = self
             .contenu(chemin)
             .filter(|_| chemin.ends_with(".pdf"))
@@ -136,7 +159,12 @@ impl Fonds {
         let texte = pdf_textes::lister(&octets)?
             .into_iter()
             .find(|ligne| ligne.id == id)
-            .ok_or_else(|| ErreurMoteur::simple("Ce texte n'existe plus dans le visuel."))?;
+            .ok_or_else(|| {
+                ErreurMoteur::simple(tr!(
+                    "Ce texte n'existe plus dans le visuel.",
+                    "This text no longer exists in the design."
+                ))
+            })?;
         let nettoye = pdf_textes::retirer(&octets, &[id])?;
         let textes = pdf_textes::lister(&nettoye)?;
         self.fichiers
@@ -163,7 +191,10 @@ impl Fonds {
                 *contenu = Bytes::new(svg.into_bytes());
                 Ok(())
             }
-            _ => Err(ErreurMoteur::simple(format!("Visuel inconnu : {chemin}"))),
+            _ => Err(ErreurMoteur::simple(tr!(
+                "Visuel inconnu : {chemin}",
+                "Unknown design: {chemin}"
+            ))),
         }
     }
 
@@ -178,8 +209,9 @@ fn genre_de(extension: &str) -> Result<Genre, ErreurMoteur> {
         "svg" => Ok(Genre::Svg),
         "pdf" => Ok(Genre::Pdf),
         "png" | "jpg" | "jpeg" => Ok(Genre::Image),
-        _ => Err(ErreurMoteur::simple(format!(
-            "Format de visuel non pris en charge (.{extension}) : utilisez un PDF, un SVG, un PNG ou un JPG."
+        _ => Err(ErreurMoteur::simple(tr!(
+            "Format de visuel non pris en charge (.{extension}) : utilisez un PDF, un SVG, un PNG ou un JPG.",
+            "Unsupported design format (.{extension}): use a PDF, SVG, PNG or JPG."
         ))),
     }
 }
@@ -200,17 +232,27 @@ fn decrire(octets: &[u8], genre: Genre) -> Result<FondImporte, ErreurMoteur> {
     };
     match genre {
         Genre::Svg => {
-            let texte = String::from_utf8(octets.to_vec())
-                .map_err(|_| ErreurMoteur::simple("Ce SVG n'est pas un texte UTF-8 valide."))?;
+            let texte = String::from_utf8(octets.to_vec()).map_err(|_| {
+                ErreurMoteur::simple(tr!(
+                    "Ce SVG n'est pas un texte UTF-8 valide.",
+                    "This SVG is not valid UTF-8 text."
+                ))
+            })?;
             fond.texte = Some(texte);
         }
         Genre::Pdf => {
-            let pdf = Pdf::new(Arc::new(octets.to_vec()))
-                .map_err(|_| ErreurMoteur::simple("Ce PDF est illisible ou protégé."))?;
-            let page = pdf
-                .pages()
-                .first()
-                .ok_or_else(|| ErreurMoteur::simple("Ce PDF ne contient aucune page."))?;
+            let pdf = Pdf::new(Arc::new(octets.to_vec())).map_err(|_| {
+                ErreurMoteur::simple(tr!(
+                    "Ce PDF est illisible ou protégé.",
+                    "This PDF cannot be read or is protected."
+                ))
+            })?;
+            let page = pdf.pages().first().ok_or_else(|| {
+                ErreurMoteur::simple(tr!(
+                    "Ce PDF ne contient aucune page.",
+                    "This PDF has no pages."
+                ))
+            })?;
             let visible = page.crop_box();
             fond.largeur_mm = Some((visible.x1 - visible.x0) * MM_PAR_POINT);
             fond.hauteur_mm = Some((visible.y1 - visible.y0) * MM_PAR_POINT);
@@ -220,8 +262,12 @@ fn decrire(octets: &[u8], genre: Genre) -> Result<FondImporte, ErreurMoteur> {
                 .map(|coupe| (coupe.x0 - visible.x0).max(0.0) * MM_PAR_POINT);
         }
         Genre::Image => {
-            let taille = imagesize::blob_size(octets)
-                .map_err(|_| ErreurMoteur::simple("Cette image est illisible."))?;
+            let taille = imagesize::blob_size(octets).map_err(|_| {
+                ErreurMoteur::simple(tr!(
+                    "Cette image est illisible.",
+                    "This image cannot be read."
+                ))
+            })?;
             fond.largeur_px = Some(taille.width as u32);
             fond.hauteur_px = Some(taille.height as u32);
         }

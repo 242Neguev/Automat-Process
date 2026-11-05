@@ -1,14 +1,19 @@
 mod cartes;
 mod commandes;
 mod conversion;
+mod effacement;
 mod fichiers;
 mod fonds;
 mod impression;
+mod langue;
 pub mod moteur;
+mod ocr;
 mod outils_pdf;
 mod pdf_textes;
+mod photos;
 mod projet_fichier;
 mod qr;
+mod registres;
 mod word;
 
 use std::sync::Arc;
@@ -24,6 +29,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(etat)
         .manage(Arc::new(Fonds::default()))
+        .manage(Arc::new(photos::Photos::default()))
         .invoke_handler(tauri::generate_handler![
             commandes::infos_moteur,
             commandes::familles_polices,
@@ -40,6 +46,14 @@ pub fn run() {
             commandes::imprimer_cartes,
             commandes::couleur_autour,
             commandes::retirer_texte_pdf,
+            commandes::empreinte_modele,
+            commandes::lire_registre,
+            commandes::ecrire_registre,
+            commandes::oublier_registre,
+            commandes::charger_photos,
+            commandes::reconnaitre_textes,
+            commandes::effacer_texte,
+            commandes::definir_langue,
             commandes::enregistrer_projet,
             commandes::ouvrir_projet,
             commandes::lire_liste,

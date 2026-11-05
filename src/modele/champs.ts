@@ -1,22 +1,14 @@
 // Création des champs d'un modèle et géométrie utilisée par l'éditeur.
 import type { Transformation } from "../donnees/nettoyage";
-import type { Champ, ChampQr, ChampTexte, ModeleCarte, TexteVisuel } from "../moteur";
+import type { Champ, ChampPhoto, ChampQr, ChampTexte, ModeleCarte, PhotoChargee, Recadrage, TexteLu, TexteVisuel } from "../moteur";
+import { textes } from "../textes";
 import { versCarte, type Format } from "./formats";
 import { choisirPolice, graisseDuNom } from "./svg";
 
 const MM_PAR_POINT = 25.4 / 72;
 
 /** Informations proposées dans l'éditeur ; leurs balises sont reliées aux colonnes à l'étape Liste. */
-export const INFORMATIONS: { libelle: string; modele: string; taille_pt?: number; graisse?: number; lignes_max?: number; transformations?: Record<string, Transformation> }[] = [
-  { libelle: "Prénom NOM", modele: "{{Prénom}} {{NOM}}", taille_pt: 11, graisse: 700, transformations: { Prénom: "nom-propre", NOM: "majuscules" } },
-  { libelle: "Fonction", modele: "{{Fonction}}", taille_pt: 8, lignes_max: 2 },
-  { libelle: "Mobile", modele: "Mob. {{Mobile}}" },
-  { libelle: "Téléphone fixe", modele: "Tél. {{Fixe}}" },
-  { libelle: "E-mail", modele: "{{Email}}", transformations: { Email: "minuscules" } },
-  { libelle: "Adresse", modele: "{{Adresse}}", lignes_max: 2 },
-  { libelle: "Site web", modele: "{{Site}}" },
-  { libelle: "Autre information", modele: "{{Information}}" },
-];
+export const INFORMATIONS = textes.informations;
 
 /** Identifiant libre suivant (c1, c2…). */
 export function nouvelId(champs: Champ[]): string {
@@ -63,17 +55,40 @@ export function nouveauQr(modele: ModeleCarte): ChampQr {
     y_mm: arrondir(5 * facteur),
     taille_mm: taille,
     couleur: { rgb: "#22252a" },
-    vcard: {
-      prenom: "{{Prénom}}",
-      nom: "{{NOM}}",
-      fonction: "{{Fonction}}",
-      organisation: "",
-      mobile: "{{Mobile}}",
-      fixe: "{{Fixe}}",
-      email: "{{Email}}",
-      site: "",
-    },
+    vcard: { ...textes.qrVcard },
   };
+}
+
+/** Cadre photo, à gauche de la carte, aux proportions d'une photo d'identité. */
+export function nouvellePhoto(modele: ModeleCarte): ChampPhoto {
+  const facteur = Math.max(1, modele.format.largeur_mm / 85);
+  const hauteur = arrondir(Math.min(modele.format.hauteur_mm * 0.55, 30 * facteur));
+  return {
+    id: nouvelId(modele.champs),
+    type: "photo",
+    x_mm: arrondir(5 * facteur),
+    y_mm: arrondir((modele.format.hauteur_mm - hauteur) / 2),
+    largeur_mm: arrondir(hauteur * 0.8),
+    hauteur_mm: hauteur,
+    balise: "Photo",
+    forme: "rectangle",
+  };
+}
+
+/**
+ * Recadrage d'office d'une photo : centré sur le visage (repéré sous Windows), assez grand pour que
+ * le visage occupe la moitié du cadre, un peu au-dessus de son centre ; sans visage repéré, la photo
+ * couvre le cadre, centrée un peu au-dessus de son milieu (portraits).
+ */
+export function recadrageAuto(champ: ChampPhoto, photo: Pick<PhotoChargee, "largeurPx" | "hauteurPx" | "visage">): Recadrage {
+  if (!photo.visage || photo.hauteurPx <= 0 || photo.largeurPx <= 0) return { centre_x: 0.5, centre_y: 0.4, zoom: 1 };
+  const proportions = photo.largeurPx / photo.hauteurPx;
+  const cadre = champ.largeur_mm / champ.hauteur_mm;
+  // Hauteur de la photo dans le cadre, rapportée à celle du cadre, quand elle le couvre juste.
+  const couverte = proportions > cadre ? 1 : cadre / proportions;
+  const zoom = Math.min(3, Math.max(1, 0.5 / (photo.visage.hauteur * couverte)));
+  const centre_y = Math.min(1, photo.visage.y + 0.08 / (couverte * zoom));
+  return { centre_x: photo.visage.x, centre_y: Math.round(centre_y * 1000) / 1000, zoom: Math.round(zoom * 100) / 100 };
 }
 
 /**
@@ -94,7 +109,7 @@ export function boiteChamp(champ: Champ) {
   if (champ.type === "qr") {
     return { x: champ.x_mm, y: champ.y_mm, largeur: champ.taille_mm, hauteur: champ.taille_mm };
   }
-  if (champ.type === "masque") {
+  if (champ.type === "masque" || champ.type === "photo") {
     return { x: champ.x_mm, y: champ.y_mm, largeur: champ.largeur_mm, hauteur: champ.hauteur_mm };
   }
   const corps = champ.taille_pt * MM_PAR_POINT;
@@ -127,7 +142,7 @@ export function transformationsParDefaut(balises: string[]): Record<string, Tran
   for (const balise of balises) {
     const simple = balise.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
     if (/^(e-?mail|mail|courriel)/.test(simple)) resultat[balise] = "minuscules";
-    else if (/^prenom/.test(simple)) resultat[balise] = "nom-propre";
+    else if (/^(prenom|first ?name|given ?name)/.test(simple)) resultat[balise] = "nom-propre";
     else if (balise.length > 1 && balise === balise.toLocaleUpperCase("fr") && /\p{L}/u.test(balise)) resultat[balise] = "majuscules";
   }
   return resultat;
@@ -173,6 +188,38 @@ export function champDepuisTexte(
     taille_min_pt: Math.round(taille * 0.75 * 2) / 2,
     lignes_max: 1,
   };
+}
+
+/**
+ * Champ créé à partir d'un texte lu dans une image (reconnaissance de caractères) : même position,
+ * même taille et même couleur ; la police est celle des autres informations, sinon Arial.
+ */
+export function champDepuisTexteLu(texte: TexteLu, contenu: string, format: Format, existants: Champ[], polices: string[]): ChampTexte {
+  const textes = existants.filter((c): c is ChampTexte => c.type === "texte");
+  const police = textes[0]?.police ?? (polices.includes("Arial") || polices.length === 0 ? "Arial" : polices[0]);
+  const taille = Math.round(texte.taillePt * 10) / 10;
+  return {
+    id: nouvelId(existants),
+    type: "texte",
+    modele: contenu,
+    x_mm: arrondir(texte.xMm),
+    y_mm: arrondir(texte.yMm),
+    police,
+    graisse: textes[0]?.graisse ?? 400,
+    taille_pt: taille,
+    couleur: { rgb: texte.couleur },
+    interlettrage_em: 0,
+    ancre: "start",
+    largeur_max_mm: arrondir(Math.max(15, texte.largeurMm, format.largeur_mm - texte.xMm - 4)),
+    taille_min_pt: Math.round(taille * 0.75 * 2) / 2,
+    lignes_max: 1,
+  };
+}
+
+/** Balise écrite dans une image et lue par la reconnaissance (« {{NOM}} », parfois « { {NOM} } ») : son nom. */
+export function baliseLue(texte: string): string | null {
+  const nom = texte.match(/^\s*\{\s*\{\s*([^{}]+?)\s*\}\s*\}\s*$/)?.[1];
+  return nom ? nom.trim() : null;
 }
 
 /** Cadre d'un texte du visuel sur la carte finie (mm), pour le désigner d'un clic. */

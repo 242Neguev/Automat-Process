@@ -22,6 +22,24 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# --- Textes (remplaces par leur traduction quand le kit est cree dans une autre langue) ---
+$T = @{
+    SansReponse = "Aucune reponse : relancez le script, ou indiquez l'agent avec -Choix."
+    AucunUnique = "Aucun agent unique ne correspond a '{0}'."
+    Installation = "Installation de la signature '{0}' dans Outlook"
+    VousEtes = 'Vous etes {0} ({1}) ? [O/n]'
+    Tapez = 'Tapez votre numero (ou une partie de votre nom)'
+    Plusieurs = 'Plusieurs agents correspondent : precisez.'
+    Aucun = 'Aucun agent ne correspond.'
+    Installee = 'Signature de {0} installee.'
+    SansCompte = "Aucun compte Outlook n'a ete trouve sur ce poste : dans Outlook, choisissez la signature"
+    SansCompte2 = "'{0}' dans Fichier > Options > Courrier > Signatures."
+    Rouvrir = "Fermez puis rouvrez Outlook pour l'utiliser."
+    Autres = 'Nouvel Outlook, Outlook sur le web ou Gmail : utilisez la page de votre signature (copier-coller).'
+}
+# --- Fin des textes ---
+
 if (-not $Destination) { $Destination = Join-Path $env:APPDATA 'Microsoft\Signatures' }
 $config = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'kit.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 $agents = @($config.agents)
@@ -80,7 +98,7 @@ function Find-Agent([object[]]$parmi, [string]$texte) {
 
 # Plus rien a lire (script lance sans clavier et sans -Choix) : arret, au lieu de reposer la question.
 function Stop-SansReponse {
-    [Console]::Error.WriteLine("Aucune reponse : relancez le script, ou indiquez l'agent avec -Choix.")
+    [Console]::Error.WriteLine($T.SansReponse)
     exit 1
 }
 
@@ -91,18 +109,18 @@ $agent = $null
 if ($Choix) {
     $trouves = @(Find-Agent $agents $Choix)
     if ($trouves.Count -ne 1) {
-        [Console]::Error.WriteLine("Aucun agent unique ne correspond a '$Choix'.")
+        [Console]::Error.WriteLine(($T.AucunUnique -f $Choix))
         exit 1
     }
     $agent = $trouves[0]
 } else {
     Write-Host ''
-    Write-Host "Installation de la signature '$nomSignature' dans Outlook" -ForegroundColor Cyan
+    Write-Host ($T.Installation -f $nomSignature) -ForegroundColor Cyan
     # Proposition d'office : l'agent dont l'adresse est celle d'un compte Outlook de ce poste.
     $adresses = @($comptes | ForEach-Object { $_.Adresse })
     $propose = $agents | Where-Object { $adresses -contains $_.email } | Select-Object -First 1
     if ($propose) {
-        $reponse = Read-Host "Vous etes $($propose.nom) ($($propose.email)) ? [O/n]"
+        $reponse = Read-Host ($T.VousEtes -f $propose.nom, $propose.email)
         if ($null -eq $reponse) { Stop-SansReponse }
         $reponse = $reponse.Trim()
         if ($reponse -eq '' -or $reponse -match '^[oOyY]') { $agent = $propose }
@@ -111,16 +129,16 @@ if ($Choix) {
     while (-not $agent) {
         Write-Host ''
         foreach ($a in $liste) { Write-Host ('{0,4}. {1}  {2}' -f $a.numero, $a.nom, $a.email) }
-        $saisie = Read-Host 'Tapez votre numero (ou une partie de votre nom)'
+        $saisie = Read-Host $T.Tapez
         if ($null -eq $saisie) { Stop-SansReponse }
         if (-not $saisie.Trim()) { continue }
         $trouves = @(Find-Agent $agents $saisie)
         if ($trouves.Count -eq 1) { $agent = $trouves[0] }
         elseif ($trouves.Count -gt 1) {
-            Write-Host 'Plusieurs agents correspondent : precisez.' -ForegroundColor Yellow
+            Write-Host $T.Plusieurs -ForegroundColor Yellow
             $liste = $trouves
         } else {
-            Write-Host 'Aucun agent ne correspond.' -ForegroundColor Yellow
+            Write-Host $T.Aucun -ForegroundColor Yellow
         }
     }
 }
@@ -169,11 +187,11 @@ if (-not $SansRegistre) {
 }
 
 Write-Host ''
-Write-Host "Signature de $($agent.nom) installee." -ForegroundColor Green
+Write-Host ($T.Installee -f $agent.nom) -ForegroundColor Green
 if (-not $SansRegistre -and -not $parDefaut) {
-    Write-Host "Aucun compte Outlook n'a ete trouve sur ce poste : dans Outlook, choisissez la signature"
-    Write-Host "'$nomSignature' dans Fichier > Options > Courrier > Signatures."
+    Write-Host $T.SansCompte
+    Write-Host ($T.SansCompte2 -f $nomSignature)
 }
-Write-Host "Fermez puis rouvrez Outlook pour l'utiliser."
-Write-Host 'Nouvel Outlook, Outlook sur le web ou Gmail : utilisez la page de votre signature (copier-coller).'
+Write-Host $T.Rouvrir
+Write-Host $T.Autres
 exit 0

@@ -1,9 +1,12 @@
-import { ActionIcon, Anchor, CopyButton, Divider, Group, Image, Modal, Stack, Text, Title, Tooltip } from "@mantine/core";
-import { IconCheck, IconCopy, IconMail, IconPhone } from "@tabler/icons-react";
+import { useState } from "react";
+import { ActionIcon, Alert, Anchor, Button, CopyButton, Divider, Group, Image, Modal, SegmentedControl, Stack, Text, Title, Tooltip } from "@mantine/core";
+import { IconCheck, IconCopy, IconLanguage, IconMail, IconPhone } from "@tabler/icons-react";
 import nomEauSeche from "./assets/eau-seche/nom.png";
 import symboleEauSeche from "./assets/eau-seche/symbole.png";
 import { version } from "../package.json";
-import { textes } from "./textes";
+import { en } from "./i18n/en";
+import { fr } from "./i18n/fr";
+import { changerLangue, langue, textes, type Langue } from "./textes";
 
 const t = textes.aPropos;
 
@@ -23,6 +26,44 @@ function Coordonnee({ icone: Icone, valeur }: { icone: typeof IconPhone; valeur:
         )}
       </CopyButton>
     </Group>
+  );
+}
+
+/** Choix de la langue : l'interface redémarre, après confirmation (un projet non enregistré serait perdu). */
+function ChoixLangue() {
+  const [demandee, setDemandee] = useState<Langue | null>(null);
+  const tl = textes.langue;
+  return (
+    <Stack gap="xs" data-langue>
+      <Group justify="space-between" wrap="nowrap">
+        <Group gap={6} wrap="nowrap">
+          <IconLanguage size={16} stroke={1.5} />
+          <Text size="sm" fw={500}>
+            {tl.titre}
+          </Text>
+        </Group>
+        <SegmentedControl
+          size="xs"
+          value={demandee ?? langue}
+          onChange={(valeur) => setDemandee(valeur === langue ? null : (valeur as Langue))}
+          data={(["fr", "en"] as const).map((value) => ({ value, label: tl.choix[value] }))}
+        />
+      </Group>
+      {demandee && (
+        <Alert color="orange" title={tl.confirmationTitre}>
+          <Text size="sm">{tl.confirmation}</Text>
+          <Group justify="flex-end" gap="xs" mt="sm">
+            <Button variant="default" size="xs" onClick={() => setDemandee(null)}>
+              {tl.annuler}
+            </Button>
+            {/* Dans la langue demandée : « Restart in English ». */}
+            <Button size="xs" onClick={() => changerLangue(demandee)}>
+              {(demandee === "en" ? en : fr).langue.confirmer}
+            </Button>
+          </Group>
+        </Alert>
+      )}
+    </Stack>
   );
 }
 
@@ -47,6 +88,8 @@ export default function APropos({ ouvert, fermer, versionTypst }: { ouvert: bool
           <Coordonnee icone={IconPhone} valeur={t.telephone} />
           <Coordonnee icone={IconMail} valeur={t.email} />
         </Group>
+        <Divider />
+        <ChoixLangue />
         <Divider />
         <Text size="xs" c="dimmed">
           {t.moteur(versionTypst ?? "…")}{" "}

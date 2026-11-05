@@ -1,4 +1,5 @@
 // Formats de carte (et d'écran), et mise en correspondance d'un visuel importé avec la carte.
+import { textes } from "../textes";
 
 export interface Format {
   largeur_mm: number;
@@ -14,11 +15,11 @@ export interface FormatPredefini extends Format {
 }
 
 export const FORMATS: FormatPredefini[] = [
-  { id: "85x55", libelle: "Carte de visite 85 × 55 mm", largeur_mm: 85, hauteur_mm: 55, fond_perdu_mm: 3 },
-  { id: "90x50", libelle: "Carte de visite 90 × 50 mm", largeur_mm: 90, hauteur_mm: 50, fond_perdu_mm: 3 },
-  { id: "us", libelle: "Carte américaine 88,9 × 50,8 mm", largeur_mm: 88.9, hauteur_mm: 50.8, fond_perdu_mm: 3 },
+  { id: "85x55", libelle: textes.formats["85x55"], largeur_mm: 85, hauteur_mm: 55, fond_perdu_mm: 3 },
+  { id: "90x50", libelle: textes.formats["90x50"], largeur_mm: 90, hauteur_mm: 50, fond_perdu_mm: 3 },
+  { id: "us", libelle: textes.formats["us"], largeur_mm: 88.9, hauteur_mm: 50.8, fond_perdu_mm: 3 },
   // Les imprimantes à cartes PVC impriment bord à bord : pas de fond perdu.
-  { id: "cr80", libelle: "Badge PVC CR80 85,6 × 54 mm", largeur_mm: 85.6, hauteur_mm: 54, fond_perdu_mm: 0 },
+  { id: "cr80", libelle: textes.formats["cr80"], largeur_mm: 85.6, hauteur_mm: 54, fond_perdu_mm: 0 },
 ];
 
 const MM_PAR_PX = 25.4 / 96;
@@ -33,9 +34,9 @@ const ecran = (id: string, libelle: string, largeur: number, hauteur: number): F
 
 /** Formats d'écran du module « Visuels numériques ». */
 export const FORMATS_ECRAN: FormatPredefini[] = [
-  ecran("teams", "Fond d'écran Teams / Zoom 1920 × 1080 px", 1920, 1080),
-  ecran("linkedin", "Bannière LinkedIn 1584 × 396 px", 1584, 396),
-  ecran("carre", "Image carrée 1080 × 1080 px", 1080, 1080),
+  ecran("teams", textes.formats.teams, 1920, 1080),
+  ecran("linkedin", textes.formats.linkedin, 1584, 396),
+  ecran("carre", textes.formats.carre, 1080, 1080),
 ];
 
 /**
@@ -139,6 +140,7 @@ export function versCarte(point: { x: number; y: number }, visuel: { largeur: nu
 }
 
 export type Niveau = "ok" | "info" | "attention";
+const d = textes.diagnostics;
 
 /** Messages pour l'utilisateur sur l'adéquation entre le visuel et le format choisi. */
 export function diagnostiquer(
@@ -154,19 +156,19 @@ export function diagnostiquer(
   const recadre = (proportions: number) => Math.abs(proportions - zoneL / zoneH) / (zoneL / zoneH) > 0.03;
   if (vl && vh) {
     const taille = `${vl.toFixed(1)} × ${vh.toFixed(1)} mm`;
-    if (format.fond_perdu_mm === 0) messages.push({ niveau: "ok", message: `Le visuel (${taille}) est imprimé bord à bord.` });
-    else if (avecFondPerdu) messages.push({ niveau: "ok", message: `Le visuel (${taille}) contient le fond perdu.` });
-    else messages.push({ niveau: "info", message: `Le visuel (${taille}) est au format fini : le fond perdu est complété à partir de ses bords.` });
-    if (recadre(vl / vh)) messages.push({ niveau: "attention", message: "Les proportions du visuel diffèrent de la carte : il est recadré." });
+    if (format.fond_perdu_mm === 0) messages.push({ niveau: "ok", message: d.bordABord(taille) });
+    else if (avecFondPerdu) messages.push({ niveau: "ok", message: d.avecFondPerdu(taille) });
+    else messages.push({ niveau: "info", message: d.formatFini(taille) });
+    if (recadre(vl / vh)) messages.push({ niveau: "attention", message: d.visuelRecadre });
   }
   if (largeurPx && hauteurPx) {
     const dpi = Math.round(Math.min(largeurPx / (zoneL / 25.4), hauteurPx / (zoneH / 25.4)));
     const pixels = `${largeurPx} × ${hauteurPx} px`;
-    if (dpi >= 280) messages.push({ niveau: "ok", message: `Image de ${pixels} : environ ${dpi} dpi, parfait pour l'impression.` });
-    else if (dpi >= 200) messages.push({ niveau: "info", message: `Image de ${pixels} : environ ${dpi} dpi, correct pour une imprimante de bureau.` });
-    else messages.push({ niveau: "attention", message: `Image de ${pixels} : environ ${dpi} dpi, trop faible pour l'impression (300 dpi conseillés).` });
-    if (format.fond_perdu_mm > 0 && !avecFondPerdu) messages.push({ niveau: "info", message: "Image au format fini : le fond perdu est complété à partir de ses bords." });
-    if (recadre(largeurPx / hauteurPx)) messages.push({ niveau: "attention", message: "Les proportions de l'image diffèrent de la carte : elle est recadrée." });
+    if (dpi >= 280) messages.push({ niveau: "ok", message: d.imageParfaite(pixels, dpi) });
+    else if (dpi >= 200) messages.push({ niveau: "info", message: d.imageCorrecte(pixels, dpi) });
+    else messages.push({ niveau: "attention", message: d.imageFaible(pixels, dpi) });
+    if (format.fond_perdu_mm > 0 && !avecFondPerdu) messages.push({ niveau: "info", message: d.imageFormatFini });
+    if (recadre(largeurPx / hauteurPx)) messages.push({ niveau: "attention", message: d.imageRecadree });
   }
   return messages;
 }
@@ -189,13 +191,13 @@ export function diagnostiquerVersionEcran(
     // Largeur de la carte finie dans l'image (sans son éventuel fond perdu).
     const utile = Math.round((largeurPx * format.largeur_mm) / zoneL);
     const taille = `${largeurPx} × ${hauteurPx} px`;
-    if (utile >= 2400) messages.push({ niveau: "ok", message: `Image de ${taille} : nette même en grande taille (2 400 px).` });
-    else if (utile >= 1200) messages.push({ niveau: "ok", message: `Image de ${taille} : nette en taille moyenne (1 200 px).` });
-    else messages.push({ niveau: "attention", message: `Image de ${taille} : un peu petite, les cartes numériques seront moins nettes.` });
-    if (recadre(largeurPx / hauteurPx)) messages.push({ niveau: "attention", message: "Les proportions de l'image diffèrent de la carte : elle est recadrée." });
+    if (utile >= 2400) messages.push({ niveau: "ok", message: d.ecranGrande(taille) });
+    else if (utile >= 1200) messages.push({ niveau: "ok", message: d.ecranMoyenne(taille) });
+    else messages.push({ niveau: "attention", message: d.ecranPetite(taille) });
+    if (recadre(largeurPx / hauteurPx)) messages.push({ niveau: "attention", message: d.imageRecadree });
   } else if (largeurMm && hauteurMm) {
-    messages.push({ niveau: "ok", message: "Visuel vectoriel : net à toutes les tailles." });
-    if (recadre(largeurMm / hauteurMm)) messages.push({ niveau: "attention", message: "Les proportions du visuel diffèrent de la carte : il est recadré." });
+    messages.push({ niveau: "ok", message: d.vectoriel });
+    if (recadre(largeurMm / hauteurMm)) messages.push({ niveau: "attention", message: d.visuelRecadre });
   }
   return messages;
 }
@@ -212,12 +214,12 @@ export function diagnostiquerEcran(
   const recadre = (proportions: number) => Math.abs(proportions - cible.largeur / cible.hauteur) / (cible.largeur / cible.hauteur) > 0.03;
   if (largeurPx && hauteurPx) {
     const taille = `${largeurPx} × ${hauteurPx} px`;
-    if (largeurPx >= cible.largeur && hauteurPx >= cible.hauteur) messages.push({ niveau: "ok", message: `Image de ${taille} : assez grande pour ce format.` });
-    else messages.push({ niveau: "attention", message: `Image de ${taille}, plus petite que le format (${cible.largeur} × ${cible.hauteur} px) : elle sera agrandie, donc moins nette.` });
-    if (recadre(largeurPx / hauteurPx)) messages.push({ niveau: "attention", message: "Les proportions de l'image diffèrent du format : elle est recadrée." });
+    if (largeurPx >= cible.largeur && hauteurPx >= cible.hauteur) messages.push({ niveau: "ok", message: d.formatAssez(taille) });
+    else messages.push({ niveau: "attention", message: d.formatAgrandi(taille, cible.largeur, cible.hauteur) });
+    if (recadre(largeurPx / hauteurPx)) messages.push({ niveau: "attention", message: d.imageRecadreeFormat });
   } else if (largeurMm && hauteurMm) {
-    messages.push({ niveau: "ok", message: "Visuel vectoriel : net à toutes les tailles." });
-    if (recadre(largeurMm / hauteurMm)) messages.push({ niveau: "attention", message: "Les proportions du visuel diffèrent du format : il est recadré." });
+    messages.push({ niveau: "ok", message: d.vectoriel });
+    if (recadre(largeurMm / hauteurMm)) messages.push({ niveau: "attention", message: d.visuelRecadreFormat });
   }
   return messages;
 }

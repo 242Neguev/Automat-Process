@@ -3,6 +3,7 @@
 // et sont retirés du visuel ; les autres sont des textes d'exemple que l'on peut remplacer d'un clic.
 import type { TexteVisuel } from "../moteur";
 import { tailleSvg } from "./formats";
+import { textes as libelles } from "../textes";
 
 const MM_PAR_POINT = 25.4 / 72;
 const BALISE = /\{\{[^}]+\}\}/;
@@ -63,11 +64,11 @@ export function graisseDuNom(nom: string): number {
 /** Analyse un SVG ; il est mesuré dans la page, invisible, car un SVG détaché n'a ni styles ni géométrie. */
 export function analyserSvg(source: string, policesInstallees: string[]): AnalyseSvg {
   const doc = new DOMParser().parseFromString(source, "image/svg+xml");
-  if (doc.getElementsByTagName("parsererror").length > 0) throw new Error("Ce SVG est mal formé.");
+  if (doc.getElementsByTagName("parsererror").length > 0) throw new Error(libelles.erreurs.svgMalForme);
   const racine = doc.documentElement;
   const viewBox = racine.getAttribute("viewBox")?.trim().split(/[\s,]+/).map(Number) ?? null;
   const taille = tailleSvg(racine.getAttribute("width"), racine.getAttribute("height"), viewBox?.length === 4 ? viewBox : null);
-  if (!taille) throw new Error("Impossible de connaître les dimensions de ce SVG (ni largeur, ni hauteur, ni viewBox).");
+  if (!taille) throw new Error(libelles.erreurs.svgSansTaille);
 
   const hote = document.createElement("div");
   hote.style.cssText = "position:fixed;left:-100000px;top:0;visibility:hidden;pointer-events:none";

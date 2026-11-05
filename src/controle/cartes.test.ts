@@ -103,6 +103,19 @@ describe("rapport de contrôle des cartes", () => {
     expect(groupes[groupes.length - 1].gravite).toBe("info");
   });
 
+  it("signale les photos introuvables, à vérifier", () => {
+    const manquante = (nom: string) => [{ champ: "p1", balise: "Photo", nom }];
+    const avecPhotos = analyser(modele, agents, mesures, new Map([["a1", manquante("absente.jpg")], ["a3", manquante("k.koffi")]]));
+    expect(avecPhotos.get("a1")).toEqual([
+      { agent: "a1", type: "photo", gravite: "attention", champs: ["p1"], libelles: ["Photo"], message: "Photo « absente.jpg » introuvable : elle n'apparaîtra pas." },
+    ]);
+    // Après les problèmes plus graves de la carte, avant les ajustements automatiques.
+    expect(avecPhotos.get("a3")!.map((p) => p.type)).toEqual(["photo", "reduit"]);
+    expect(compter(avecPhotos)).toEqual({ erreur: 1, attention: 2, info: 0 });
+    // Un seul groupe pour le cadre, quel que soit le nom de chaque photo.
+    expect(regrouper(avecPhotos).filter((g) => g.type === "photo")).toEqual([{ cle: "photo:p1", type: "photo", gravite: "attention", resume: "Photo introuvable", agents: ["a1", "a3"] }]);
+  });
+
   it("trouve le cas le plus long de chaque information", () => {
     expect(casLesPlusLongs(modele, mesures)).toEqual([
       { champ: "c1", libelle: "Prénom NOM", agent: "a2" },

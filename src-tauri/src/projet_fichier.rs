@@ -16,7 +16,9 @@ use typst::foundations::Bytes;
 use crate::cartes;
 use crate::fichiers::{self, Nature};
 use crate::fonds::Fonds;
+use crate::langue::texte;
 use crate::moteur::ErreurMoteur;
+use crate::tr;
 
 const APPLICATION: &str = "Automat-Process";
 const VERSION_FORMAT: u64 = 1;
@@ -39,7 +41,7 @@ pub struct ProjetOuvert {
 }
 
 fn erreur(contexte: &str) -> impl Fn(&dyn std::fmt::Display) -> ErreurMoteur + '_ {
-    move |cause| ErreurMoteur::simple(format!("{contexte} : {cause}"))
+    move |cause| ErreurMoteur::simple(tr!("{contexte} : {cause}", "{contexte}: {cause}"))
 }
 
 /// Enregistre le modèle, ses visuels et les correspondances dans `chemin`.
@@ -52,29 +54,54 @@ pub fn enregistrer(
     fonds: &Fonds,
 ) -> Result<(), ErreurMoteur> {
     if !DOCUMENTS.contains(&document) {
-        return Err(ErreurMoteur::simple(format!(
-            "Sorte de document inconnue : {document}"
+        return Err(ErreurMoteur::simple(tr!(
+            "Sorte de document inconnue : {document}",
+            "Unknown kind of document: {document}"
         )));
     }
     let mut modele = modele.clone();
     let mut visuels = visuels.clone();
     let mut fichiers = Vec::new();
+    // Range un visuel dans l'archive, sous le nom de son emplacement ; renvoie son nom dans l'archive.
+    let mut ranger = |virtuel: &str, emplacement: &str, visuels: &mut Value| {
+        let extension = virtuel.rsplit('.').next().unwrap_or("bin");
+        let interne = format!("fonds/{emplacement}.{extension}");
+        let octets = fonds
+            .contenu(virtuel)
+            .or_else(|| cartes::fichier_demo(virtuel))
+            .ok_or_else(|| {
+                ErreurMoteur::simple(tr!(
+                    "Visuel introuvable : {virtuel}",
+                    "Design not found: {virtuel}"
+                ))
+            })?;
+        fichiers.push((interne.clone(), octets));
+        if let Some(visuel) = visuels.get_mut(emplacement).filter(|v| v.is_object()) {
+            visuel["chemin"] = Value::String(interne.clone());
+            visuel["texte"] = Value::Null;
+        }
+        Ok::<String, ErreurMoteur>(interne)
+    };
     for face in EMPLACEMENTS {
         let cle = format!("fond_{face}");
         let Some(virtuel) = modele.get(&cle).and_then(Value::as_str).map(str::to_owned) else {
             continue;
         };
-        let extension = virtuel.rsplit('.').next().unwrap_or("bin");
-        let interne = format!("fonds/{face}.{extension}");
-        let octets = fonds
-            .contenu(&virtuel)
-            .or_else(|| cartes::fichier_demo(&virtuel))
-            .ok_or_else(|| ErreurMoteur::simple(format!("Visuel introuvable : {virtuel}")))?;
-        fichiers.push((interne.clone(), octets));
-        modele[&cle] = Value::String(interne.clone());
-        if let Some(visuel) = visuels.get_mut(face).filter(|v| v.is_object()) {
-            visuel["chemin"] = Value::String(interne);
-            visuel["texte"] = Value::Null;
+        modele[&cle] = Value::String(ranger(&virtuel, face, &mut visuels)?);
+    }
+    // Visuels propres aux variantes (emplacements « variante-v1-recto »…).
+    for (rang, variante) in valeurs_des_variantes(&mut modele).iter_mut().enumerate() {
+        for face in ["recto", "verso"] {
+            let cle = format!("fond_{face}");
+            let Some(virtuel) = variante
+                .get(&cle)
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+            else {
+                continue;
+            };
+            let emplacement = emplacement_de_variante(variante, rang, face);
+            variante[&cle] = Value::String(ranger(&virtuel, &emplacement, &mut visuels)?);
         }
     }
     // Courriers Word : le modèle (.docx ou .dotx) voyage avec le projet.
@@ -101,7 +128,10 @@ pub fn enregistrer(
         "visuels": visuels,
     });
 
-    let ecriture = erreur("Impossible d'enregistrer le projet");
+    let ecriture = erreur(texte(
+        "Impossible d'enregistrer le projet",
+        "Cannot save the project",
+    ));
     let fichier = std::fs::File::create(chemin).map_err(|e| ecriture(&e))?;
     let mut archive = zip::ZipWriter::new(fichier);
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
@@ -118,6 +148,31 @@ pub fn enregistrer(
     Ok(())
 }
 
+/// Variantes du modèle (filiale, langue…), chacune avec ses propres visuels.
+fn valeurs_des_variantes(modele: &mut Value) -> &mut [Value] {
+    match modele
+        .pointer_mut("/variantes/valeurs")
+        .and_then(Value::as_array_mut)
+    {
+        Some(valeurs) => valeurs,
+        None => &mut [],
+    }
+}
+
+/// Emplacement d'un visuel de variante, comme l'interface le nomme (« variante-v1-recto ») ; un
+/// identifiant inattendu est remplacé par le rang de la variante (le nom sert dans l'archive).
+fn emplacement_de_variante(variante: &Value, rang: usize, face: &str) -> String {
+    let id = variante["id"]
+        .as_str()
+        .filter(|id| {
+            !id.is_empty()
+                && id.len() <= 20
+                && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+        })
+        .map_or_else(|| rang.to_string(), str::to_owned);
+    format!("variante-{id}-{face}")
+}
+
 /// Dossier de travail neuf pour un projet rouvert (dans le dossier temporaire du système).
 fn dossier_de_travail() -> std::io::Result<std::path::PathBuf> {
     static COMPTEUR: AtomicUsize = AtomicUsize::new(0);
@@ -132,24 +187,35 @@ fn dossier_de_travail() -> std::io::Result<std::path::PathBuf> {
 
 /// Rouvre un projet : ses visuels reprennent place dans la réserve des fonds.
 pub fn ouvrir(chemin: &str, fonds: &Fonds) -> Result<ProjetOuvert, ErreurMoteur> {
-    let lecture = erreur("Impossible d'ouvrir le projet");
+    let lecture = erreur(texte(
+        "Impossible d'ouvrir le projet",
+        "Cannot open the project",
+    ));
     let fichier = std::fs::File::open(chemin).map_err(|e| lecture(&e))?;
-    let mut archive = ZipArchive::new(fichier)
-        .map_err(|_| ErreurMoteur::simple("Ce fichier n'est pas un projet Automat-Process."))?;
-    let projet: Value =
-        serde_json::from_reader(archive.by_name(ENTREE_PROJET).map_err(|_| {
-            ErreurMoteur::simple("Ce fichier n'est pas un projet Automat-Process.")
-        })?)
-        .map_err(|e| lecture(&e))?;
-    if projet["application"] != APPLICATION {
-        return Err(ErreurMoteur::simple(
+    let mut archive = ZipArchive::new(fichier).map_err(|_| {
+        ErreurMoteur::simple(tr!(
             "Ce fichier n'est pas un projet Automat-Process.",
-        ));
+            "This file is not an Automat-Process project."
+        ))
+    })?;
+    let projet: Value = serde_json::from_reader(archive.by_name(ENTREE_PROJET).map_err(|_| {
+        ErreurMoteur::simple(tr!(
+            "Ce fichier n'est pas un projet Automat-Process.",
+            "This file is not an Automat-Process project."
+        ))
+    })?)
+    .map_err(|e| lecture(&e))?;
+    if projet["application"] != APPLICATION {
+        return Err(ErreurMoteur::simple(tr!(
+            "Ce fichier n'est pas un projet Automat-Process.",
+            "This file is not an Automat-Process project."
+        )));
     }
     if projet["format"].as_u64().unwrap_or(0) > VERSION_FORMAT {
-        return Err(ErreurMoteur::simple(
+        return Err(ErreurMoteur::simple(tr!(
             "Ce projet a été créé par une version plus récente d'Automat-Process : mettez l'application à jour.",
-        ));
+            "This project was created by a newer version of Automat-Process: update the application."
+        )));
     }
 
     let mut modele = projet["modele"].clone();
@@ -158,34 +224,56 @@ pub fn ouvrir(chemin: &str, fonds: &Fonds) -> Result<ProjetOuvert, ErreurMoteur>
     } else {
         json!({})
     };
+    // Remet un visuel de l'archive dans la réserve des fonds ; renvoie son nouveau chemin virtuel.
+    let mut restaurer = |interne: &str, emplacement: &str, visuels: &mut Value| {
+        let mut octets = Vec::new();
+        archive
+            .by_name(interne)
+            .map_err(|_| {
+                ErreurMoteur::simple(tr!(
+                    "Visuel manquant dans le projet : {interne}",
+                    "Design missing from the project: {interne}"
+                ))
+            })?
+            .read_to_end(&mut octets)
+            .map_err(|e| lecture(&e))?;
+        let extension = interne.rsplit('.').next().unwrap_or_default();
+        let nom = visuels[emplacement]["nomFichier"]
+            .as_str()
+            .unwrap_or(interne)
+            .to_owned();
+        let fond = fonds.ajouter(octets, extension, nom)?;
+        if visuels[emplacement].is_object() {
+            // Analyse fraîche : source d'un SVG, textes d'un PDF (pour les remplacer d'un clic).
+            visuels[emplacement]["chemin"] = Value::String(fond.chemin.clone());
+            visuels[emplacement]["texte"] =
+                serde_json::to_value(&fond.texte).map_err(|e| lecture(&e))?;
+            visuels[emplacement]["textes"] =
+                serde_json::to_value(&fond.textes).map_err(|e| lecture(&e))?;
+        } else {
+            visuels[emplacement] = serde_json::to_value(&fond).map_err(|e| lecture(&e))?;
+        }
+        Ok::<String, ErreurMoteur>(fond.chemin)
+    };
     for face in EMPLACEMENTS {
         let cle = format!("fond_{face}");
         let Some(interne) = modele.get(&cle).and_then(Value::as_str).map(str::to_owned) else {
             continue;
         };
-        let mut octets = Vec::new();
-        archive
-            .by_name(&interne)
-            .map_err(|_| {
-                ErreurMoteur::simple(format!("Visuel manquant dans le projet : {interne}"))
-            })?
-            .read_to_end(&mut octets)
-            .map_err(|e| lecture(&e))?;
-        let extension = interne.rsplit('.').next().unwrap_or_default();
-        let nom = visuels[face]["nomFichier"]
-            .as_str()
-            .unwrap_or(&interne)
-            .to_owned();
-        let fond = fonds.ajouter(octets, extension, nom)?;
-        modele[&cle] = Value::String(fond.chemin.clone());
-        if visuels[face].is_object() {
-            // Analyse fraîche : source d'un SVG, textes d'un PDF (pour les remplacer d'un clic).
-            visuels[face]["chemin"] = Value::String(fond.chemin.clone());
-            visuels[face]["texte"] = serde_json::to_value(&fond.texte).map_err(|e| lecture(&e))?;
-            visuels[face]["textes"] =
-                serde_json::to_value(&fond.textes).map_err(|e| lecture(&e))?;
-        } else {
-            visuels[face] = serde_json::to_value(&fond).map_err(|e| lecture(&e))?;
+        modele[&cle] = Value::String(restaurer(&interne, face, &mut visuels)?);
+    }
+    for (rang, variante) in valeurs_des_variantes(&mut modele).iter_mut().enumerate() {
+        for face in ["recto", "verso"] {
+            let cle = format!("fond_{face}");
+            let Some(interne) = variante
+                .get(&cle)
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+            else {
+                continue;
+            };
+            let emplacement = emplacement_de_variante(variante, rang, face);
+            variante[&cle] = Value::String(restaurer(&interne, &emplacement, &mut visuels)?);
         }
     }
     // Courriers Word : le modèle est extrait dans un dossier de travail, d'où il sera relu.
@@ -197,7 +285,12 @@ pub fn ouvrir(chemin: &str, fonds: &Fonds) -> Result<ProjetOuvert, ErreurMoteur>
         let mut octets = Vec::new();
         archive
             .by_name(&interne)
-            .map_err(|_| ErreurMoteur::simple("Le modèle Word manque dans ce projet."))?
+            .map_err(|_| {
+                ErreurMoteur::simple(tr!(
+                    "Le modèle Word manque dans ce projet.",
+                    "The Word template is missing from this project."
+                ))
+            })?
             .read_to_end(&mut octets)
             .map_err(|e| lecture(&e))?;
         let dossier = dossier_de_travail().map_err(|e| lecture(&e))?;
@@ -304,6 +397,49 @@ mod tests {
             assert_eq!(ouvert.visuels[emplacement]["largeurPx"], cote);
             assert!(rouverts.contenu(virtuel).is_some());
         }
+    }
+
+    #[test]
+    fn emporte_les_visuels_des_variantes() {
+        let fonds = Fonds::default();
+        let png = |cote: u32| {
+            tiny_skia::Pixmap::new(cote, cote)
+                .unwrap()
+                .encode_png()
+                .unwrap()
+        };
+        let douala = fonds.ajouter(png(20), "png", "douala.png".into()).unwrap();
+        let abidjan = fonds
+            .ajouter(png(24), "png", "abidjan-verso.png".into())
+            .unwrap();
+        let mut modele = cartes::modele_demo();
+        modele["variantes"] = json!({ "balise": "Filiale", "valeurs": [
+            { "id": "v1", "valeur": "Douala", "fond_recto": douala.chemin },
+            { "id": "v2", "valeur": "Abidjan", "fond_verso": abidjan.chemin, "fond_recto": null },
+            { "id": "../x", "valeur": "Sans visuel" },
+        ] });
+        let visuels = json!({
+            "variante-v1-recto": { "nomFichier": "douala.png", "largeurPx": 20 },
+            "variante-v2-verso": { "nomFichier": "abidjan-verso.png", "largeurPx": 24 },
+        });
+        let chemin = chemin_temporaire("variantes.automat");
+        enregistrer(&chemin, "carte", &modele, &json!({}), &visuels, &fonds).unwrap();
+
+        let rouverts = Fonds::default();
+        let ouvert = ouvrir(&chemin, &rouverts).unwrap();
+        let valeurs = &ouvert.modele["variantes"]["valeurs"];
+        for (rang, face, emplacement, cote) in [
+            (0, "recto", "variante-v1-recto", 20),
+            (1, "verso", "variante-v2-verso", 24),
+        ] {
+            let virtuel = valeurs[rang][format!("fond_{face}")].as_str().unwrap();
+            assert!(virtuel.starts_with("/fonds/"), "{virtuel}");
+            assert!(rouverts.contenu(virtuel).is_some());
+            assert_eq!(ouvert.visuels[emplacement]["chemin"], virtuel);
+            assert_eq!(ouvert.visuels[emplacement]["largeurPx"], cote);
+        }
+        assert!(valeurs[1]["fond_recto"].is_null());
+        assert_eq!(valeurs[2]["valeur"], "Sans visuel");
     }
 
     #[test]

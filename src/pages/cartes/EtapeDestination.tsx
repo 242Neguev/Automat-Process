@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge, Button, Group, List, Loader, Modal, Paper, SegmentedControl, Select, Stack, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconCheck, IconFileTypePdf } from "@tabler/icons-react";
@@ -6,6 +6,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { compter, graviteCarte, regrouper } from "../../controle/cartes";
 import { libelleAgent } from "../../donnees/agents";
 import { nomsUniques } from "../../donnees/noms";
+import { repeter } from "../../donnees/quantite";
 import {
   exporterBat,
   exporterCartes,
@@ -23,8 +24,10 @@ import { signalerErreur } from "../commun/signalerErreur";
 import ExportBat from "./ExportBat";
 import ExportNumerique from "./ExportNumerique";
 import ImpressionDirecte from "./ImpressionDirecte";
+import { locale } from "../../textes";
 import { libellesCartes } from "./libelles";
 import type { Controle } from "./useControle";
+import { useMiseAJour } from "./useMiseAJour";
 
 const FEUILLES: Feuille[] = ["A4", "A3", "SRA3"];
 type Mode = "pdf" | "impression" | "numerique" | "bat";
@@ -38,6 +41,12 @@ export interface Numerique {
 interface Props {
   modele: ModeleCarte;
   agents: DonneesAgent[];
+  /** Empreinte de l'identité de chaque agent (même ordre) : mise à jour incrémentale. */
+  cles: string[];
+  /** Nombre de cartes de chaque agent (même ordre), pour le PDF de l'imprimeur et l'impression directe. */
+  quantites: number[];
+  /** Colonne d'où viennent les quantités, s'il y en a une. */
+  colonneQuantite: string | null;
   /** Pour chaque agent (même ordre), ses liens et sa fiche contact. */
   numeriques: Numerique[];
   controle: Controle;
@@ -45,7 +54,10 @@ interface Props {
   onVoirCartes: () => void;
 }
 
-export default function EtapeDestination({ modele, agents, numeriques, controle, onVoirCartes }: Props) {
+/** Date d'un export, lisible : « 4 novembre 2026 à 18:30 ». */
+const dateLisible = (iso: string) => new Date(iso).toLocaleString(locale, { dateStyle: "long", timeStyle: "short" });
+
+export default function EtapeDestination({ modele, agents, cles, quantites, colonneQuantite, numeriques, controle, onVoirCartes }: Props) {
   // Un badge PVC (sans fond perdu) s'imprime en général directement ; une carte de visite part chez l'imprimeur.
   const ecran = Boolean(modele.format.px);
   const { destination: t, controle: tc } = libellesCartes(ecran);
@@ -55,7 +67,32 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
   const [enCours, setEnCours] = useState(false);
   const [aConfirmer, setAConfirmer] = useState<{ cartes: DonneesAgent[]; action: () => void } | null>(null);
   const { rapport } = controle;
-  const nombres = rapport ? compter(rapport) : null;
+
+  // Mise à jour incrémentale : les cartes imprimées et les cartes numériques ont chacune leur registre.
+  const imprimees = mode === "pdf" || mode === "impression";
+  const maj = useMiseAJour(modele, agents, cles, mode === "numerique" ? "numerique" : "impression");
+  const tm = t.miseAJour;
+  const [toutes, setToutes] = useState(false);
+  const incremental = mode !== "bat" && maj.canal !== undefined;
+  const etatsPrets = maj.etats.length === agents.length;
+  const seulementNouvelles = incremental && !toutes;
+  const aRefaire = useMemo(() => agents.filter((_, i) => maj.etats[i] !== "inchangee"), [agents, maj.etats]);
+  const choisis = seulementNouvelles && etatsPrets ? aRefaire : agents;
+  const compte = (etat: string) => maj.etats.filter((e) => e === etat).length;
+  // Résumé du contrôle : seulement les cartes à exporter (les inchangées ne sont pas refaites).
+  const nombres = useMemo(
+    () => (rapport && choisis.length > 0 ? compter(new Map(choisis.map((agent) => [agent.id, rapport.get(agent.id) ?? []]))) : null),
+    [rapport, choisis],
+  );
+  // Quantités : chaque carte imprimée est répétée autant de fois que demandé (0 : aucune).
+  const quantiteDe = useMemo(() => new Map(agents.map((agent, i) => [agent, quantites[i] ?? 1])), [agents, quantites]);
+  const avecQuantites = (cartes: DonneesAgent[]) => repeter(cartes, cartes.map((agent) => quantiteDe.get(agent) ?? 1));
+  const produites = (cartes: DonneesAgent[]) => cartes.filter((agent) => (quantiteDe.get(agent) ?? 1) > 0);
+  /** Cartes produites pour ces agents : quantités comprises pour les cartes imprimées. */
+  const nombreDe = (cartes: DonneesAgent[]) => (imprimees ? avecQuantites(cartes).length : cartes.length);
+  const nbCartes = nombreDe(choisis);
+  // Le registre n'est pas encore comparé, ou il n'y a rien à refaire.
+  const rienAExporter = (incremental && !etatsPrets) || nbCartes === 0;
 
   /** Les cartes qui ont un problème grave sont signalées avant l'export ou l'impression. */
   function avecConfirmation(cartes: DonneesAgent[], action: () => void) {
@@ -69,8 +106,10 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
     if (!chemin) return;
     setEnCours(true);
     try {
-      await exporterCartes(modele, agents, sortie, feuille, chemin);
+      const aExporter = avecQuantites(choisis);
+      await exporterCartes(modele, aExporter, sortie, feuille, chemin);
       notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.enregistre, message: chemin });
+      await maj.enregistrer(produites(choisis), aExporter.length);
     } catch (e) {
       signalerErreur(e);
     } finally {
@@ -81,8 +120,10 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
   async function imprimer(imprimante: string, cartes: DonneesAgent[], reglages: ReglagesImpression) {
     setEnCours(true);
     try {
-      if (await imprimerCartes(modele, cartes, imprimante, reglages)) {
-        notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.impression.envoyee(imprimante), message: t.impression.nbCartes(cartes.length) });
+      const aImprimer = avecQuantites(cartes);
+      if (await imprimerCartes(modele, aImprimer, imprimante, reglages)) {
+        notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.impression.envoyee(imprimante), message: t.impression.nbCartes(aImprimer.length) });
+        await maj.enregistrer(produites(cartes), aImprimer.length);
       } else {
         notifications.show({ color: "gray", title: t.impression.annulee, message: t.impression.annuleeDetail });
       }
@@ -98,11 +139,14 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
     if (typeof dossier !== "string") return;
     setEnCours(true);
     try {
-      const avecLiens = agents.map((agent, i) => ({ ...agent, liens: numeriques[i]?.liens ?? {} }));
-      const fiches = avecFiches ? numeriques.map((n) => n.fiche) : [];
-      const noms = nomsUniques(agents.map(libelleAgent));
+      const rang = new Map(agents.map((agent, i) => [agent, i]));
+      const numerique = (agent: DonneesAgent) => numeriques[rang.get(agent) ?? -1];
+      const avecLiens = choisis.map((agent) => ({ ...agent, liens: numerique(agent)?.liens ?? {} }));
+      const fiches = avecFiches ? choisis.map((agent) => numerique(agent)?.fiche ?? "") : [];
+      const noms = nomsUniques(choisis.map(libelleAgent));
       const chemin = await exporterNumerique(modele, avecLiens, noms, fiches, options, dossier, t.numerique.nomDossier(modele.nom));
       notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.numerique.cree, message: chemin, autoClose: 10000 });
+      await maj.enregistrer(choisis);
     } catch (e) {
       signalerErreur(e);
     } finally {
@@ -116,7 +160,7 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
     if (!chemin) return;
     setEnCours(true);
     try {
-      const date = new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+      const date = new Date().toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
       await exporterBat(modele, cartes.map((agent) => ({ ...agent, libelle: libelleAgent(agent) })), modele.nom, date, chemin);
       notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.bat.cree, message: chemin });
     } catch (e) {
@@ -139,8 +183,13 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
       <Stack gap="md">
         <Group justify="space-between">
           <Title order={5}>{t.titre}</Title>
-          <Badge variant="light">{t.resume(agents.length)}</Badge>
+          <Badge variant="light">{t.resume(mode === "bat" ? agents.length : nbCartes)}</Badge>
         </Group>
+        {imprimees && colonneQuantite && (
+          <Text size="xs" c="dimmed" mt={-8}>
+            {t.quantites(choisis.length, colonneQuantite)}
+          </Text>
+        )}
         {controle.enCours ? (
           <Group gap="xs">
             <Loader size={14} />
@@ -157,6 +206,37 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
               </Text>
             </Group>
           )
+        )}
+        {incremental && maj.canal && (
+          <Stack gap={6} data-mise-a-jour>
+            <Group justify="space-between" gap="xs" wrap="nowrap">
+              <Text size="sm" fw={500}>
+                {tm.titre}
+              </Text>
+              <Button variant="subtle" size="compact-xs" onClick={maj.oublier}>
+                {tm.oublier}
+              </Button>
+            </Group>
+            <Text size="xs" c="dimmed">
+              {tm.dernier(dateLisible(maj.canal.date), maj.canal.nombre)} {tm.aide}
+            </Text>
+            <SegmentedControl
+              fullWidth
+              size="xs"
+              value={seulementNouvelles ? "nouvelles" : "toutes"}
+              onChange={(valeur) => setToutes(valeur === "toutes")}
+              data={[
+                { value: "nouvelles", label: tm.nouvelles(etatsPrets ? nombreDe(aRefaire) : 0) },
+                { value: "toutes", label: tm.toutes(nombreDe(agents)) },
+              ]}
+            />
+            {etatsPrets && (
+              <Text size="xs" c="dimmed">
+                {maj.modeleChange ? tm.modeleChange : tm.detail(compte("nouvelle"), compte("modifiee"), compte("inchangee"))}
+              </Text>
+            )}
+            {seulementNouvelles && etatsPrets && choisis.length === 0 && <Text size="sm">{tm.rien}</Text>}
+          </Stack>
         )}
         {!ecran && (
           <SegmentedControl
@@ -191,19 +271,23 @@ export default function EtapeDestination({ modele, agents, numeriques, controle,
             <Text size="sm" c="dimmed">
               {sortie === "planches" ? t.detailPlanches : t.detailCartes}
             </Text>
-            <Button leftSection={<IconFileTypePdf size={18} />} loading={enCours} disabled={controle.enCours} onClick={() => avecConfirmation(agents, exporter)}>
+            <Button leftSection={<IconFileTypePdf size={18} />} loading={enCours} disabled={controle.enCours || rienAExporter} onClick={() => avecConfirmation(choisis, exporter)}>
               {t.enregistrer}
             </Button>
           </>
         ) : mode === "bat" ? (
           <ExportBat modele={modele} agents={agents} mesures={controle.mesures} enCours={enCours || controle.enCours} onCreer={exporterBon} />
         ) : mode === "numerique" ? (
-          <ExportNumerique modele={modele} enCours={enCours || controle.enCours} onExporter={(options, fiches) => avecConfirmation(agents, () => exporterNumeriques(options, fiches))} />
+          <ExportNumerique
+            modele={modele}
+            enCours={enCours || controle.enCours || rienAExporter}
+            onExporter={(options, fiches) => avecConfirmation(choisis, () => exporterNumeriques(options, fiches))}
+          />
         ) : (
           <ImpressionDirecte
             modele={modele}
-            agents={agents}
-            enCours={enCours || controle.enCours}
+            agents={choisis}
+            enCours={enCours || controle.enCours || rienAExporter}
             onImprimer={(imprimante, cartes, reglages) => avecConfirmation(cartes, () => imprimer(imprimante, cartes, reglages))}
           />
         )}

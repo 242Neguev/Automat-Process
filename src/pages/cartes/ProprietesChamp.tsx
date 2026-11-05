@@ -3,7 +3,7 @@ import { IconColorPicker, IconTrash, IconX } from "@tabler/icons-react";
 import type { Transformation } from "../../donnees/nettoyage";
 import type { ChampsVCard } from "../../donnees/vcard";
 import { changerAncre } from "../../modele/champs";
-import type { Champ, ChampMasque, ChampQr, ChampTexte, Couleur, ModeleCarte } from "../../moteur";
+import type { Champ, ChampMasque, ChampPhoto, ChampQr, ChampTexte, Couleur, ModeleCarte } from "../../moteur";
 import { textes } from "../../textes";
 import { COULEURS } from "../../theme";
 
@@ -32,9 +32,9 @@ interface Props {
 }
 
 export default function ProprietesChamp({ champ, modele, polices, onChamp, onTransformation, onSupprimer, onFermer, onMesurerCouleur }: Props) {
-  const couleursModele = [...new Set(modele.champs.map((c) => enHexa(c.couleur)))];
+  const couleursModele = [...new Set(modele.champs.flatMap((c) => ("couleur" in c ? [enHexa(c.couleur)] : [])))];
   const nuancier = [...new Set([COULEURS.encre, COULEURS.eau, "#000000", "#ffffff", ...couleursModele])];
-  const couleur = (
+  const couleur = "couleur" in champ && (
     <ColorInput
       label={t.couleur}
       format="hex"
@@ -102,6 +102,39 @@ export default function ProprietesChamp({ champ, modele, polices, onChamp, onTra
           <Group grow>
             <NumberInput label={t.largeurMasque} min={0.5} step={0.5} decimalScale={1} value={masque.largeur_mm} onChange={dimension("largeur_mm")} />
             <NumberInput label={t.hauteurMasque} min={0.5} step={0.5} decimalScale={1} value={masque.hauteur_mm} onChange={dimension("hauteur_mm")} />
+          </Group>
+          {supprimer}
+        </Stack>
+      </Paper>
+    );
+  }
+
+  if (champ.type === "photo") {
+    const photo: ChampPhoto = champ;
+    const ronde = photo.forme === "cercle";
+    const dimension = (cle: "largeur_mm" | "hauteur_mm") => (v: string | number) =>
+      typeof v === "number" && v >= 5 && onChamp(photo.id, ronde ? { largeur_mm: v, hauteur_mm: v } : { [cle]: v });
+    return (
+      <Paper withBorder p="md">
+        <Stack gap="sm">
+          {entete(t.titrePhoto)}
+          <TextInput label={t.photoBalise} description={t.photoBaliseAide} value={photo.balise} onChange={(e) => onChamp(photo.id, { balise: e.currentTarget.value })} />
+          <div>
+            <Text size="sm" fw={500} mb={4}>
+              {t.forme}
+            </Text>
+            <SegmentedControl
+              fullWidth
+              value={photo.forme}
+              onChange={(forme) =>
+                onChamp(photo.id, forme === "cercle" ? { forme, largeur_mm: photo.largeur_mm, hauteur_mm: photo.largeur_mm } : { forme: forme as ChampPhoto["forme"] })
+              }
+              data={(["rectangle", "arrondi", "cercle"] as const).map((value) => ({ value, label: t.formes[value] }))}
+            />
+          </div>
+          <Group grow>
+            <NumberInput label={t.largeurPhoto} min={5} step={0.5} decimalScale={1} value={photo.largeur_mm} onChange={dimension("largeur_mm")} />
+            <NumberInput label={t.hauteurPhoto} min={5} step={0.5} decimalScale={1} value={photo.hauteur_mm} disabled={ronde} onChange={dimension("hauteur_mm")} />
           </Group>
           {supprimer}
         </Stack>

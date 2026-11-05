@@ -1,5 +1,6 @@
 // Copie d'une signature dans le presse-papiers, en HTML (mise en forme gardée au collage dans
 // Outlook ou Gmail) et en texte brut.
+import { textes } from "../textes";
 
 export async function copierSignature(html: string, texte: string): Promise<void> {
   if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
@@ -22,7 +23,7 @@ export async function copierSignature(html: string, texte: string): Promise<void
   selection?.removeAllRanges();
   selection?.addRange(plage);
   try {
-    if (!document.execCommand("copy")) throw new Error("La copie a été refusée.");
+    if (!document.execCommand("copy")) throw new Error(textes.erreurs.copieRefusee);
   } finally {
     selection?.removeAllRanges();
     zone.remove();

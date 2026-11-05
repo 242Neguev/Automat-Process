@@ -1,11 +1,12 @@
 // Liste vide à faire remplir (par les ressources humaines…) : un classeur Excel avec une colonne par
 // information du modèle. Rempli puis importé à l'étape Liste, il est relié d'office au modèle.
 import * as XLSX from "xlsx";
+import { textes } from "../textes";
 
 /** Lignes préparées au format texte, sous les titres. */
 export const LIGNES_PREPAREES = 500;
-export const FEUILLE_LISTE = "Liste";
-export const FEUILLE_AIDE = "Mode d'emploi";
+export const FEUILLE_LISTE = textes.liste.listeVide.feuilles.liste;
+export const FEUILLE_AIDE = textes.liste.listeVide.feuilles.aide;
 
 /**
  * Classeur Excel vide : les titres des colonnes sont les informations du modèle, et les cellules en

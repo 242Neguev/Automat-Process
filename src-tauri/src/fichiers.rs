@@ -6,6 +6,7 @@ use std::path::Path;
 use serde::Deserialize;
 
 use crate::moteur::ErreurMoteur;
+use crate::tr;
 
 /// Ce que l'on s'attend à lire : chaque nature a ses formats et sa taille maximale.
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -41,18 +42,25 @@ impl Nature {
 
     fn refus(self, extension: &str) -> String {
         match self {
-            Nature::Liste => format!(
-                "Format de liste non pris en charge (.{extension}) : utilisez un fichier Excel, CSV ou ODS."
+            Nature::Liste => tr!(
+                "Format de liste non pris en charge (.{extension}) : utilisez un fichier Excel, CSV ou ODS.",
+                "Unsupported list format (.{extension}): use an Excel, CSV or ODS file."
             ),
-            Nature::Image => format!(
-                "Format d'image non pris en charge (.{extension}) : utilisez un PNG, un JPG, un GIF ou un SVG."
+            Nature::Image => tr!(
+                "Format d'image non pris en charge (.{extension}) : utilisez un PNG, un JPG, un GIF ou un SVG.",
+                "Unsupported image format (.{extension}): use a PNG, JPG, GIF or SVG."
             ),
-            Nature::Signature => format!(
-                "Format non pris en charge (.{extension}) : choisissez une signature enregistrée en HTML (.htm ou .html)."
+            Nature::Signature => tr!(
+                "Format non pris en charge (.{extension}) : choisissez une signature enregistrée en HTML (.htm ou .html).",
+                "Unsupported format (.{extension}): choose a signature saved as HTML (.htm or .html)."
             ),
-            Nature::Pdf => format!("Format non pris en charge (.{extension}) : choisissez un PDF."),
-            Nature::Word => format!(
-                "Format non pris en charge (.{extension}) : choisissez un document Word (.docx ou .dotx)."
+            Nature::Pdf => tr!(
+                "Format non pris en charge (.{extension}) : choisissez un PDF.",
+                "Unsupported format (.{extension}): choose a PDF."
+            ),
+            Nature::Word => tr!(
+                "Format non pris en charge (.{extension}) : choisissez un document Word (.docx ou .dotx).",
+                "Unsupported format (.{extension}): choose a Word document (.docx or .dotx)."
             ),
         }
     }
@@ -69,12 +77,16 @@ pub fn lire(chemin: &str, nature: Nature) -> Result<Vec<u8>, ErreurMoteur> {
         return Err(ErreurMoteur::simple(nature.refus(&extension)));
     }
     let illisible = |erreur: std::io::Error| {
-        ErreurMoteur::simple(format!("Impossible de lire « {chemin} » : {erreur}"))
+        ErreurMoteur::simple(tr!(
+            "Impossible de lire « {chemin} » : {erreur}",
+            "Cannot read “{chemin}”: {erreur}"
+        ))
     };
     let taille = std::fs::metadata(chemin).map_err(illisible)?.len();
     if taille > nature.taille_max() {
-        return Err(ErreurMoteur::simple(format!(
+        return Err(ErreurMoteur::simple(tr!(
             "Le fichier dépasse {} Mo.",
+            "The file is larger than {} MB.",
             nature.taille_max() / (1024 * 1024)
         )));
     }
@@ -144,19 +156,25 @@ pub fn ecrire(
     sous_dossier: &str,
     fichiers: &[FichierAEcrire],
 ) -> Result<String, ErreurMoteur> {
-    let nom_dossier =
-        nom_sur(sous_dossier).ok_or_else(|| ErreurMoteur::simple("Nom de dossier invalide."))?;
+    let nom_dossier = nom_sur(sous_dossier).ok_or_else(|| {
+        ErreurMoteur::simple(tr!("Nom de dossier invalide.", "Invalid folder name."))
+    })?;
     let cible = Path::new(dossier).join(nom_dossier);
     let echec = |erreur: std::io::Error| {
-        ErreurMoteur::simple(format!(
+        ErreurMoteur::simple(tr!(
             "Impossible d'écrire dans « {} » : {erreur}",
+            "Cannot write to “{}”: {erreur}",
             cible.display()
         ))
     };
     std::fs::create_dir_all(&cible).map_err(echec)?;
     for fichier in fichiers {
         let nom = chemin_sur(&fichier.nom).ok_or_else(|| {
-            ErreurMoteur::simple(format!("Nom de fichier invalide : {}", fichier.nom))
+            ErreurMoteur::simple(tr!(
+                "Nom de fichier invalide : {}",
+                "Invalid file name: {}",
+                fichier.nom
+            ))
         })?;
         if let Some(parent) = cible.join(&nom).parent() {
             std::fs::create_dir_all(parent).map_err(echec)?;

@@ -2,6 +2,8 @@
 //! Magicard…) ou toute autre imprimante installée. Chaque carte est rendue à la résolution de
 //! l'imprimante, puis envoyée à son pilote à sa taille réelle, centrée sur la page.
 
+#[cfg(not(windows))]
+use crate::langue::texte;
 use serde::{Deserialize, Serialize};
 
 /// Une imprimante installée.
@@ -87,7 +89,11 @@ pub fn imprimer(
     _retourner_verso: bool,
     _rendre: &Rendu,
 ) -> Result<bool, String> {
-    Err("L'impression directe n'est disponible que sous Windows.".into())
+    Err(texte(
+        "L'impression directe n'est disponible que sous Windows.",
+        "Direct printing is only available on Windows.",
+    )
+    .into())
 }
 
 #[cfg(windows)]
@@ -116,6 +122,8 @@ mod systeme {
     use windows::core::{HSTRING, PCWSTR, PWSTR};
 
     use super::{Face, Imprimante, Rendu, demi_tour};
+    use crate::langue::texte;
+    use crate::tr;
 
     /// Tampon aligné pour les structures de taille variable renvoyées par Windows.
     fn tampon(octets: usize) -> Vec<u64> {
@@ -145,7 +153,12 @@ mod systeme {
                 &mut nombre,
             )
         }
-        .map_err(|erreur| format!("Liste des imprimantes illisible : {erreur}"))?;
+        .map_err(|erreur| {
+            tr!(
+                "Liste des imprimantes illisible : {erreur}",
+                "The list of printers cannot be read: {erreur}"
+            )
+        })?;
         let infos = unsafe {
             std::slice::from_raw_parts(memoire.as_ptr().cast::<PRINTER_INFO_4W>(), nombre as usize)
         };
@@ -187,10 +200,20 @@ mod systeme {
         paysage: bool,
         recto_verso: bool,
     ) -> Result<Vec<u64>, String> {
-        let illisibles = || "Les réglages de l'imprimante sont illisibles.".to_string();
+        let illisibles = || {
+            texte(
+                "Les réglages de l'imprimante sont illisibles.",
+                "The printer settings cannot be read.",
+            )
+            .to_string()
+        };
         let mut imprimante = PRINTER_HANDLE::default();
-        unsafe { OpenPrinterW(nom, &mut imprimante, None) }
-            .map_err(|erreur| format!("Imprimante introuvable : {erreur}"))?;
+        unsafe { OpenPrinterW(nom, &mut imprimante, None) }.map_err(|erreur| {
+            tr!(
+                "Imprimante introuvable : {erreur}",
+                "Printer not found: {erreur}"
+            )
+        })?;
         let resultat = (|| {
             let taille = unsafe { DocumentPropertiesW(None, imprimante, nom, None, None, 0) };
             if taille <= 0 {
@@ -260,8 +283,9 @@ mod systeme {
             )
         };
         if hdc.is_invalid() {
-            return Err(format!(
-                "Impossible d'ouvrir l'imprimante « {imprimante} »."
+            return Err(tr!(
+                "Impossible d'ouvrir l'imprimante « {imprimante} ».",
+                "Cannot open the printer “{imprimante}”."
             ));
         }
         let resultat = envoyer(hdc, document, taille_mm, faces, retourner_verso, rendre);
@@ -288,7 +312,11 @@ mod systeme {
             if unsafe { GetLastError() } == ERROR_CANCELLED {
                 return Ok(false);
             }
-            return Err("L'impression n'a pas pu démarrer.".into());
+            return Err(texte(
+                "L'impression n'a pas pu démarrer.",
+                "Printing could not start.",
+            )
+            .into());
         }
         let caps = |index| unsafe { GetDeviceCaps(Some(hdc), index) };
         let (dpi_x, dpi_y) = (f64::from(caps(LOGPIXELSX)), f64::from(caps(LOGPIXELSY)));
@@ -321,7 +349,11 @@ mod systeme {
                 ..Default::default()
             };
             if unsafe { StartPage(hdc) } <= 0 {
-                return Err("L'imprimante a refusé une page.".to_string());
+                return Err(texte(
+                    "L'imprimante a refusé une page.",
+                    "The printer refused a page.",
+                )
+                .to_string());
             }
             let lignes = unsafe {
                 let _ = SetStretchBltMode(hdc, HALFTONE);
@@ -343,7 +375,11 @@ mod systeme {
                 )
             };
             if lignes <= 0 || unsafe { EndPage(hdc) } <= 0 {
-                return Err("Une carte n'a pas pu être envoyée à l'imprimante.".to_string());
+                return Err(texte(
+                    "Une carte n'a pas pu être envoyée à l'imprimante.",
+                    "A card could not be sent to the printer.",
+                )
+                .to_string());
             }
             Ok(())
         });

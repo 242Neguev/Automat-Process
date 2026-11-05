@@ -1,8 +1,9 @@
 // Rapport de contrôle des cartes : les mesures de mise en page renvoyées par le moteur deviennent des
 // problèmes compréhensibles, carte par carte, rangés du plus grave au moins grave.
+import type { PhotoManquante } from "../donnees/agents";
 import { MARGE_SECURITE_MM } from "../modele/formats";
 import type { ChampQr, ChampTexte, DonneesAgent, MesureTexte, ModeleCarte } from "../moteur";
-import { textes } from "../textes";
+import { locale, textes } from "../textes";
 
 const t = textes.cartes.controle;
 
@@ -35,6 +36,7 @@ const GRAVITES: Record<TypeProbleme, Gravite> = {
   chevauche: "attention",
   "hors-zone": "attention",
   descend: "attention",
+  photo: "attention",
   reduit: "info",
   lignes: "info",
 };
@@ -50,14 +52,17 @@ export function libelleChamp(champ: ChampTexte): string {
   return balises.length > 0 ? balises.join(" ") : champ.modele;
 }
 
-const nombre = (valeur: number) => valeur.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+const nombre = (valeur: number) => valeur.toLocaleString(locale, { maximumFractionDigits: 1 });
 
 type Boite = { gauche: number; droite: number; haut: number; bas: number };
 const chevauchent = (a: Boite, b: Boite) =>
   a.gauche < b.droite - TOLERANCE && b.gauche < a.droite - TOLERANCE && a.haut < b.bas - TOLERANCE && b.haut < a.bas - TOLERANCE;
 
-/** Problèmes de chaque carte (par identifiant d'agent), du plus grave au moins grave. */
-export function analyser(modele: ModeleCarte, agents: DonneesAgent[], mesures: MesureTexte[]): Map<string, Probleme[]> {
+/**
+ * Problèmes de chaque carte (par identifiant d'agent), du plus grave au moins grave. `photos` : les
+ * photos demandées par la liste mais introuvables, par agent.
+ */
+export function analyser(modele: ModeleCarte, agents: DonneesAgent[], mesures: MesureTexte[], photos?: Map<string, PhotoManquante[]>): Map<string, Probleme[]> {
   const champsTexte = new Map(modele.champs.filter((c): c is ChampTexte => c.type === "texte").map((c) => [c.id, c]));
   const qr = modele.champs.find((c): c is ChampQr => c.type === "qr");
   const zoneQr = qr && { gauche: qr.x_mm, droite: qr.x_mm + qr.taille_mm, haut: qr.y_mm, bas: qr.y_mm + qr.taille_mm };
@@ -93,6 +98,9 @@ export function analyser(modele: ModeleCarte, agents: DonneesAgent[], mesures: M
     const plusBasse = siennes.reduce<MesureTexte | null>((bas, m) => (!bas || m.base > bas.base ? m : bas), null);
     if (plusBasse && plusBasse.base - basePrevue > DESCENTE_MAX) {
       signaler("descend", [plusBasse], () => t.problemes.descend(nombre(plusBasse.base - basePrevue)));
+    }
+    for (const photo of photos?.get(agent.id) ?? []) {
+      problemes.push({ agent: agent.id, type: "photo", gravite: GRAVITES.photo, champs: [photo.champ], libelles: [photo.balise], message: t.problemes.photo(photo.nom) });
     }
     problemes.sort((a, b) => ORDRE_GRAVITES.indexOf(a.gravite) - ORDRE_GRAVITES.indexOf(b.gravite));
     rapport.set(agent.id, problemes);

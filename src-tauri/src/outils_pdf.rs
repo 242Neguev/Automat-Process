@@ -8,6 +8,7 @@ use lopdf::{Dictionary, Document, Object, ObjectId, dictionary};
 use typst::foundations::Bytes;
 
 use crate::moteur::{ErreurMoteur, Fichiers, Moteur};
+use crate::tr;
 
 /// Attributs qu'une page peut hériter de ses parents dans l'arbre des pages.
 const HERITES: [&[u8]; 4] = [b"Resources", b"MediaBox", b"CropBox", b"Rotate"];
@@ -15,11 +16,17 @@ const HERITES: [&[u8]; 4] = [b"Resources", b"MediaBox", b"CropBox", b"Rotate"];
 /// Charge un PDF ; un PDF chiffré sans mot de passe d'ouverture est déchiffré.
 fn charger(octets: &[u8], nom: &str) -> Result<Document, ErreurMoteur> {
     let mut document = Document::load_mem(octets).map_err(|erreur| {
-        ErreurMoteur::simple(format!("« {nom} » n'a pas pu être lu : {erreur}"))
+        ErreurMoteur::simple(tr!(
+            "« {nom} » n'a pas pu être lu : {erreur}",
+            "“{nom}” could not be read: {erreur}"
+        ))
     })?;
     if document.is_encrypted() {
         document.decrypt("").map_err(|_| {
-            ErreurMoteur::simple(format!("« {nom} » est protégé par un mot de passe."))
+            ErreurMoteur::simple(tr!(
+                "« {nom} » est protégé par un mot de passe.",
+                "“{nom}” is password-protected."
+            ))
         })?;
     }
     aplatir_heritage(&mut document);
@@ -91,7 +98,10 @@ fn assembler(
     document.compress();
     let mut octets = Vec::new();
     document.save_to(&mut octets).map_err(|erreur| {
-        ErreurMoteur::simple(format!("Le PDF n'a pas pu être écrit : {erreur}"))
+        ErreurMoteur::simple(tr!(
+            "Le PDF n'a pas pu être écrit : {erreur}",
+            "The PDF could not be written: {erreur}"
+        ))
     })?;
     Ok(octets)
 }
@@ -99,7 +109,7 @@ fn assembler(
 /// Pages d'un PDF en SVG, pour les afficher (aperçu fidèle d'un courrier) : le moteur de rendu
 /// lit le PDF comme une image, page par page, polices incorporées comprises.
 pub fn rendre_pages(moteur: &Moteur, pdf: Vec<u8>) -> Result<Vec<String>, ErreurMoteur> {
-    let pages = nombre_de_pages(&pdf, "aperçu")?;
+    let pages = nombre_de_pages(&pdf, crate::langue::texte("aperçu", "preview"))?;
     let source: String = (1..=pages)
         .map(|page| format!("#page(width: auto, height: auto, margin: 0pt, image(\"/apercu.pdf\", page: {page}))\n"))
         .collect();
@@ -118,7 +128,10 @@ pub fn nombre_de_pages(octets: &[u8], nom: &str) -> Result<usize, ErreurMoteur> 
 /// Un seul PDF fait de tous les PDF donnés (nom, contenu), dans l'ordre.
 pub fn fusionner(sources: &[(String, Vec<u8>)]) -> Result<Vec<u8>, ErreurMoteur> {
     if sources.is_empty() {
-        return Err(ErreurMoteur::simple("Aucun PDF à fusionner."));
+        return Err(ErreurMoteur::simple(tr!(
+            "Aucun PDF à fusionner.",
+            "No PDF to merge."
+        )));
     }
     let mut objets = BTreeMap::new();
     let mut pages = Vec::new();

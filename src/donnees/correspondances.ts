@@ -18,11 +18,12 @@ const SYNONYMES = {
   fonction: ["fonction", "poste", "titre", "intitule", "intituledeposte", "jobtitle", "title"],
   email: ["email", "mail", "courriel", "adressemail", "adresseemail", "emailprofessionnel", "mailprofessionnel"],
   mobile: ["mobile", "portable", "gsm", "cellulaire", "telmobile", "telephonemobile", "telportable", "cell"],
-  fixe: ["fixe", "telfixe", "telephonefixe", "bureau", "telbureau", "telephonebureau", "lignedirecte"],
+  fixe: ["fixe", "telfixe", "telephonefixe", "bureau", "telbureau", "telephonebureau", "lignedirecte", "officephone", "workphone", "landline", "deskphone"],
   telephone: ["telephone", "tel", "phone", "numerodetelephone"],
   matricule: ["matricule", "identifiant", "numeroagent", "numerodagent", "id"],
   direction: ["direction", "departement", "service", "division", "pole"],
   site: ["site", "ville", "localisation", "agence", "implantation"],
+  photo: ["photo", "photos", "fichierphoto", "nomphoto", "portrait", "image", "picture"],
 };
 
 /** Nature d'une information, d'après les intitulés courants. */
