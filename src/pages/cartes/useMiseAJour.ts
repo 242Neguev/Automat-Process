@@ -10,8 +10,8 @@ export interface MiseAJour {
   etats: EtatCarte[];
   /** Le modèle a changé depuis ces exports : toutes les cartes sont à refaire. */
   modeleChange: boolean;
-  /** Note les cartes qui viennent d'être produites. */
-  enregistrer: (exportes: DonneesAgent[]) => Promise<void>;
+  /** Note les cartes qui viennent d'être produites (`nombre` : quantités comprises, une par agent par défaut). */
+  enregistrer: (exportes: DonneesAgent[], nombre?: number) => Promise<void>;
   /** Oublie les exports précédents du modèle (tous canaux). */
   oublier: () => Promise<void>;
 }
@@ -46,7 +46,7 @@ export function useMiseAJour(modele: ModeleCarte, agents: DonneesAgent[], cles: 
   const exports = registre?.canaux[canal];
   const etats = useMemo(() => (empreinte ? etatsCartes(cles, cartes, exports, empreinte) : []), [cles, cartes, exports, empreinte]);
 
-  async function enregistrer(exportes: DonneesAgent[]) {
+  async function enregistrer(exportes: DonneesAgent[], nombre?: number) {
     if (!id || !empreinte) return;
     const rangs = new Map(agents.map((agent, i) => [agent, i]));
     const indices = [...new Set(exportes.map((agent) => rangs.get(agent)).filter((i): i is number => i !== undefined))];
@@ -55,6 +55,7 @@ export function useMiseAJour(modele: ModeleCarte, agents: DonneesAgent[], cles: 
       canal,
       empreinte,
       indices.map((i) => ({ cle: cles[i], carte: cartes[i] })),
+      { nombre },
     );
     try {
       await ecrireRegistre(id, nouveau);

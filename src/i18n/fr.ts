@@ -58,6 +58,7 @@ export const fr = {
       balises: "Informations à remplir pour chaque agent",
       source: { demo: "Modèle de démonstration", perso: "Mon modèle" },
       nomPerso: "Mon modèle",
+      nomDemo: "Carte de démonstration (EXEMPLE SA)",
       formatTitre: "Format de la carte",
       formatPersonnalise: "Format personnalisé",
       largeur: "Largeur (mm)",
@@ -192,6 +193,7 @@ export const fr = {
         descend: (mm: string) => `Les textes descendent ${mm} mm plus bas que prévu : vérifiez qu'ils ne touchent pas le bas du visuel.`,
         reduit: (libelle: string, taille: string, origine: string) => `« ${libelle} » est réduit à ${taille} pt (au lieu de ${origine} pt) pour tenir.`,
         lignes: (libelle: string, lignes: number) => `« ${libelle} » passe sur ${lignes} lignes.`,
+        photo: (nom: string) => `Photo « ${nom} » introuvable : elle n'apparaîtra pas.`,
       },
       resumes: {
         deborde: (libelles: string[]) => `« ${libelles[0]} » trop long, même réduit`,
@@ -201,6 +203,7 @@ export const fr = {
         descend: () => "Textes plus bas que prévu",
         reduit: (libelles: string[]) => `« ${libelles[0]} » réduit pour tenir`,
         lignes: (libelles: string[]) => `« ${libelles[0]} » sur plusieurs lignes`,
+        photo: () => "Photo introuvable",
       },
     },
     verification: {

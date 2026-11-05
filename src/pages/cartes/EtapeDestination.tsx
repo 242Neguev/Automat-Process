@@ -67,7 +67,6 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
   const [enCours, setEnCours] = useState(false);
   const [aConfirmer, setAConfirmer] = useState<{ cartes: DonneesAgent[]; action: () => void } | null>(null);
   const { rapport } = controle;
-  const nombres = rapport ? compter(rapport) : null;
 
   // Mise à jour incrémentale : les cartes imprimées et les cartes numériques ont chacune leur registre.
   const imprimees = mode === "pdf" || mode === "impression";
@@ -77,16 +76,21 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
   const incremental = mode !== "bat" && maj.canal !== undefined;
   const etatsPrets = maj.etats.length === agents.length;
   const seulementNouvelles = incremental && !toutes;
-  const choisis = useMemo(
-    () => (seulementNouvelles && etatsPrets ? agents.filter((_, i) => maj.etats[i] !== "inchangee") : agents),
-    [seulementNouvelles, etatsPrets, agents, maj.etats],
-  );
+  const aRefaire = useMemo(() => agents.filter((_, i) => maj.etats[i] !== "inchangee"), [agents, maj.etats]);
+  const choisis = seulementNouvelles && etatsPrets ? aRefaire : agents;
   const compte = (etat: string) => maj.etats.filter((e) => e === etat).length;
+  // Résumé du contrôle : seulement les cartes à exporter (les inchangées ne sont pas refaites).
+  const nombres = useMemo(
+    () => (rapport && choisis.length > 0 ? compter(new Map(choisis.map((agent) => [agent.id, rapport.get(agent.id) ?? []]))) : null),
+    [rapport, choisis],
+  );
   // Quantités : chaque carte imprimée est répétée autant de fois que demandé (0 : aucune).
   const quantiteDe = useMemo(() => new Map(agents.map((agent, i) => [agent, quantites[i] ?? 1])), [agents, quantites]);
   const avecQuantites = (cartes: DonneesAgent[]) => repeter(cartes, cartes.map((agent) => quantiteDe.get(agent) ?? 1));
   const produites = (cartes: DonneesAgent[]) => cartes.filter((agent) => (quantiteDe.get(agent) ?? 1) > 0);
-  const nbCartes = imprimees ? avecQuantites(choisis).length : choisis.length;
+  /** Cartes produites pour ces agents : quantités comprises pour les cartes imprimées. */
+  const nombreDe = (cartes: DonneesAgent[]) => (imprimees ? avecQuantites(cartes).length : cartes.length);
+  const nbCartes = nombreDe(choisis);
   // Le registre n'est pas encore comparé, ou il n'y a rien à refaire.
   const rienAExporter = (incremental && !etatsPrets) || nbCartes === 0;
 
@@ -102,9 +106,10 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
     if (!chemin) return;
     setEnCours(true);
     try {
-      await exporterCartes(modele, avecQuantites(choisis), sortie, feuille, chemin);
+      const aExporter = avecQuantites(choisis);
+      await exporterCartes(modele, aExporter, sortie, feuille, chemin);
       notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.enregistre, message: chemin });
-      await maj.enregistrer(produites(choisis));
+      await maj.enregistrer(produites(choisis), aExporter.length);
     } catch (e) {
       signalerErreur(e);
     } finally {
@@ -118,7 +123,7 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
       const aImprimer = avecQuantites(cartes);
       if (await imprimerCartes(modele, aImprimer, imprimante, reglages)) {
         notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.impression.envoyee(imprimante), message: t.impression.nbCartes(aImprimer.length) });
-        await maj.enregistrer(produites(cartes));
+        await maj.enregistrer(produites(cartes), aImprimer.length);
       } else {
         notifications.show({ color: "gray", title: t.impression.annulee, message: t.impression.annuleeDetail });
       }
@@ -221,8 +226,8 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
               value={seulementNouvelles ? "nouvelles" : "toutes"}
               onChange={(valeur) => setToutes(valeur === "toutes")}
               data={[
-                { value: "nouvelles", label: tm.nouvelles(etatsPrets ? compte("nouvelle") + compte("modifiee") : 0) },
-                { value: "toutes", label: tm.toutes(agents.length) },
+                { value: "nouvelles", label: tm.nouvelles(etatsPrets ? nombreDe(aRefaire) : 0) },
+                { value: "toutes", label: tm.toutes(nombreDe(agents)) },
               ]}
             />
             {etatsPrets && (

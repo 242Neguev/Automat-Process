@@ -83,10 +83,16 @@ describe("état des cartes et registre", () => {
   });
 
   it("complète le registre à chaque export", () => {
-    const premier = apresExport(null, "numerique", "M", [{ cle: "a", carte: "1" }], new Date("2026-11-04T10:00:00Z"));
+    const premier = apresExport(null, "numerique", "M", [{ cle: "a", carte: "1" }], { date: new Date("2026-11-04T10:00:00Z") });
+    expect(premier.canaux.numerique?.date).toBe("2026-11-04T10:00:00.000Z");
     const second = apresExport(premier, "numerique", "M", [{ cle: "b", carte: "2" }]);
     expect(second.canaux.numerique?.cartes).toEqual({ a: "1", b: "2" });
     expect(second.canaux.numerique?.nombre).toBe(1);
+  });
+
+  it("compte les cartes produites, quantités comprises", () => {
+    const registre = apresExport(null, "impression", "M", [{ cle: "a", carte: "1" }, { cle: "b", carte: "2" }], { nombre: 5 });
+    expect(registre.canaux.impression?.nombre).toBe(5);
   });
 
   it("ignore un registre illisible", () => {

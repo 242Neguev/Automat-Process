@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Group, Stack, Stepper, Text, Title } from "@mantine/core";
-import { balisesDuModele, construireAgent, ficheContact, liensAgent, valeursDeLigne } from "../../donnees/agents";
+import { balisesDuModele, construireAgent, ficheContact, liensAgent, photosManquantes, valeursDeLigne } from "../../donnees/agents";
 import { quantitesDe } from "../../donnees/quantite";
 import { identites, nouvelIdentifiant } from "../../donnees/registre";
 import { FORMATS, FORMATS_ECRAN } from "../../modele/formats";
@@ -61,7 +61,7 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
     famillesPolices().then(setPolices, signalerErreur);
   }, []);
   useEffect(() => {
-    if (source === "demo" && !modeles.demo) modeleDemo().then((demo) => setModeles((m) => ({ ...m, demo: { ...demo, id: "demo" } })), signalerErreur);
+    if (source === "demo" && !modeles.demo) modeleDemo().then((demo) => setModeles((m) => ({ ...m, demo: { ...demo, id: "demo", nom: t.modele.nomDemo } })), signalerErreur);
   }, [source, modeles.demo]);
 
   const balises = useMemo(() => (modele ? balisesDuModele(modele) : []), [modele]);
@@ -87,8 +87,13 @@ export default function AssistantCartes({ variante = "cartes" }: { variante?: "c
       return { liens: liensAgent(modele, valeurs), fiche: ficheContact(modele, valeurs) };
     });
   }, [etape, modele, liste, correspondances]);
+  // Photos demandées par la liste mais introuvables (une fois le chargement fini) : signalées au contrôle.
+  const manquantes = useMemo(
+    () => (modele && liste && !photos.progression ? photosManquantes(modele, liste.lignes, correspondances, agents) : undefined),
+    [modele, liste, correspondances, agents, photos.progression],
+  );
   // Le contrôle des cartes sert à la vérification et à l'export.
-  const controle = useControle(modele, agents, etape >= 2);
+  const controle = useControle(modele, agents, etape >= 2, manquantes);
   const exemple = useMemo(
     () => (modele && liste?.lignes[0] ? valeursDeLigne(modele, liste.lignes[0], correspondances) : {}),
     [modele, liste, correspondances],

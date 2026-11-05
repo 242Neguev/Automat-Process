@@ -3,7 +3,7 @@ import modeleDemo from "../../src-tauri/ressources/demo/projet.json";
 import { nouvellePhoto, recadrageAuto } from "../modele/champs";
 import { aUnVerso } from "../modele/visuels";
 import type { ChampPhoto, ModeleCarte, PhotoChargee } from "../moteur";
-import { agentBalises, balisesDuModele, cleRecadrage, construireAgent, varianteDe, type Photos } from "./agents";
+import { agentBalises, balisesDuModele, cleRecadrage, construireAgent, photosManquantes, varianteDe, type Photos } from "./agents";
 import { associer } from "./correspondances";
 import type { LigneListe } from "./liste";
 import { empreinteCarte } from "./registre";
@@ -81,6 +81,18 @@ describe("photos des agents", () => {
     // Photo absente de la liste, ou introuvable : pas de photo.
     expect(construireAgent(modele, ligne({ Photo: "" }), correspondances, photos).photos).toBeUndefined();
     expect(construireAgent(modele, ligne({ Photo: "inconnue" }), correspondances, photos).photos).toBeUndefined();
+  });
+
+  it("manquantes : demandées par la liste mais absentes de la carte", () => {
+    const photos: Photos = { chargees: new Map([["adiallo", chargee(null)]]), recadrages: {} };
+    const lignes = [ligne({ Photo: "adiallo" }), ligne({ Photo: "inconnue" }), ligne({ Photo: "" })];
+    const agents = lignes.map((l, i) => ({ ...construireAgent(modele, l, correspondances, photos), id: `ligne ${i + 2}` }));
+    expect([...photosManquantes(modele, lignes, correspondances, agents)]).toEqual([["ligne 3", [{ champ: "p1", balise: "Photo", nom: "inconnue" }]]]);
+    // Dossier pas encore choisi : toutes les photos demandées manquent.
+    const sansDossier = lignes.map((l, i) => ({ ...construireAgent(modele, l, correspondances, { chargees: new Map(), recadrages: {} }), id: `ligne ${i + 2}` }));
+    expect([...photosManquantes(modele, lignes, correspondances, sansDossier).keys()]).toEqual(["ligne 2", "ligne 3"]);
+    // Modèle sans cadre photo : rien à signaler.
+    expect(photosManquantes(demo, lignes, correspondances, agents).size).toBe(0);
   });
 
   it("laissent intacte l'empreinte des cartes d'un modèle sans photo ni variante", () => {

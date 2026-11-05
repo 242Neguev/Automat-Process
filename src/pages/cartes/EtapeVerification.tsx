@@ -97,9 +97,11 @@ function RecadragePhotos({ modele, agent, onRecadrer }: { modele: ModeleCarte; a
             </Stack>
           );
         })}
-        <Text size="xs" c="dimmed">
-          {t.aide}
-        </Text>
+        {cadres.some((cadre) => agent.photos?.[cadre.id]) && (
+          <Text size="xs" c="dimmed">
+            {t.aide}
+          </Text>
+        )}
       </Stack>
     </Paper>
   );

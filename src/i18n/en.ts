@@ -46,6 +46,7 @@ export const en: Textes = {
       balises: "Fields to fill in for each person",
       source: { demo: "Demo template", perso: "My template" },
       nomPerso: "My template",
+      nomDemo: "Demo card (EXEMPLE SA)",
       formatTitre: "Card format",
       formatPersonnalise: "Custom format",
       largeur: "Width (mm)",
@@ -177,6 +178,7 @@ export const en: Textes = {
         descend: (mm: string) => `The texts go ${mm} mm lower than planned: check they do not touch the bottom of the design.`,
         reduit: (libelle: string, taille: string, origine: string) => `“${libelle}” is shrunk to ${taille} pt (instead of ${origine} pt) to fit.`,
         lignes: (libelle: string, lignes: number) => `“${libelle}” runs over ${lignes} lines.`,
+        photo: (nom: string) => `Photo “${nom}” not found: it will not appear.`,
       },
       resumes: {
         deborde: (libelles: string[]) => `“${libelles[0]}” too long, even shrunk`,
@@ -186,6 +188,7 @@ export const en: Textes = {
         descend: () => "Texts lower than planned",
         reduit: (libelles: string[]) => `“${libelles[0]}” shrunk to fit`,
         lignes: (libelles: string[]) => `“${libelles[0]}” on several lines`,
+        photo: () => "Photo not found",
       },
     },
     verification: {

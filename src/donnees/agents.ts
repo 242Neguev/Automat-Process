@@ -55,6 +55,33 @@ export const nomPhoto = (champ: ChampPhoto, ligne: LigneListe, correspondances: 
 /** Clé du recadrage d'une photo dans un cadre (le nom de la photo n'y figure que par son empreinte). */
 export const cleRecadrage = (champ: ChampPhoto, nom: string) => `${champ.id}:${empreinte(nom)}`;
 
+/** Photo demandée par la liste mais absente de la carte : son cadre, la balise de sa colonne, le nom donné. */
+export interface PhotoManquante {
+  champ: string;
+  balise: string;
+  nom: string;
+}
+
+/**
+ * Photos que la liste demande mais qui manquent aux cartes (introuvables, illisibles, ou dossier pas
+ * encore choisi), par identifiant d'agent. `agents` : construits depuis `lignes`, dans le même ordre.
+ */
+export function photosManquantes(modele: ModeleCarte, lignes: LigneListe[], correspondances: Correspondances, agents: DonneesAgent[]): Map<string, PhotoManquante[]> {
+  const cadres = modele.champs.filter(estPhoto);
+  const manquantes = new Map<string, PhotoManquante[]>();
+  if (cadres.length === 0) return manquantes;
+  lignes.forEach((ligne, i) => {
+    const agent = agents[i];
+    if (!agent) return;
+    const siennes = cadres.flatMap((cadre) => {
+      const nom = nomPhoto(cadre, ligne, correspondances);
+      return nom && !agent.photos?.[cadre.id] ? [{ champ: cadre.id, balise: cadre.balise, nom }] : [];
+    });
+    if (siennes.length > 0) manquantes.set(agent.id, siennes);
+  });
+  return manquantes;
+}
+
 function photosDeLigne(modele: ModeleCarte, ligne: LigneListe, correspondances: Correspondances, photos: Photos): Record<string, PhotoAgent> | undefined {
   const resultat: Record<string, PhotoAgent> = {};
   for (const champ of modele.champs.filter(estPhoto)) {

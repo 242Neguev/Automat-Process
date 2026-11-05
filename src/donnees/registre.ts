@@ -109,13 +109,20 @@ export function etatsCartes(cles: string[], cartes: string[], canal: RegistreCan
 
 /**
  * Registre après un export. Si le modèle a changé, les cartes d'avant ne comptent plus : seules
- * restent celles qui viennent d'être produites avec le nouveau modèle.
+ * restent celles qui viennent d'être produites avec le nouveau modèle. `nombre` : cartes produites,
+ * quantités comprises (par défaut, une par agent exporté).
  */
-export function apresExport(registre: Registre | null, canal: Canal, modele: string, exportees: { cle: string; carte: string }[], date = new Date()): Registre {
+export function apresExport(
+  registre: Registre | null,
+  canal: Canal,
+  modele: string,
+  exportees: { cle: string; carte: string }[],
+  { date = new Date(), nombre = exportees.length }: { date?: Date; nombre?: number } = {},
+): Registre {
   const actuel = registre?.canaux[canal];
   const cartes = actuel && actuel.modele === modele ? { ...actuel.cartes } : {};
   for (const { cle, carte } of exportees) cartes[cle] = carte;
-  return { version: 1, canaux: { ...registre?.canaux, [canal]: { modele, date: date.toISOString(), nombre: exportees.length, cartes } } };
+  return { version: 1, canaux: { ...registre?.canaux, [canal]: { modele, date: date.toISOString(), nombre, cartes } } };
 }
 
 /** Lit un registre enregistré ; un fichier d'une autre version ou abîmé est ignoré. */
