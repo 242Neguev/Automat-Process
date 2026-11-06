@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Group, Modal, Stack, Stepper, Text, Title } from "@mantine/core";
 import { join } from "@tauri-apps/api/path";
-import urlFondExemple from "../../assets/fond-teams-exemple.svg?url";
+// « no-inline » : le fichier reste à part (sinon Vite intègre un petit fichier au code en data:, que la politique de sécurité de l'application interdit de lire avec fetch).
+import urlFondExemple from "../../assets/fond-teams-exemple.svg?url&no-inline";
 import { balisesDuModele, construireAgent, ficheContact, liensAgent, photosManquantes, valeursDeLigne } from "../../donnees/agents";
 import { genreDe } from "../../donnees/fichiersDeposes";
 import { quantitesDe } from "../../donnees/quantite";

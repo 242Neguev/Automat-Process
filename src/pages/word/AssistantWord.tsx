@@ -21,8 +21,9 @@ import {
 import { IconBulb, IconChevronLeft, IconChevronRight, IconFileImport, IconFileTypeDocx, IconInfoCircle } from "@tabler/icons-react";
 import { join } from "@tauri-apps/api/path";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import urlCourrierEn from "../../assets/courrier-exemple-en.docx?url";
-import urlCourrierFr from "../../assets/courrier-exemple.docx?url";
+// « no-inline » : le fichier reste à part (sinon Vite intègre un petit fichier au code en data:, que la politique de sécurité de l'application interdit de lire avec fetch).
+import urlCourrierEn from "../../assets/courrier-exemple-en.docx?url&no-inline";
+import urlCourrierFr from "../../assets/courrier-exemple.docx?url&no-inline";
 import { remplir, valeursDeLigne } from "../../donnees/agents";
 import { dossierDe, nomDe as nomDuFichier } from "../../donnees/chemins";
 import { genreDe } from "../../donnees/fichiersDeposes";
