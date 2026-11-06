@@ -77,6 +77,8 @@ interface Props {
   onDeverrouiller?: () => void;
   /** Visuel glissé dans la fenêtre : il habille le recto (ou la face choisie s'il y en a déjà un). */
   visuelDepose?: { id: number; chemin: string } | null;
+  /** Visuels numériques : essayer un fond d'exemple (à défaut de modèle de démonstration). */
+  onExemple?: () => void;
 }
 
 /** Le modèle d'un coup d'œil, en mode opérateur : format, informations à fournir et visuels. */
@@ -145,7 +147,7 @@ function avecChamps(m: ModeleCarte, nouveaux: ChampTexte[], transformations?: Re
   return { ...m, champs, transformations: { ...defaut, ...transformations, ...m.transformations } };
 }
 
-export default function EtapeModele({ source, onSource, modele, onModele, visuels, onVisuels, polices, avecDemo = true, verrouille = false, onDeverrouiller, visuelDepose }: Props) {
+export default function EtapeModele({ source, onSource, modele, onModele, visuels, onVisuels, polices, avecDemo = true, verrouille = false, onDeverrouiller, visuelDepose, onExemple }: Props) {
   const t = libellesCartes(Boolean(modele.format.px)).modele;
   const [face, setFace] = useState<Face>("recto");
   const [selection, setSelection] = useState<string | null>(null);
@@ -613,8 +615,8 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
                   {t.depart.choisir}
                 </Button>
                 <Group gap="xs" justify="center">
-                  {avecDemo && (
-                    <Button variant="subtle" onClick={() => onSource("demo")}>
+                  {(avecDemo || onExemple) && (
+                    <Button variant="subtle" onClick={() => (onExemple ? onExemple() : onSource("demo"))}>
                       {t.depart.demo}
                     </Button>
                   )}
