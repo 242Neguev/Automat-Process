@@ -5,7 +5,7 @@ import type { Document } from "./moteur";
 export const MODULES = [
   { cle: "cartes", icone: IconId, exemple: true },
   { cle: "signatures", icone: IconMail, exemple: true },
-  { cle: "numerique", icone: IconDeviceMobile, exemple: false },
+  { cle: "numerique", icone: IconDeviceMobile, exemple: true },
   { cle: "word", icone: IconFileTypeDocx, exemple: true },
 ] as const;
 

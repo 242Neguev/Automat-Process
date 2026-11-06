@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Group, Stack, Stepper, Text, Title } from "@mantine/core";
+import { Button, Group, Modal, Stack, Stepper, Text, Title } from "@mantine/core";
+import { join } from "@tauri-apps/api/path";
+import urlFondExemple from "../../assets/fond-teams-exemple.svg?url";
 import { balisesDuModele, construireAgent, ficheContact, liensAgent, photosManquantes, valeursDeLigne } from "../../donnees/agents";
 import { genreDe } from "../../donnees/fichiersDeposes";
 import { quantitesDe } from "../../donnees/quantite";
 import { identites, nouvelIdentifiant } from "../../donnees/registre";
 import { FORMATS, FORMATS_ECRAN } from "../../modele/formats";
 import { pourEnregistrer, preparerVisuel, type Emplacement, type Visuels } from "../../modele/visuels";
-import { famillesPolices, modeleDemo, type ModeleCarte, type ProjetOuvert } from "../../moteur";
+import { dossierTemporaire, ecrireFichiers, famillesPolices, modeleDemo, type ModeleCarte, type ProjetOuvert } from "../../moteur";
 import { textes } from "../../textes";
 import BandeauExemple from "../commun/BandeauExemple";
 import BarreEtapes from "../commun/BarreEtapes";
@@ -59,6 +61,8 @@ export default function AssistantCartes({ variante = "cartes", commande, onOuvri
   // Visuel glissé dans la fenêtre, transmis à l'étape Modèle (le numéro change à chaque dépôt).
   const [visuelDepose, setVisuelDepose] = useState<{ id: number; chemin: string } | null>(null);
   const depots = useRef(0);
+  // Visuels numériques : l'exemple remplacerait un visuel en cours ; on demande d'abord.
+  const [remplacerParExemple, setRemplacerParExemple] = useState(false);
   const [source, setSource] = useState<Source>("perso");
   const [modeles, setModeles] = useState<Record<Source, ModeleCarte | null>>({ perso: modeleVierge(ecran), demo: null });
   const [visuels, setVisuels] = useState<Visuels>({});
@@ -148,10 +152,42 @@ export default function AssistantCartes({ variante = "cartes", commande, onOuvri
 
   /** « Essayer avec l'exemple » : la carte de démonstration et la liste d'exemple, à parcourir depuis le début. */
   function essayerExemple() {
+    if (ecran) {
+      // Pas de modèle de démonstration à part : l'exemple prend la place du visuel en cours.
+      const enCours = modeles.perso && (modeles.perso.fond_recto || modeles.perso.champs.length > 0);
+      if (enCours) setRemplacerParExemple(true);
+      else void essayerFondExemple();
+      return;
+    }
     setSource("demo");
     void donnees.utiliserExemple();
     setEtape(0);
     setEssai(true);
+  }
+
+  /**
+   * Visuels numériques : un fond Teams d'exemple, dont les informations ({{Prénom}} {{NOM}},
+   * {{Fonction}}) se placent d'elles-mêmes, et la liste d'exemple.
+   */
+  async function essayerFondExemple() {
+    setRemplacerParExemple(false);
+    try {
+      const nom = textes.exemple.fichierFond;
+      const texte = await (await fetch(urlFondExemple)).text();
+      const dossier = await ecrireFichiers(await dossierTemporaire(), "exemple", [{ nom, texte }]);
+      const chemin = await join(dossier, nom);
+      // Un modèle neuf (l'étape Modèle repart de zéro), habillé du fond d'exemple.
+      setModeles((m) => ({ ...m, perso: modeleVierge(true) }));
+      setVisuels({});
+      setOuvertures((n) => n + 1);
+      depots.current += 1;
+      setVisuelDepose({ id: depots.current, chemin });
+      await donnees.utiliserExemple();
+      setEtape(0);
+      setEssai(true);
+    } catch (e) {
+      signalerErreur(e);
+    }
   }
 
   /** Fichiers glissés dans la fenêtre : un visuel habille la carte, une liste devient celle des agents. */
@@ -205,7 +241,19 @@ export default function AssistantCartes({ variante = "cartes", commande, onOuvri
         />
       </Group>
 
-      <BandeauExemple message={essai ? textes.exemple.cartes : null} onFermer={() => setEssai(false)} />
+      <BandeauExemple message={essai ? (ecran ? textes.exemple.ecran : textes.exemple.cartes) : null} onFermer={() => setEssai(false)} />
+
+      <Modal opened={remplacerParExemple} onClose={() => setRemplacerParExemple(false)} title={textes.exemple.remplacerTitre} centered>
+        <Stack gap="sm">
+          <Text size="sm">{textes.exemple.remplacer}</Text>
+          <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={() => setRemplacerParExemple(false)}>
+              {textes.exemple.annuler}
+            </Button>
+            <Button onClick={() => void essayerFondExemple()}>{textes.exemple.confirmer}</Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
         <Stepper.Step label={libelles.etapes.modele.titre} description={libelles.etapes.modele.description}>
@@ -224,6 +272,7 @@ export default function AssistantCartes({ variante = "cartes", commande, onOuvri
               onVisuels={setVisuels}
               polices={polices}
               avecDemo={!ecran}
+              onExemple={ecran ? () => void essayerFondExemple() : undefined}
               verrouille={verrouille}
               onDeverrouiller={() => verrouiller(false)}
               visuelDepose={visuelDepose}
