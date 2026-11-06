@@ -2,7 +2,7 @@
 
 Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par le pilote Windows, la conversion des courriers par Word et les signatures dans Outlook. Le reste de l'application a été testé de bout en bout sur Mac, y compris avec la politique de sécurité de la version finale.
 
-Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : voir les [résultats](#résultats-du-4-novembre-2026). L'installateur a été produit, installé et essayé, puis celui de la [version 0.2.0](#installateur-de-la-version-020-5-novembre-2026), avec la Version Pro, le 5 novembre. La [prise en main sans formation](#prise-en-main-sans-formation-6-novembre-2026) a été essayée le 6 novembre. Il reste surtout à essayer une **imprimante à badges** (partie 4b) et **Outlook avec un compte de messagerie** (parties 6 et 7).
+Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : voir les [résultats](#résultats-du-4-novembre-2026). L'installateur a été produit, installé et essayé, puis celui de la [version 0.2.0](#installateur-de-la-version-020-5-novembre-2026), avec la Version Pro, le 5 novembre. La [prise en main sans formation](#prise-en-main-sans-formation-6-novembre-2026) a été essayée le 6 novembre, puis l'installateur de la [version 0.3.0](#installateur-de-la-version-030-6-novembre-2026). Il reste surtout à essayer une **imprimante à badges** (partie 4b) et **Outlook avec un compte de messagerie** (parties 6 et 7).
 
 **Version à tester** : 0.3.0, du 6 novembre 2026, ou plus récente (`git log -1` pour le vérifier).
 
@@ -217,3 +217,15 @@ Même PC, application de développement (`npm run tauri dev`), parcours automati
 | Glisser-déposer | ✅ | Événements de la fenêtre émis par le script. Voile « Déposez le fichier ici » pendant le survol, retiré quand le fichier sort. Liste Excel déposée sur l'accueil : « Pour quel document ? », puis la liste chargée dans le module choisi, à l'étape Liste. Courrier Word : module Word, comme modèle. Image déposée sur une carte vierge : recto. Programme (`.exe`) : « Fichier non pris en charge ». **Reste à essayer** avec un vrai fichier glissé depuis l'Explorateur. |
 
 La première compilation de l'application de développement s'est arrêtée sur « can't find crate for `typst` », alors que d'autres sessions occupaient presque toute la mémoire du PC ; relancée quand la mémoire s'est libérée, elle a réussi sans autre changement. Pour l'essai des visuels numériques, OneDrive avait changé la date des fichiers Rust : la compilation relancée pour rien restait bloquée faute de mémoire ; l'application déjà compilée (même code Rust) a été lancée avec le seul serveur de l'interface (`npm run dev`).
+
+## Installateur de la version 0.3.0 (6 novembre 2026)
+
+Même PC. Installateur compilé par GitHub Actions (tag `v0.3.0`, publication en brouillon), téléchargé, puis installé et essayé avant publication.
+
+| Étape | Résultat | Remarques |
+|---|---|---|
+| Compilation | ✅ | GitHub Actions, en 16 minutes : installateur de 15,4 Mo et MSI de 21,9 Mo, en version 0.3.0, éditeur « Eau sèche », langue française, non signés (la demande à SignPath Foundation est en cours). |
+| Premier brouillon | ✅ après correction | Installé puis essayé : « Essayer avec l'exemple » échouait pour **Word** et les **visuels numériques** (« Une erreur est survenue : Failed to fetch »), alors que tout marchait en développement. Vite intégrait au code, en `data:`, les fichiers de moins de 4 Ko (courriers Word d'exemple, fond Teams), et la politique de sécurité de l'application installée interdit de les lire. **Corrigé** (PR n° 9, `?url&no-inline`) ; brouillon et tag supprimés avant toute publication, puis l'installateur a été recompilé. |
+| Mise à jour depuis la 0.2.0 | ✅ | Installée par-dessus en mode silencieux (`/S`) : « Automat-Process 0.3.0 » remplace la 0.2.0 dans les programmes installés (même entrée), exécutable en version 0.3.0, un seul raccourci dans le menu Démarrer, données gardées (registres des exports). La version corrigée s'installe aussi par-dessus le premier brouillon. |
+| Accueil et version | ✅ | « Que voulez-vous créer ? » à l'ouverture ; « À propos » : version 0.3.0. |
+| Essais avec l'exemple | ✅ | Cartes : de la carte de démonstration jusqu'à l'export (modes en liste expliquée). Word : courrier d'exemple chargé, « Suivant » actif. Visuels numériques : fond Teams rendu par le moteur, nom et fonction placés d'eux-mêmes, « Toutes les images sont correctes » pour les 6 agents. Aucune erreur dans la page. |
