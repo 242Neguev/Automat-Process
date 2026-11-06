@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Group, Paper, ScrollArea, SegmentedControl, Select, Stack, Text, Title } from "@mantine/core";
+import { Badge, Button, Group, Modal, Paper, ScrollArea, SegmentedControl, Select, Stack, Text, ThemeIcon, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconAlertTriangle, IconArrowBackUp, IconArrowsMove, IconEraser, IconPlus, IconQrcode, IconReplace, IconScan, IconSparkles, IconUser } from "@tabler/icons-react";
+import { IconAlertTriangle, IconArrowBackUp, IconArrowsMove, IconEraser, IconPhotoUp, IconPlus, IconQrcode, IconReplace, IconScan, IconSparkles, IconUser } from "@tabler/icons-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { agentBalises, balisesDuModele } from "../../donnees/agents";
+import { nomDe as nomDuFichier } from "../../donnees/chemins";
 import type { Transformation } from "../../donnees/nettoyage";
 import {
   baliseLue,
@@ -74,6 +75,8 @@ interface Props {
   /** Mode opérateur : le modèle s'affiche sans pouvoir être modifié. */
   verrouille?: boolean;
   onDeverrouiller?: () => void;
+  /** Visuel glissé dans la fenêtre : il habille le recto (ou la face choisie s'il y en a déjà un). */
+  visuelDepose?: { id: number; chemin: string } | null;
 }
 
 /** Le modèle d'un coup d'œil, en mode opérateur : format, informations à fournir et visuels. */
@@ -142,10 +145,21 @@ function avecChamps(m: ModeleCarte, nouveaux: ChampTexte[], transformations?: Re
   return { ...m, champs, transformations: { ...defaut, ...transformations, ...m.transformations } };
 }
 
-export default function EtapeModele({ source, onSource, modele, onModele, visuels, onVisuels, polices, avecDemo = true, verrouille = false, onDeverrouiller }: Props) {
+export default function EtapeModele({ source, onSource, modele, onModele, visuels, onVisuels, polices, avecDemo = true, verrouille = false, onDeverrouiller, visuelDepose }: Props) {
   const t = libellesCartes(Boolean(modele.format.px)).modele;
   const [face, setFace] = useState<Face>("recto");
   const [selection, setSelection] = useState<string | null>(null);
+  // « Continuer sans visuel » : on travaille sur une carte blanche, sans repasser par l'écran de départ.
+  const [sansVisuel, setSansVisuel] = useState(false);
+  // Visuel glissé dans la fenêtre alors que la carte a déjà un recto : on demande quelle face il habille.
+  const [aPlacer, setAPlacer] = useState<string | null>(null);
+  const deposes = useRef(0);
+  useEffect(() => {
+    if (!visuelDepose || visuelDepose.id === deposes.current || verrouille) return;
+    deposes.current = visuelDepose.id;
+    if (modele.fond_recto && !modele.format.px) setAPlacer(visuelDepose.chemin);
+    else void importerVisuel("recto", visuelDepose.chemin);
+  }, [visuelDepose]); // `importerVisuel` lit le modèle le plus récent
   const [outil, setOutil] = useState<Outil>("edition");
   const [texteChoisi, setTexteChoisi] = useState<Choix | null>(null);
   const [occupe, setOccupe] = useState(false);
@@ -312,7 +326,11 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
 
   async function importer(faceVisuel: Face) {
     const chemin = await open({ multiple: false, directory: false, filters: [{ name: t.filtreVisuels, extensions: ["pdf", "svg", "png", "jpg", "jpeg"] }] });
-    if (typeof chemin !== "string") return;
+    if (typeof chemin === "string") await importerVisuel(faceVisuel, chemin);
+  }
+
+  /** Visuel d'une face, depuis ce fichier (choisi, ou glissé dans la fenêtre). */
+  async function importerVisuel(faceVisuel: Face, chemin: string) {
     try {
       const { visuel, balises, svgNettoye } = preparerVisuel(await importerFond(chemin), polices);
       // Les balises sont retirées du visuel quelle que soit la face : elles ne doivent jamais s'imprimer.
@@ -525,6 +543,9 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
       modifierChamp(id, { couleur: { rgb: couleur } });
     });
 
+  // Modèle vierge : on invite d'abord à choisir le visuel (on peut aussi partir d'une carte blanche).
+  const depart = source === "perso" && !verrouille && !modele.fond_recto && modele.champs.length === 0 && !sansVisuel && faceAffichee === "recto";
+
   return (
     <Stack gap="md">
       {avecDemo && !verrouille && (
@@ -576,6 +597,34 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
               onChange={(valeur) => valeur && setVarianteApercu(valeur)}
             />
           )}
+          {depart ? (
+            <Paper withBorder p="xl" style={{ borderStyle: "dashed", borderWidth: 2 }} data-depart>
+              <Stack align="center" gap="sm" py="lg">
+                <ThemeIcon size={60} radius="xl" variant="light">
+                  <IconPhotoUp size={32} stroke={1.5} />
+                </ThemeIcon>
+                <Title order={4} ta="center">
+                  {t.depart.titre}
+                </Title>
+                <Text ta="center" maw={460}>
+                  {t.depart.texte}
+                </Text>
+                <Button size="md" onClick={() => void importer("recto")}>
+                  {t.depart.choisir}
+                </Button>
+                <Group gap="xs" justify="center">
+                  {avecDemo && (
+                    <Button variant="subtle" onClick={() => onSource("demo")}>
+                      {t.depart.demo}
+                    </Button>
+                  )}
+                  <Button variant="subtle" color="gray" onClick={() => setSansVisuel(true)}>
+                    {t.depart.sansVisuel}
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+          ) : (
           <ApercuCarte modele={modele} agent={agent} face={faceAffichee}>
             {faceAffichee === "recto" && !verrouille && modele.fond_calque && calqueVisible && <CalqueReference modele={modele} opacite={opaciteCalque} />}
             {faceAffichee === "recto" && !verrouille && (
@@ -596,6 +645,7 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
               />
             )}
           </ApercuCarte>
+          )}
           {!verrouille && faceAffichee === "recto" && modele.fond_recto && (historique.length > 0 || (outilActif === "remplacer" && textesLus === null && !recto?.textes.length)) && (
             <Group gap="xs">
               {outilActif === "remplacer" && textesLus === null && !recto?.textes.length && (
@@ -610,7 +660,7 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
               )}
             </Group>
           )}
-          <Group justify="space-between" wrap="nowrap">
+          <Group justify="space-between" wrap="nowrap" display={depart ? "none" : undefined}>
             <Text size="xs" c="dimmed">
               {aide}
             </Text>
@@ -721,14 +771,17 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
                     onImporterSecondaire={importerSecondaire}
                     onRetirerSecondaire={retirerSecondaire}
                     calque={{ visible: calqueVisible, opacite: opaciteCalque, onVisible: setCalqueVisible, onOpacite: setOpaciteCalque }}
-                  />
-                  <PanneauVariantes
-                    variantes={modele.variantes}
-                    faces={modele.format.px ? ["recto"] : ["recto", "verso"]}
-                    visuels={visuels}
-                    onVariantes={(modification) => onModele((m) => ({ ...m, variantes: modification(m.variantes) }))}
-                    onImporter={importerVariante}
-                    onRetirer={retirerVariante}
+                    avancesUtilises={Boolean(modele.variantes?.valeurs.length)}
+                    complements={
+                      <PanneauVariantes
+                        variantes={modele.variantes}
+                        faces={modele.format.px ? ["recto"] : ["recto", "verso"]}
+                        visuels={visuels}
+                        onVariantes={(modification) => onModele((m) => ({ ...m, variantes: modification(m.variantes) }))}
+                        onImporter={importerVariante}
+                        onRetirer={retirerVariante}
+                      />
+                    }
                   />
                   </>
                 )
@@ -737,6 +790,30 @@ export default function EtapeModele({ source, onSource, modele, onModele, visuel
           )}
         </ScrollArea.Autosize>
       </Group>
+
+      <Modal opened={aPlacer !== null} onClose={() => setAPlacer(null)} title={t.depose.titre} centered size="sm">
+        <Stack gap="sm">
+          <Text size="sm" style={{ overflowWrap: "anywhere" }}>
+            {aPlacer ? nomDuFichier(aPlacer) : ""}
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button variant="default" onClick={() => setAPlacer(null)}>
+              {t.depose.annuler}
+            </Button>
+            {(["recto", "verso"] as Face[]).map((faceVisuel) => (
+              <Button
+                key={faceVisuel}
+                onClick={() => {
+                  if (aPlacer) void importerVisuel(faceVisuel, aPlacer);
+                  setAPlacer(null);
+                }}
+              >
+                {faceVisuel === "recto" ? t.depose.recto : t.depose.verso}
+              </Button>
+            ))}
+          </Group>
+        </Stack>
+      </Modal>
     </Stack>
   );
 }

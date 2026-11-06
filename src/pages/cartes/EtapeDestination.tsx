@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Badge, Button, Group, List, Loader, Modal, Paper, SegmentedControl, Select, Stack, Text, Title } from "@mantine/core";
+import { Badge, Button, Group, List, Loader, Modal, Paper, Radio, SegmentedControl, Select, Stack, Text, Title } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconCheck, IconFileTypePdf } from "@tabler/icons-react";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -20,6 +20,7 @@ import {
   type Sortie,
 } from "../../moteur";
 import IconeGravite from "../commun/IconeGravite";
+import Resultat, { type Cree } from "../commun/Resultat";
 import { signalerErreur } from "../commun/signalerErreur";
 import ExportBat from "./ExportBat";
 import ExportNumerique from "./ExportNumerique";
@@ -66,6 +67,8 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
   const [feuille, setFeuille] = useState<Feuille>("A4");
   const [enCours, setEnCours] = useState(false);
   const [aConfirmer, setAConfirmer] = useState<{ cartes: DonneesAgent[]; action: () => void } | null>(null);
+  // Dernier fichier (ou dossier) créé : de quoi l'ouvrir, jusqu'à l'export suivant.
+  const [cree, setCree] = useState<Cree | null>(null);
   const { rapport } = controle;
 
   // Mise à jour incrémentale : les cartes imprimées et les cartes numériques ont chacune leur registre.
@@ -75,8 +78,10 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
   const [toutes, setToutes] = useState(false);
   const incremental = mode !== "bat" && maj.canal !== undefined;
   const etatsPrets = maj.etats.length === agents.length;
-  const seulementNouvelles = incremental && !toutes;
   const aRefaire = useMemo(() => agents.filter((_, i) => maj.etats[i] !== "inchangee"), [agents, maj.etats]);
+  // Rien de nouveau depuis le dernier export : on refait tout, plutôt que de griser le bouton.
+  const rienDeNouveau = incremental && etatsPrets && aRefaire.length === 0;
+  const seulementNouvelles = incremental && !toutes && !rienDeNouveau;
   const choisis = seulementNouvelles && etatsPrets ? aRefaire : agents;
   const compte = (etat: string) => maj.etats.filter((e) => e === etat).length;
   // Résumé du contrôle : seulement les cartes à exporter (les inchangées ne sont pas refaites).
@@ -105,10 +110,11 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
     const chemin = await save({ defaultPath: t.nomFichier[sortie], filters: [{ name: t.filtrePdf, extensions: ["pdf"] }] });
     if (!chemin) return;
     setEnCours(true);
+    setCree(null);
     try {
       const aExporter = avecQuantites(choisis);
       await exporterCartes(modele, aExporter, sortie, feuille, chemin);
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.enregistre, message: chemin });
+      setCree({ titre: t.enregistre, chemin });
       await maj.enregistrer(produites(choisis), aExporter.length);
     } catch (e) {
       signalerErreur(e);
@@ -138,6 +144,7 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
     const dossier = await open({ directory: true, multiple: false, title: t.numerique.choisirDossier });
     if (typeof dossier !== "string") return;
     setEnCours(true);
+    setCree(null);
     try {
       const rang = new Map(agents.map((agent, i) => [agent, i]));
       const numerique = (agent: DonneesAgent) => numeriques[rang.get(agent) ?? -1];
@@ -145,7 +152,7 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
       const fiches = avecFiches ? choisis.map((agent) => numerique(agent)?.fiche ?? "") : [];
       const noms = nomsUniques(choisis.map(libelleAgent));
       const chemin = await exporterNumerique(modele, avecLiens, noms, fiches, options, dossier, t.numerique.nomDossier(modele.nom));
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.numerique.cree, message: chemin, autoClose: 10000 });
+      setCree({ titre: t.numerique.cree, chemin, dossier: true });
       await maj.enregistrer(choisis);
     } catch (e) {
       signalerErreur(e);
@@ -159,10 +166,11 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
     const chemin = await save({ defaultPath: t.bat.nomFichier(modele.nom), filters: [{ name: t.filtrePdf, extensions: ["pdf"] }] });
     if (!chemin) return;
     setEnCours(true);
+    setCree(null);
     try {
       const date = new Date().toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
       await exporterBat(modele, cartes.map((agent) => ({ ...agent, libelle: libelleAgent(agent) })), modele.nom, date, chemin);
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.bat.cree, message: chemin });
+      setCree({ titre: t.bat.cree, chemin });
     } catch (e) {
       signalerErreur(e);
     } finally {
@@ -179,7 +187,8 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
       : [];
 
   return (
-    <Paper withBorder p="lg" maw={480}>
+    <Stack gap="md" maw={640}>
+    <Paper withBorder p="lg" maw={520}>
       <Stack gap="md">
         <Group justify="space-between">
           <Title order={5}>{t.titre}</Title>
@@ -220,31 +229,37 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
             <Text size="xs" c="dimmed">
               {tm.dernier(dateLisible(maj.canal.date), maj.canal.nombre)} {tm.aide}
             </Text>
-            <SegmentedControl
-              fullWidth
-              size="xs"
-              value={seulementNouvelles ? "nouvelles" : "toutes"}
-              onChange={(valeur) => setToutes(valeur === "toutes")}
-              data={[
-                { value: "nouvelles", label: tm.nouvelles(etatsPrets ? nombreDe(aRefaire) : 0) },
-                { value: "toutes", label: tm.toutes(nombreDe(agents)) },
-              ]}
-            />
-            {etatsPrets && (
-              <Text size="xs" c="dimmed">
-                {maj.modeleChange ? tm.modeleChange : tm.detail(compte("nouvelle"), compte("modifiee"), compte("inchangee"))}
-              </Text>
+            {rienDeNouveau ? (
+              <Text size="sm">{tm.rien}</Text>
+            ) : (
+              <>
+                <SegmentedControl
+                  fullWidth
+                  size="xs"
+                  value={seulementNouvelles ? "nouvelles" : "toutes"}
+                  onChange={(valeur) => setToutes(valeur === "toutes")}
+                  data={[
+                    { value: "nouvelles", label: tm.nouvelles(etatsPrets ? nombreDe(aRefaire) : 0) },
+                    { value: "toutes", label: tm.toutes(nombreDe(agents)) },
+                  ]}
+                />
+                {etatsPrets && (
+                  <Text size="xs" c="dimmed">
+                    {maj.modeleChange ? tm.modeleChange : tm.detail(compte("nouvelle"), compte("modifiee"), compte("inchangee"))}
+                  </Text>
+                )}
+              </>
             )}
-            {seulementNouvelles && etatsPrets && choisis.length === 0 && <Text size="sm">{tm.rien}</Text>}
           </Stack>
         )}
         {!ecran && (
-          <SegmentedControl
-            fullWidth
-            value={mode}
-            onChange={(valeur) => setMode(valeur as Mode)}
-            data={(["pdf", "impression", "numerique", "bat"] as const).map((value) => ({ value, label: t.modes[value] }))}
-          />
+          <Radio.Group value={mode} onChange={(valeur) => setMode(valeur as Mode)} data-modes>
+            <Stack gap="xs">
+              {(["pdf", "impression", "numerique", "bat"] as const).map((valeur) => (
+                <Radio key={valeur} value={valeur} label={t.modes[valeur]} description={t.modesAide[valeur]} />
+              ))}
+            </Stack>
+          </Radio.Group>
         )}
 
         {mode === "pdf" ? (
@@ -329,5 +344,7 @@ export default function EtapeDestination({ modele, agents, cles, quantites, colo
         </Stack>
       </Modal>
     </Paper>
+    <Resultat cree={cree} onFermer={() => setCree(null)} />
+    </Stack>
   );
 }

@@ -6,5 +6,6 @@ import { textes } from "../../textes";
 /** Affiche une erreur (du cœur ou de l'interface) dans une notification. */
 export function signalerErreur(e: unknown) {
   const { message, details } = enErreurMoteur(e);
-  notifications.show({ color: "red", icon: <IconAlertTriangle size={18} />, title: textes.erreur, message: [message, ...details].join("\n") });
+  // Quinze secondes : le temps de lire le message, même long (les autres notifications partent plus vite).
+  notifications.show({ color: "red", icon: <IconAlertTriangle size={18} />, title: textes.erreur, message: [message, ...details].join("\n"), autoClose: 15000 });
 }

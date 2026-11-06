@@ -18,11 +18,14 @@ import {
   TextInput,
   Title,
 } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
-import { IconAlertTriangle, IconCheck, IconChevronLeft, IconChevronRight, IconFileImport, IconFileTypeDocx, IconInfoCircle } from "@tabler/icons-react";
+import { IconBulb, IconChevronLeft, IconChevronRight, IconFileImport, IconFileTypeDocx, IconInfoCircle } from "@tabler/icons-react";
 import { join } from "@tauri-apps/api/path";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
+import urlCourrierEn from "../../assets/courrier-exemple-en.docx?url";
+import urlCourrierFr from "../../assets/courrier-exemple.docx?url";
 import { remplir, valeursDeLigne } from "../../donnees/agents";
+import { dossierDe, nomDe as nomDuFichier } from "../../donnees/chemins";
+import { genreDe } from "../../donnees/fichiersDeposes";
 import type { Transformation } from "../../donnees/nettoyage";
 import { nomsUniques } from "../../donnees/noms";
 import { transformationsParDefaut } from "../../modele/champs";
@@ -30,16 +33,22 @@ import {
   convertirCourriers,
   dossierTemporaire,
   ecrireCourriers,
+  ecrireFichiers,
   fusionnerPdf,
   lireModeleWord,
   supprimerTemporaire,
   type Convertisseur,
   type Courrier,
+  type ProjetOuvert,
 } from "../../moteur";
-import { textes } from "../../textes";
+import { langue, textes } from "../../textes";
 import { apercuTexte, fusionnerCorps, preparerModele, remplirModele, type ModelePrepare } from "../../word/docx";
+import BandeauExemple from "../commun/BandeauExemple";
+import BarreEtapes from "../commun/BarreEtapes";
+import { useCommande, type Commande } from "../commun/commande";
 import EtapeListe from "../commun/EtapeListe";
-import { BoutonsProjet, choisirProjet, enregistrerSous, projetOuvert } from "../commun/projet";
+import { BoutonsProjet, enregistrerSous, projetOuvert } from "../commun/projet";
+import Resultat, { type Cree } from "../commun/Resultat";
 import { signalerErreur } from "../commun/signalerErreur";
 import { useListe } from "../commun/useListe";
 import { BandeauVerrou, LectureSeule } from "../commun/verrou";
@@ -69,8 +78,14 @@ interface ProjetWord {
 }
 
 /** Assistant « Documents Word » : Modèle → Liste → Vérification → Destination. */
-export default function AssistantWord() {
+export default function AssistantWord({ commande, onOuvrirProjet }: { commande?: Commande; onOuvrirProjet: () => void }) {
   const [etape, setEtape] = useState(0);
+  // Dernier dossier de courriers créé : de quoi l'ouvrir, jusqu'à la création suivante.
+  const [cree, setCree] = useState<Cree | null>(null);
+  // Courrier d'exemple enregistré pour être ouvert dans Word.
+  const [exempleCree, setExempleCree] = useState<Cree | null>(null);
+  // Bandeau « Vous essayez avec l'exemple », affiché après « Essayer avec l'exemple ».
+  const [essai, setEssai] = useState(false);
   const [modele, setModele] = useState<ModeleWord | null>(null);
   const [courant, setCourant] = useState(0);
   const [parPersonne, setParPersonne] = useState(true);
@@ -96,12 +111,56 @@ export default function AssistantWord() {
   );
   const nomDe = (valeurs: Record<string, string>, numero: number) => remplir(nommage, valeurs) || `Courrier ${numero}`;
 
+  /** Lit le modèle Word et en fait le modèle des courriers. */
+  async function chargerModele(chemin: string) {
+    const prepare = preparerModele(await lireModeleWord(chemin));
+    setModele({ ...prepare, chemin, nomFichier: nomDuFichier(chemin), transformations: transformationsParDefaut(prepare.balises) });
+  }
+
   async function importer() {
     const chemin = await open({ multiple: false, directory: false, filters: [{ name: t.modele.filtre, extensions: ["docx", "dotx"] }] });
     if (typeof chemin !== "string") return;
+    setEssai(false);
     try {
-      const prepare = preparerModele(await lireModeleWord(chemin));
-      setModele({ ...prepare, chemin, nomFichier: chemin.split(/[\\/]/).pop() ?? chemin, transformations: transformationsParDefaut(prepare.balises) });
+      await chargerModele(chemin);
+    } catch (e) {
+      signalerErreur(e);
+    }
+  }
+
+  /** Octets du courrier d'exemple, dans la langue de l'interface (ses informations sont les colonnes de la liste d'exemple). */
+  async function octetsExemple(): Promise<number[]> {
+    const reponse = await fetch(langue === "en" ? urlCourrierEn : urlCourrierFr);
+    return Array.from(new Uint8Array(await reponse.arrayBuffer()));
+  }
+
+  /** « Essayer avec l'exemple » : le courrier d'exemple (copié dans un dossier temporaire) et la liste d'exemple. */
+  async function essayerExemple() {
+    try {
+      const dossier = await ecrireFichiers(await dossierTemporaire(), "exemple", [{ nom: t.modele.nomExemple, octets: await octetsExemple() }]);
+      await chargerModele(await join(dossier, t.modele.nomExemple));
+      await donnees.utiliserExemple();
+      setEtape(0);
+      setEssai(true);
+    } catch (e) {
+      signalerErreur(e);
+    }
+  }
+
+  /** « Créer un courrier Word d'exemple… » : à ouvrir dans Word pour voir comment écrire les informations à remplir. */
+  async function creerExemple() {
+    const choisi = await save({ defaultPath: t.modele.nomExemple, filters: [{ name: t.modele.filtre, extensions: ["docx"] }] });
+    if (!choisi) return;
+    const chemin = /\.docx$/i.test(choisi) ? choisi : `${choisi}.docx`;
+    const dossier = dossierDe(chemin);
+    // Le cœur écrit dans un sous-dossier d'un dossier : ici, le dossier choisi lui-même (à la racine
+    // d'un disque, dans un dossier « Automat-Process »).
+    const racineDisque = /^[A-Za-z]:\\?$/.test(dossier);
+    try {
+      const ecrit = await ecrireFichiers(racineDisque ? dossier : dossierDe(dossier), racineDisque ? textes.application : nomDuFichier(dossier), [
+        { nom: nomDuFichier(chemin), octets: await octetsExemple() },
+      ]);
+      setExempleCree({ titre: t.modele.exempleCree, chemin: await join(ecrit, nomDuFichier(chemin)), details: [t.modele.exempleEnsuite] });
     } catch (e) {
       signalerErreur(e);
     }
@@ -120,9 +179,8 @@ export default function AssistantWord() {
     return enregistrerSous("word", modele.nomFichier.replace(/\.(docx|dotx)$/i, ""), projet, correspondances);
   }
 
-  async function ouvrir() {
-    const projet = await choisirProjet("word");
-    if (!projet) return;
+  /** Projet rouvert (depuis l'accueil ou « Ouvrir un projet… ») : le modèle Word est relu à son emplacement. */
+  async function appliquerProjet(projet: ProjetOuvert) {
     try {
       const enregistre = projet.modele as ProjetWord;
       const prepare = preparerModele(await lireModeleWord(enregistre.chemin));
@@ -166,6 +224,7 @@ export default function AssistantWord() {
     const veutPdf = pdfParPersonne || pdfFusion;
     const temporaires: string[] = [];
     setAvancement({ fait: 0, total: destinataires.length });
+    setCree(null);
     try {
       // Le dossier des résultats existe d'emblée (un PDF fusionné seul y est écrit à la fin).
       const final = (await ecrireCourriers(modele.chemin, [], dossier, sousDossier)).dossier;
@@ -202,17 +261,11 @@ export default function AssistantWord() {
         await ecrireCourriers(modele.chemin, [{ nom: t.destination.fichierFusion, parties }], dossier, sousDossier);
       }
       if (pdfFusion) await fusionnerPdf(pdfs, await join(final, t.destination.pdfFusionne));
-      const lignes = [final];
-      if (convertisseurs.size > 0) lignes.push(t.destination.conversion([...convertisseurs].map((c) => t.destination.logiciels[c]).join(" et ")));
-      if (remarque) lignes.push(remarque);
-      notifications.show({
-        color: remarque ? "orange" : "teal",
-        icon: remarque ? <IconAlertTriangle size={18} /> : <IconCheck size={18} />,
-        title: t.destination.cree,
-        message: lignes.join("\n"),
-        // Une remarque (Word remplacé par LibreOffice) reste affichée jusqu'à ce qu'on la ferme.
-        autoClose: remarque ? false : 10000,
-      });
+      const details: string[] = [];
+      if (convertisseurs.size > 0) details.push(t.destination.conversion([...convertisseurs].map((c) => t.destination.logiciels[c]).join(" et ")));
+      if (remarque) details.push(remarque);
+      // Une remarque (Word remplacé par LibreOffice) colore l'encadré en orange.
+      setCree({ titre: t.destination.cree, chemin: final, dossier: true, details, attention: Boolean(remarque) });
     } catch (e) {
       signalerErreur(e);
     } finally {
@@ -221,7 +274,36 @@ export default function AssistantWord() {
     }
   }
 
+  /** Fichiers glissés dans la fenêtre : un courrier Word devient le modèle, une liste celle des destinataires. */
+  async function recevoir(chemins: string[]) {
+    const courrier = chemins.find((chemin) => genreDe(chemin) === "word");
+    const fichierListe = chemins.find((chemin) => genreDe(chemin) === "liste");
+    // Ses propres fichiers : l'essai avec l'exemple est fini.
+    if (courrier || fichierListe) setEssai(false);
+    try {
+      if (courrier) {
+        await chargerModele(courrier);
+        setEtape(0);
+      }
+      if (fichierListe) {
+        await donnees.importerChemin(fichierListe);
+        if (!courrier && etapePrete[0]) setEtape(1);
+      }
+    } catch (e) {
+      signalerErreur(e);
+    }
+  }
+
+  useCommande(commande, (demande) => {
+    if (demande.type === "exemple") void essayerExemple();
+    else if (demande.type === "projet") void appliquerProjet(demande.projet);
+    else void recevoir(demande.chemins);
+  });
+
   const etapePrete = [Boolean(modele) && balises.length > 0, destinataires.length > 0 && Object.values(correspondances).some(Boolean), destinataires.length > 0, false];
+  const n = textes.navigation.manque;
+  // Ce qui manque pour passer à l'étape suivante, dit en clair à côté du bouton grisé.
+  const manque = [modele ? n.balisesWord : n.modeleWord, liste ? n.colonnes : n.liste, n.liste, null];
 
   return (
     <Stack gap="lg" maw={1240}>
@@ -231,12 +313,14 @@ export default function AssistantWord() {
           <Text c="dimmed">{t.sousTitre}</Text>
         </div>
         <BoutonsProjet
-          onOuvrir={ouvrir}
+          onOuvrir={onOuvrirProjet}
           onEnregistrer={enregistrer}
           enregistrable={Boolean(modele)}
           verrou={modele ? { verrouille, onChange: setVerrouille } : undefined}
         />
       </Group>
+
+      <BandeauExemple message={essai ? textes.exemple.word : null} onFermer={() => setEssai(false)} />
 
       <Stepper active={etape} onStepClick={setEtape} allowNextStepsSelect={false} size="sm">
         <Stepper.Step label={t.etapes.modele.titre} description={t.etapes.modele.description}>
@@ -265,6 +349,16 @@ export default function AssistantWord() {
                       <Button leftSection={<IconFileImport size={18} />} variant={modele ? "light" : "filled"} onClick={importer}>
                         {modele ? t.modele.autre : t.modele.importer}
                       </Button>
+                      {!modele && (
+                        <>
+                          <Button variant="light" leftSection={<IconBulb size={18} />} onClick={() => void essayerExemple()}>
+                            {t.modele.essayer}
+                          </Button>
+                          <Button variant="subtle" leftSection={<IconFileTypeDocx size={18} />} onClick={() => void creerExemple()}>
+                            {t.modele.creerExemple}
+                          </Button>
+                        </>
+                      )}
                       {modele && (
                         <>
                           <Group gap="xs" wrap="nowrap">
@@ -284,6 +378,7 @@ export default function AssistantWord() {
                       {modele && <Text size="xs" c="dimmed">{t.modele.aide}</Text>}
                     </Stack>
                   </Paper>
+                  <Resultat cree={exempleCree} onFermer={() => setExempleCree(null)} />
                   {balises.length > 0 && modele && (
                     <Paper withBorder p="md">
                       <Stack gap="xs">
@@ -322,7 +417,10 @@ export default function AssistantWord() {
             correspondances={correspondances}
             exemple={destinataires[0]?.valeurs ?? {}}
             anomalies={donnees.anomalies}
-            onImporter={donnees.importer}
+            onImporter={() => {
+              setEssai(false);
+              void donnees.importer();
+            }}
             onExemple={donnees.utiliserExemple}
             onFeuille={donnees.setFeuille}
             onCorrespondance={donnees.relier}
@@ -383,6 +481,7 @@ export default function AssistantWord() {
         </Stepper.Step>
 
         <Stepper.Step label={t.etapes.destination.titre} description={t.etapes.destination.description}>
+          <Stack gap="md" maw={640}>
           <Paper withBorder p="lg" maw={520}>
             <Stack gap="md">
               <Group justify="space-between">
@@ -417,19 +516,18 @@ export default function AssistantWord() {
               </Button>
             </Stack>
           </Paper>
+          <Resultat cree={cree} onFermer={() => setCree(null)} />
+          </Stack>
         </Stepper.Step>
       </Stepper>
 
-      <Group justify="space-between">
-        <Button variant="default" disabled={etape === 0} onClick={() => setEtape(etape - 1)}>
-          {textes.cartes.precedent}
-        </Button>
-        {etape < 3 && (
-          <Button disabled={!etapePrete[etape]} onClick={() => setEtape(etape + 1)}>
-            {textes.cartes.suivant}
-          </Button>
-        )}
-      </Group>
+      <BarreEtapes
+        etape={etape}
+        titres={[t.etapes.modele.titre, t.etapes.liste.titre, t.etapes.verification.titre, t.etapes.destination.titre]}
+        prete={etapePrete[etape]}
+        manque={manque[etape]}
+        onEtape={setEtape}
+      />
     </Stack>
   );
 }

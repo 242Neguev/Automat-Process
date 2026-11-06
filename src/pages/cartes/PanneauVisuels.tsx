@@ -1,5 +1,6 @@
-import { Button, Group, List, NumberInput, Paper, Select, Slider, Stack, Switch, Text, TextInput, ThemeIcon, Title } from "@mantine/core";
-import { IconAlertTriangle, IconCheck, IconDeviceDesktop, IconInfoSmall, IconPhoto, IconStack2 } from "@tabler/icons-react";
+import { useState, type ReactNode } from "react";
+import { Button, Collapse, Group, List, NumberInput, Paper, Select, Slider, Stack, Switch, Text, TextInput, ThemeIcon, Title } from "@mantine/core";
+import { IconAlertTriangle, IconCheck, IconChevronDown, IconDeviceDesktop, IconInfoSmall, IconPhoto, IconStack2 } from "@tabler/icons-react";
 import { diagnostiquer, diagnostiquerEcran, diagnostiquerVersionEcran, FORMATS, FORMATS_ECRAN, type Format, type Niveau } from "../../modele/formats";
 import type { Visuel, Visuels } from "../../modele/visuels";
 import type { Face } from "../../moteur";
@@ -27,6 +28,10 @@ interface Props {
   onImporterSecondaire: (emplacement: Secondaire) => void;
   onRetirerSecondaire: (emplacement: Secondaire) => void;
   calque: { visible: boolean; opacite: number; onVisible: (visible: boolean) => void; onOpacite: (opacite: number) => void };
+  /** Autres réglages avancés, à la suite (les variantes du modèle). */
+  complements?: ReactNode;
+  /** Le modèle se sert déjà de réglages avancés (variantes…) : ils s'affichent d'emblée. */
+  avancesUtilises?: boolean;
 }
 
 /** Diagnostics d'un visuel, avec leur icône. */
@@ -83,6 +88,8 @@ export default function PanneauVisuels({
   onImporterSecondaire,
   onRetirerSecondaire,
   calque,
+  complements,
+  avancesUtilises = false,
 }: Props) {
   // Format d'écran (Visuels numériques) : formats en pixels seulement, sans fond perdu ni verso.
   const ecran = Boolean(format.px);
@@ -93,35 +100,39 @@ export default function PanneauVisuels({
   );
   const dimension = (cle: keyof Format) => (valeur: string | number) =>
     typeof valeur === "number" && valeur >= 0 && onFormat({ ...format, [cle]: valeur });
+  // Réglages avancés : ouverts d'emblée si le modèle s'en sert déjà (format personnalisé, calque, version écran, variantes).
+  const [avances, setAvances] = useState(
+    () => avancesUtilises || (!predefini && !ecran) || Boolean(visuels.calque || visuels.recto_ecran || visuels.verso_ecran),
+  );
+
+  // Le format d'un visuel d'écran (fond Teams, bannière…) fixe la taille des images : il reste en vue.
+  const blocFormat = (
+    <>
+      <Title order={5}>{t.formatTitre}</Title>
+      <Select
+        value={predefini?.id ?? PERSONNALISE}
+        allowDeselect={false}
+        data={[...formats.map((f) => ({ value: f.id, label: f.libelle })), ...(ecran ? [] : [{ value: PERSONNALISE, label: t.formatPersonnalise }])]}
+        onChange={(id) => {
+          const choisi = formats.find((f) => f.id === id);
+          if (choisi) onFormat({ largeur_mm: choisi.largeur_mm, hauteur_mm: choisi.hauteur_mm, fond_perdu_mm: choisi.fond_perdu_mm, px: choisi.px });
+        }}
+      />
+      {!predefini && (
+        <Group grow>
+          <NumberInput label={t.largeur} min={20} max={300} decimalScale={1} value={format.largeur_mm} onChange={dimension("largeur_mm")} />
+          <NumberInput label={t.hauteur} min={20} max={300} decimalScale={1} value={format.hauteur_mm} onChange={dimension("hauteur_mm")} />
+        </Group>
+      )}
+    </>
+  );
+  const faces = ecran ? (["recto"] as Face[]) : (["recto", "verso"] as Face[]);
 
   return (
     <Paper withBorder p="md">
       <Stack gap="sm">
-        <TextInput label={t.nomModele} value={nom} onChange={(e) => onNom(e.currentTarget.value)} />
-        <Title order={5}>{t.formatTitre}</Title>
-        <Select
-          value={predefini?.id ?? PERSONNALISE}
-          allowDeselect={false}
-          data={[...formats.map((f) => ({ value: f.id, label: f.libelle })), ...(ecran ? [] : [{ value: PERSONNALISE, label: t.formatPersonnalise }])]}
-          onChange={(id) => {
-            const choisi = formats.find((f) => f.id === id);
-            if (choisi) onFormat({ largeur_mm: choisi.largeur_mm, hauteur_mm: choisi.hauteur_mm, fond_perdu_mm: choisi.fond_perdu_mm, px: choisi.px });
-          }}
-        />
-        {!predefini && (
-          <Group grow>
-            <NumberInput label={t.largeur} min={20} max={300} decimalScale={1} value={format.largeur_mm} onChange={dimension("largeur_mm")} />
-            <NumberInput label={t.hauteur} min={20} max={300} decimalScale={1} value={format.hauteur_mm} onChange={dimension("hauteur_mm")} />
-          </Group>
-        )}
-        {!ecran && (
-          <NumberInput label={t.fondPerdu} description={t.fondPerduAide} min={0} max={10} step={0.5} decimalScale={1} value={format.fond_perdu_mm} onChange={dimension("fond_perdu_mm")} />
-        )}
-
-        <Title order={5} mt="xs">
-          {t.visuelsTitre}
-        </Title>
-        {(ecran ? (["recto"] as Face[]) : (["recto", "verso"] as Face[])).map((face) => {
+        <Title order={5}>{t.visuelsTitre}</Title>
+        {faces.map((face) => {
           const visuel = visuels[face];
           return (
             <Stack key={face} gap={6}>
@@ -149,64 +160,101 @@ export default function PanneauVisuels({
                 </Button>
               )}
               {visuel && <Diagnostics messages={ecran ? diagnostiquerEcran(visuel, format) : diagnostiquer(visuel, format, avecFondPerdu[face])} />}
-              {visuel && format.fond_perdu_mm > 0 && (
-                <Switch
-                  size="xs"
-                  label={t.contientFondPerdu}
-                  checked={avecFondPerdu[face]}
-                  onChange={(e) => onFondPerdu(face, e.currentTarget.checked)}
-                />
-              )}
               {!visuel && face === "recto" && (
                 <Text size="xs" c="dimmed">
                   {t.aucunVisuel}
                 </Text>
               )}
-              {/* Cartes : une version écran (RVB) facultative, pour les cartes numériques. */}
-              {visuel && !ecran && (
-                <VersionEcran face={face} visuels={visuels} format={format} onImporterSecondaire={onImporterSecondaire} onRetirerSecondaire={onRetirerSecondaire} />
-              )}
             </Stack>
           );
         })}
 
-        <Title order={5} mt="xs">
-          {t.calqueTitre}
-        </Title>
-        <Text size="xs" c="dimmed">
-          {t.calqueAide}
-        </Text>
-        {visuels.calque ? (
-          <>
-            <VisuelChoisi
-              visuel={visuels.calque}
-              onRemplacer={() => onImporterSecondaire("calque")}
-              onRetirer={() => onRetirerSecondaire("calque")}
-              remplacer={t.remplacer}
-              retirer={t.retirer}
-            />
-            <Switch size="xs" label={t.afficherCalque} checked={calque.visible} onChange={(e) => calque.onVisible(e.currentTarget.checked)} />
-            <div>
-              <Text size="xs" mb={4}>
-                {t.opaciteCalque}
-              </Text>
-              <Slider
-                aria-label={t.opaciteCalque}
-                min={10}
-                max={90}
-                step={5}
-                value={calque.opacite}
-                label={(valeur) => `${valeur} %`}
-                disabled={!calque.visible}
-                onChange={calque.onOpacite}
-              />
-            </div>
-          </>
-        ) : (
-          <Button variant="light" leftSection={<IconStack2 size={16} />} onClick={() => onImporterSecondaire("calque")}>
-            {t.choisirCalque}
-          </Button>
-        )}
+        <TextInput label={t.nomModele} description={t.nomModeleAide} value={nom} onChange={(e) => onNom(e.currentTarget.value)} />
+        {ecran && blocFormat}
+
+        {/* Réglages de spécialiste (imprimeur, graphiste) : repliés tant qu'on ne s'en sert pas. */}
+        <Button
+          variant="subtle"
+          color="gray"
+          size="compact-sm"
+          justify="space-between"
+          rightSection={<IconChevronDown size={16} style={{ transform: avances ? "rotate(180deg)" : undefined, transition: "transform 150ms" }} />}
+          onClick={() => setAvances((ouvert) => !ouvert)}
+          aria-expanded={avances}
+          data-reglages-avances
+          mt="xs"
+        >
+          {t.avances}
+        </Button>
+        <Collapse expanded={avances}>
+          <Stack gap="sm">
+            <Text size="xs" c="dimmed">
+              {ecran ? t.avancesAideEcran : t.avancesAide}
+            </Text>
+            {!ecran && blocFormat}
+            {!ecran && (
+              <NumberInput label={t.fondPerdu} description={t.fondPerduAide} min={0} max={10} step={0.5} decimalScale={1} value={format.fond_perdu_mm} onChange={dimension("fond_perdu_mm")} />
+            )}
+            {!ecran &&
+              faces.map((face) => {
+                const visuel = visuels[face];
+                if (!visuel) return null;
+                return (
+                  <Stack key={face} gap={6}>
+                    {format.fond_perdu_mm > 0 && (
+                      <Switch
+                        size="xs"
+                        label={t.contientFondPerduFace(face === "recto" ? t.recto : t.verso)}
+                        checked={avecFondPerdu[face]}
+                        onChange={(e) => onFondPerdu(face, e.currentTarget.checked)}
+                      />
+                    )}
+                    {/* Cartes : une version écran (RVB) facultative, pour les cartes numériques. */}
+                    <VersionEcran face={face} visuels={visuels} format={format} onImporterSecondaire={onImporterSecondaire} onRetirerSecondaire={onRetirerSecondaire} />
+                  </Stack>
+                );
+              })}
+
+            <Title order={5} mt="xs">
+              {t.calqueTitre}
+            </Title>
+            <Text size="xs" c="dimmed">
+              {t.calqueAide}
+            </Text>
+            {visuels.calque ? (
+              <>
+                <VisuelChoisi
+                  visuel={visuels.calque}
+                  onRemplacer={() => onImporterSecondaire("calque")}
+                  onRetirer={() => onRetirerSecondaire("calque")}
+                  remplacer={t.remplacer}
+                  retirer={t.retirer}
+                />
+                <Switch size="xs" label={t.afficherCalque} checked={calque.visible} onChange={(e) => calque.onVisible(e.currentTarget.checked)} />
+                <div>
+                  <Text size="xs" mb={4}>
+                    {t.opaciteCalque}
+                  </Text>
+                  <Slider
+                    aria-label={t.opaciteCalque}
+                    min={10}
+                    max={90}
+                    step={5}
+                    value={calque.opacite}
+                    label={(valeur) => `${valeur} %`}
+                    disabled={!calque.visible}
+                    onChange={calque.onOpacite}
+                  />
+                </div>
+              </>
+            ) : (
+              <Button variant="light" leftSection={<IconStack2 size={16} />} onClick={() => onImporterSecondaire("calque")}>
+                {t.choisirCalque}
+              </Button>
+            )}
+            {complements}
+          </Stack>
+        </Collapse>
       </Stack>
     </Paper>
   );

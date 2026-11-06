@@ -47,7 +47,11 @@ export function useListe(balises: string[]) {
 
   async function importer() {
     const chemin = await open({ multiple: false, directory: false, filters: [{ name: textes.liste.filtre, extensions: EXTENSIONS_LISTE }] });
-    if (typeof chemin !== "string") return;
+    if (typeof chemin === "string") await importerChemin(chemin);
+  }
+
+  /** Lit la liste de ce fichier (choisi, ou glissé dans la fenêtre). */
+  async function importerChemin(chemin: string) {
     try {
       ouvrir(await lireListe(chemin), chemin.split(/[\\/]/).pop() ?? chemin);
     } catch (e) {
@@ -85,6 +89,7 @@ export function useListe(balises: string[]) {
     aEnregistrer: (): Correspondances => (quantite === undefined && !colonneQuantite ? correspondances : { ...correspondances, [CLE_QUANTITE]: quantite ?? colonneQuantite }),
     anomalies,
     importer,
+    importerChemin,
     utiliserExemple,
   };
 }

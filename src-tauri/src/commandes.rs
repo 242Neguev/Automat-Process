@@ -722,3 +722,16 @@ pub async fn effacer_texte(
 pub fn definir_langue(langue: String) {
     crate::langue::definir(&langue);
 }
+
+/// Ouvre un document créé par l'application (PDF, Word, Excel, image, page de signatures) dans
+/// l'application habituelle, ou un dossier dans l'Explorateur.
+#[tauri::command]
+pub fn ouvrir_fichier(chemin: String) -> Result<(), ErreurMoteur> {
+    crate::ouverture::ouvrir(&chemin)
+}
+
+/// Affiche un fichier dans son dossier, sélectionné ; un dossier est simplement ouvert.
+#[tauri::command]
+pub fn montrer_dans_dossier(chemin: String) -> Result<(), ErreurMoteur> {
+    crate::ouverture::montrer(&chemin)
+}

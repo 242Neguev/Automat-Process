@@ -9,6 +9,7 @@ mod langue;
 pub mod moteur;
 mod ocr;
 mod outils_pdf;
+mod ouverture;
 mod pdf_textes;
 mod photos;
 mod projet_fichier;
@@ -67,6 +68,8 @@ pub fn run() {
             commandes::supprimer_temporaire,
             commandes::convertir_courriers,
             commandes::apercu_courrier,
+            commandes::ouvrir_fichier,
+            commandes::montrer_dans_dossier,
         ])
         .run(tauri::generate_context!())
         .expect("erreur au lancement d'Automat-Process");

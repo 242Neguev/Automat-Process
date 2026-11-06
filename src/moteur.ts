@@ -427,6 +427,12 @@ export type FichierAEcrire = { nom: string; texte: string } | { nom: string; oct
 export const ecrireFichiers = (dossier: string, sousDossier: string, fichiers: FichierAEcrire[]) =>
   invoke<string>("ecrire_fichiers", { dossier, sousDossier, fichiers });
 
+/** Ouvre un document créé par l'application (PDF, Word, Excel, image, page de signatures) dans l'application habituelle, ou un dossier. */
+export const ouvrirFichier = (chemin: string) => invoke<void>("ouvrir_fichier", { chemin });
+
+/** Affiche un fichier dans son dossier (Explorateur), sélectionné ; un dossier est simplement ouvert. */
+export const montrerDansDossier = (chemin: string) => invoke<void>("montrer_dans_dossier", { chemin });
+
 /** Ramène toute erreur (Rust ou JavaScript) au format affiché par l'interface. */
 export function enErreurMoteur(erreur: unknown): ErreurMoteur {
   if (typeof erreur === "object" && erreur !== null && "message" in erreur) {
