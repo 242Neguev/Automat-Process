@@ -18,7 +18,7 @@ L'installateur Windows de la dernière version se trouve sur la page [**Releases
 
 ## État actuel
 
-Version 0.2.0 : les quatre modules et la Version Pro (variantes et photos, mise à jour incrémentale, reconnaissance du texte, interface en anglais) sont disponibles. L'application a été compilée, installée par son installateur et essayée sous Windows 11 les 4 et 5 novembre 2026 ([résultats](docs/test-windows/README.md#résultats-du-4-novembre-2026)) : il reste à essayer une imprimante à badges et Outlook avec un compte de messagerie.
+Version 0.3.0 : les quatre modules, la Version Pro (variantes et photos, mise à jour incrémentale, reconnaissance du texte, interface en anglais) et la **prise en main sans formation** (accueil « Que voulez-vous créer ? », essais avec l'exemple, barre des étapes qui dit ce qui manque, encadré « Ouvrir », glisser-déposer) sont disponibles. L'application a été compilée, installée par son installateur et essayée sous Windows 11 les 4 et 5 novembre 2026, et la prise en main le 6 novembre ([résultats](docs/test-windows/README.md#résultats-du-4-novembre-2026)) : il reste à essayer une imprimante à badges et Outlook avec un compte de messagerie.
 
 | Fonction | État |
 |---|---|
@@ -87,7 +87,7 @@ La première compilation Rust est longue (plusieurs minutes) ; les suivantes son
 2. Ouvrir l'onglet **Actions**, choisir **Installateur Windows**, puis **Run workflow**.
 3. À la fin de l'exécution (environ 20 à 30 minutes), télécharger les **artefacts** : l'installateur `.exe` (NSIS) et le `.msi`.
 
-Pour publier une version, il suffit d'envoyer un tag : `git tag v0.2.0 && git push origin v0.2.0`. Une **publication GitHub en brouillon** est alors créée avec les installateurs attachés : il reste à l'essayer, puis à la publier.
+Pour publier une version, il suffit d'envoyer un tag : `git tag v0.3.0 && git push origin v0.3.0`. Une **publication GitHub en brouillon** est alors créée avec les installateurs attachés : il reste à l'essayer, puis à la publier.
 
 > Les vérifications tournent sous Windows à chaque envoi sur `main` et pour chaque pull request. L'installateur n'est construit qu'à la demande ou sur un tag.
 

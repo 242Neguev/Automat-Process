@@ -4,7 +4,7 @@ Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par
 
 Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : voir les [résultats](#résultats-du-4-novembre-2026). L'installateur a été produit, installé et essayé, puis celui de la [version 0.2.0](#installateur-de-la-version-020-5-novembre-2026), avec la Version Pro, le 5 novembre. La [prise en main sans formation](#prise-en-main-sans-formation-6-novembre-2026) a été essayée le 6 novembre. Il reste surtout à essayer une **imprimante à badges** (partie 4b) et **Outlook avec un compte de messagerie** (parties 6 et 7).
 
-**Version à tester** : 0.2.0, du 5 novembre 2026, ou plus récente (`git log -1` pour le vérifier).
+**Version à tester** : 0.3.0, du 6 novembre 2026, ou plus récente (`git log -1` pour le vérifier).
 
 ## Avant de commencer
 
@@ -32,7 +32,7 @@ Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : 
    - Si le script demande de fermer la fenêtre et de le relancer (après une installation), le faire.
    - S'il s'arrête sur **ÉCHEC**, faire une capture des 30 dernières lignes de la fenêtre.
    - Avec 8 Go de mémoire, fermer navigateur et messagerie pendant la compilation : l'étape finale demande à elle seule environ 3 Go. Après un échec faute de mémoire (`memory allocation of … bytes failed`, `rustc-LLVM ERROR: out of memory` ou code `0xC0000409`), il suffit de relancer le script : la compilation reprend là où elle s'était arrêtée.
-3. À la fin, le dossier de l'installateur s'ouvre : `src-tauri\target\release\bundle\nsis\`, ou `%LOCALAPPDATA%\Automat-Process-compilation\release\bundle\nsis\` si le projet est dans OneDrive (la compilation se fait alors hors de OneDrive). Lancer `Automat-Process_0.2.0_x64-setup.exe`.
+3. À la fin, le dossier de l'installateur s'ouvre : `src-tauri\target\release\bundle\nsis\`, ou `%LOCALAPPDATA%\Automat-Process-compilation\release\bundle\nsis\` si le projet est dans OneDrive (la compilation se fait alors hors de OneDrive). Lancer `Automat-Process_0.3.0_x64-setup.exe`.
    - « Windows a protégé votre ordinateur » : cliquer sur **Informations complémentaires**, puis sur **Exécuter quand même**.
    - L'installation se fait pour l'utilisateur courant, sans droits d'administrateur.
 
