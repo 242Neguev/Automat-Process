@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { WorkBook } from "xlsx";
-import urlListeExemple from "../../assets/exemple-agents.xlsx?url";
+// « no-inline » : le fichier reste à part (sinon Vite intègre un petit fichier au code en data:, que la politique de sécurité de l'application interdit de lire avec fetch).
+import urlListeExemple from "../../assets/exemple-agents.xlsx?url&no-inline";
 import { controlerListe } from "../../donnees/controle";
 import { fusionner, type Correspondances } from "../../donnees/correspondances";
 import { lireFeuille, ouvrirClasseur } from "../../donnees/liste";
