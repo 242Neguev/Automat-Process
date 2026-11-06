@@ -2,7 +2,7 @@
 
 Tout ce qui ne peut pas être essayé sur Mac : la compilation, l'impression par le pilote Windows, la conversion des courriers par Word et les signatures dans Outlook. Le reste de l'application a été testé de bout en bout sur Mac, y compris avec la politique de sécurité de la version finale.
 
-Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : voir les [résultats](#résultats-du-4-novembre-2026). L'installateur a été produit, installé et essayé, puis celui de la [version 0.2.0](#installateur-de-la-version-020-5-novembre-2026), avec la Version Pro, le 5 novembre. Il reste surtout à essayer une **imprimante à badges** (partie 4b) et **Outlook avec un compte de messagerie** (parties 6 et 7).
+Une première campagne a eu lieu le 4 novembre 2026 sur un PC sous Windows 11 : voir les [résultats](#résultats-du-4-novembre-2026). L'installateur a été produit, installé et essayé, puis celui de la [version 0.2.0](#installateur-de-la-version-020-5-novembre-2026), avec la Version Pro, le 5 novembre. La [prise en main sans formation](#prise-en-main-sans-formation-6-novembre-2026) a été essayée le 6 novembre. Il reste surtout à essayer une **imprimante à badges** (partie 4b) et **Outlook avec un compte de messagerie** (parties 6 et 7).
 
 **Version à tester** : 0.2.0, du 5 novembre 2026, ou plus récente (`git log -1` pour le vérifier).
 
@@ -201,3 +201,18 @@ Même PC, Rust 1.99.1, avec la Version Pro (partie 10).
 | PDF des planches | ✅ | « Toutes (6) » choisi, puis vraie boîte « Enregistrer sous » vers un dossier au nom accentué : 2 pages A4, traits de coupe, accents corrects ; le registre note le nouvel export. |
 
 Détection des visages toujours pas essayée sur une vraie photo. Pendant ces essais, les boîtes « Ouvrir » et « Enregistrer sous » ne passaient pas au premier plan : l'application, lancée par un script, n'avait pas la main pendant que le PC servait dans une autre fenêtre, ce que Windows interdit. Sans autre activité sur le PC, elles s'ouvraient au premier plan (essais précédents).
+
+## Prise en main sans formation (6 novembre 2026)
+
+Même PC, application de développement (`npm run tauri dev`), parcours automatique d'un débutant (Playwright par le port de débogage de WebView2). Les boîtes « Enregistrer sous » et « Choisir un dossier » étaient simulées ; les fichiers ont bien été écrits par le cœur.
+
+| Étape | Résultat | Remarques |
+|---|---|---|
+| Accueil | ✅ | « Que voulez-vous créer ? » à l'ouverture : quatre tuiles avec ce qu'il faut pour chaque document, les quatre étapes, « Reprendre un projet enregistré ». Le menu n'affiche plus « Moteur Typst · 323 polices ». |
+| Essai des cartes avec l'exemple | ✅ | Bandeau « Vous essayez avec l'exemple », carte de démonstration et liste de 6 agents ; « Suivant : Liste », « Suivant : Vérification », « Suivant : Destination ». Modes d'export dans une liste expliquée. Le bloc « Mise à jour », qui grisait le bouton (« rien à refaire »), dit maintenant « toutes les cartes seront refaites ». PDF des planches enregistré, encadré « PDF enregistré » avec **Ouvrir** et **Afficher dans le dossier**, visible au-dessus de la barre des étapes. « Afficher dans le dossier » ouvre l'Explorateur, `planches.pdf` sélectionné. |
+| Modèle vierge (cartes, visuels numériques) | ✅ | « Commencez par le visuel de la carte » (ou « par l'image de fond ») à la place de la carte blanche. Bouton « Suivant » grisé, avec ce qui manque : « Choisissez le visuel de la carte, puis ajoutez au moins une information… », puis, visuel choisi, « Ajoutez au moins une information sur la carte… ». « Réglages avancés » repliés. Passer à « Mon modèle » ferme le bandeau de l'exemple. |
+| Essai de Word avec le courrier d'exemple | ✅ | Courrier d'exemple et liste d'exemple ; 6 courriers `.docx` créés dans « Courriers - Courrier d'exemple », encadré « Ouvrir le dossier ». |
+| Essai des signatures avec l'exemple | ✅ | Pages créées ; « Ouvrir » vise la page qui récapitule tout le monde (`_Toutes les signatures.html`). |
+| Glisser-déposer | ✅ | Événements de la fenêtre émis par le script. Voile « Déposez le fichier ici » pendant le survol, retiré quand le fichier sort. Liste Excel déposée sur l'accueil : « Pour quel document ? », puis la liste chargée dans le module choisi, à l'étape Liste. Courrier Word : module Word, comme modèle. Image déposée sur une carte vierge : recto. Programme (`.exe`) : « Fichier non pris en charge ». **Reste à essayer** avec un vrai fichier glissé depuis l'Explorateur. |
+
+La première compilation de l'application de développement s'est arrêtée sur « can't find crate for `typst` », alors que d'autres sessions occupaient presque toute la mémoire du PC ; relancée quand la mémoire s'est libérée, elle a réussi sans autre changement.

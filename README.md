@@ -58,6 +58,7 @@ Version 0.2.0 : les quatre modules et la Version Pro (variantes et photos, mise 
 | **Reconnaissance du texte d'exemple** d'un visuel en image (ou PDF aplati) par la reconnaissance de caractères intégrée à Windows, hors ligne : position, taille et couleur proposées ; balises `{{…}}` écrites dans l'image placées d'office ; **effacement intelligent** (le fond est reconstruit autour du texte, annulable) | ✅ |
 | **Interface en anglais**, au choix (fenêtre « À propos ») : écrans, messages, bon à tirer, planches, pages de signature, kit Outlook et liste à remplir | ✅ |
 | **Kit Outlook** : un seul dossier pour tous (partage réseau, clé USB) ; chaque agent lance « Installer ma signature.cmd », choisit son nom (proposé d'office d'après ses comptes Outlook) et sa signature devient celle des nouveaux messages et des réponses de son compte, qu'il peut encore changer ; pour le service informatique, installation sans question (`-Choix`) et signature verrouillée si besoin (`-Imposer`) | ✅ (script essayé sous Windows ; reste à l'essayer dans Outlook avec un compte) |
+| **Prise en main sans formation** : **accueil** « Que voulez-vous créer ? » (chaque document en grand, avec ce qu'il faut pour le faire ; **« Essayer avec l'exemple »** pour les cartes, les signatures et les courriers Word, avec un courrier d'exemple ; « Reprendre un projet enregistré » qui l'ouvre dans le bon module) ; barre **« Précédent / Suivant : … »** toujours visible, qui dit **ce qui manque** quand on ne peut pas avancer ; modèle vierge : invitation à choisir le visuel, réglages de spécialiste (format, fond perdu, version écran, calque, variantes) repliés dans « Réglages avancés » ; une fois le travail fait, un encadré **Ouvrir / Afficher dans le dossier** (seuls les documents que l'application crée s'ouvrent ainsi) ; **fichiers glissés dans la fenêtre** (visuel, liste Excel, courrier Word, projet) ; mode d'export choisi dans une liste expliquée, l'export n'est plus grisé quand rien n'a changé (tout est refait) ; vocabulaire simplifié, textes d'aide plus contrastés, erreurs affichées 15 secondes | ✅ |
 
 ## Développer (Mac ou Windows)
 
@@ -111,14 +112,18 @@ Pour produire aussi un `.msi`, lancer `scripts\compiler-windows.cmd -Msi` dans u
 
 ```
 src/                     Interface React + TypeScript
-  textes.ts              Tous les textes de l'interface (traduction future)
+  Accueil.tsx            Accueil « Que voulez-vous créer ? » ; App.tsx : menu, glisser-déposer, projets rouverts
+  modules.ts             Les quatre modules et le module de chaque sorte de projet
+  textes.ts              Tous les textes de l'interface (i18n/fr.ts et i18n/en.ts)
   moteur.ts              Accès typé aux commandes du cœur
   controle/              Rapport de contrôle des cartes (à partir des mesures du moteur)
   signatures/            Signatures e-mail : modèle, HTML compatible Outlook, import, pages des agents
   word/                  Courriers Word : préparation du modèle, remplissage, document fusionné
   donnees/               Listes, correspondances, nettoyage, vCard, agents à rendre
   modele/                Formats, champs, analyse des SVG, visuels
-  pages/                 Écrans (cartes/, qui sert aussi aux visuels numériques, signatures/, word/, et commun/ : étape Liste partagée)
+  pages/                 Écrans (cartes/, qui sert aussi aux visuels numériques, signatures/, word/, et commun/ : étape Liste
+                         partagée, barre « Précédent / Suivant », encadré « Ouvrir / Afficher dans le dossier », bandeau de l'exemple)
+  assets/                Liste d'exemple (Excel) et courriers Word d'exemple (français, anglais)
 src-tauri/               Cœur Rust (Tauri)
   src/moteur/            Moteur de rendu Typst : compilation, fichiers virtuels, exports PDF/PNG/SVG
   src/commandes.rs       Commandes appelées par l'interface
@@ -128,6 +133,7 @@ src-tauri/               Cœur Rust (Tauri)
   src/projet_fichier.rs  Fichiers de projet « .automat »
   src/impression.rs      Impression directe par le pilote Windows (badges PVC)
   src/fichiers.rs        Lecture contrôlée des fichiers choisis, écriture des dossiers de résultats
+  src/ouverture.rs       Ouvrir un document créé, ou l'afficher dans son dossier (seuls les formats que l'application crée)
   src/outils_pdf.rs      PDF des courriers : fusion (pages recopiées telles quelles) et aperçu fidèle
   src/word.rs            Modèles Word : lecture des parties à remplir, écriture des courriers
   src/conversion.rs      Courriers en PDF : Microsoft Word (script PowerShell), sinon LibreOffice
