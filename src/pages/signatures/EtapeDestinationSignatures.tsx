@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Badge, Button, Group, List, Paper, Stack, Text, Title } from "@mantine/core";
-import { notifications } from "@mantine/notifications";
-import { IconBrandWindows, IconCheck, IconFolderPlus } from "@tabler/icons-react";
+import { IconBrandWindows, IconFolderPlus } from "@tabler/icons-react";
+import { join } from "@tauri-apps/api/path";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ecrireFichiers, type FichierAEcrire } from "../../moteur";
 import { emailAgent, nomAgent } from "../../signatures/agents";
@@ -11,6 +11,7 @@ import { preparerLogo } from "../../signatures/logo";
 import type { ModeleSignature } from "../../signatures/modele";
 import { nomsDeFichiers, pageAgent, pageRecapitulatif } from "../../signatures/pages";
 import { textes } from "../../textes";
+import Resultat, { type Cree } from "../commun/Resultat";
 import { signalerErreur } from "../commun/signalerErreur";
 import type { AgentSignature } from "./EtapeVerificationSignatures";
 
@@ -26,12 +27,15 @@ function octetsDe(dataUrl: string): number[] {
 export default function EtapeDestinationSignatures({ modele, agents }: { modele: ModeleSignature; agents: AgentSignature[] }) {
   const [enCours, setEnCours] = useState(false);
   const [kitEnCours, setKitEnCours] = useState(false);
+  // Dernières pages (ou dernier kit) créées : de quoi les ouvrir, jusqu'à la création suivante.
+  const [cree, setCree] = useState<Cree | null>(null);
   const logo = modele.source === "mise-en-page" ? modele.logo : null;
 
   async function creer() {
     const dossier = await open({ directory: true, multiple: false, title: t.choisirDossier });
     if (typeof dossier !== "string") return;
     setEnCours(true);
+    setCree(null);
     try {
       const noms = agents.map((agent) => nomAgent(modele, agent.valeurs));
       const pages = nomsDeFichiers(noms);
@@ -57,7 +61,8 @@ export default function EtapeDestinationSignatures({ modele, agents }: { modele:
         fichiers.push({ nom: FICHIER_LOGO, octets: octetsDe(simple.donnees) });
       }
       const chemin = await ecrireFichiers(dossier, t.nomDossier(modele.nom), fichiers);
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.cree, message: chemin, autoClose: 10000 });
+      // « Ouvrir » montre la page qui récapitule tout le monde, dans le navigateur.
+      setCree({ titre: t.cree, chemin: await join(chemin, t.recapitulatif) });
     } catch (e) {
       signalerErreur(e);
     } finally {
@@ -69,6 +74,7 @@ export default function EtapeDestinationSignatures({ modele, agents }: { modele:
     const dossier = await open({ directory: true, multiple: false, title: t.choisirDossier });
     if (typeof dossier !== "string") return;
     setKitEnCours(true);
+    setCree(null);
     try {
       const fichiers = construireKit(
         modele.nom,
@@ -80,7 +86,7 @@ export default function EtapeDestinationSignatures({ modele, agents }: { modele:
         })),
       );
       const chemin = await ecrireFichiers(dossier, t.kit.nomDossier(modele.nom), fichiers);
-      notifications.show({ color: "teal", icon: <IconCheck size={18} />, title: t.kit.cree, message: chemin, autoClose: 10000 });
+      setCree({ titre: t.kit.cree, chemin, dossier: true });
     } catch (e) {
       signalerErreur(e);
     } finally {
@@ -125,6 +131,7 @@ export default function EtapeDestinationSignatures({ modele, agents }: { modele:
           </Button>
         </Stack>
       </Paper>
+      <Resultat cree={cree} onFermer={() => setCree(null)} />
     </Stack>
   );
 }

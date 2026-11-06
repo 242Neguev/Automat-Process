@@ -5,7 +5,7 @@ import { Notifications } from "@mantine/notifications";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import App from "./App";
-import { theme } from "./theme";
+import { theme, variables } from "./theme";
 import { definirLangue } from "./moteur";
 import { langue } from "./textes";
 
@@ -15,7 +15,7 @@ definirLangue(langue).catch(() => undefined);
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <MantineProvider theme={theme} defaultColorScheme="light">
+    <MantineProvider theme={theme} cssVariablesResolver={variables} defaultColorScheme="light">
       <Notifications position="bottom-right" />
       <App />
     </MantineProvider>

@@ -23,14 +23,12 @@ export async function enregistrerSous(document: Document, nom: string, modele: u
   }
 }
 
-/** Ouvre un projet de la sorte attendue (un projet d'un autre module est refusé avec un message clair). */
-export async function choisirProjet(document: Document): Promise<ProjetOuvert | null> {
-  const chemin = await open({ multiple: false, directory: false, filters: FILTRE });
-  if (typeof chemin !== "string") return null;
+/** Ouvre un projet, quel que soit son module : l'application l'ouvre ensuite dans le bon module. */
+export async function choisirProjet(chemin?: string): Promise<ProjetOuvert | null> {
+  const choisi = chemin ?? (await open({ multiple: false, directory: false, filters: FILTRE }));
+  if (typeof choisi !== "string") return null;
   try {
-    const projet = await ouvrirProjet(chemin);
-    if (projet.document !== document) throw new Error(t.autreModule[projet.document] ?? t.autreModule.carte);
-    return projet;
+    return await ouvrirProjet(choisi);
   } catch (e) {
     signalerErreur(e);
     return null;

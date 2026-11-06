@@ -89,14 +89,17 @@ export default function EtapeVerificationSignatures({ modele, agents }: { modele
             </Button>
           )}
         </Group>
-        <Text size="xs" c="dimmed" data-tailles>
-          {t.taille(html.length)}
-          {" · "}
-          <Text span size="xs" c={gmail.length > LIMITE_GMAIL ? "red" : "dimmed"}>
-            {gmail.length > LIMITE_GMAIL && <IconAlertTriangle size={12} style={{ verticalAlign: "middle", marginRight: 4 }} />}
-            {t.tailleGmail(gmail.length, LIMITE_GMAIL)}
+        {/* La taille du code ne regarde l'utilisateur que si Gmail risque de refuser la signature. */}
+        {gmail.length > 0.8 * LIMITE_GMAIL && (
+          <Text size="xs" c="dimmed" data-tailles>
+            {t.taille(html.length)}
+            {" · "}
+            <Text span size="xs" c={gmail.length > LIMITE_GMAIL ? "red" : "dimmed"}>
+              {gmail.length > LIMITE_GMAIL && <IconAlertTriangle size={12} style={{ verticalAlign: "middle", marginRight: 4 }} />}
+              {t.tailleGmail(gmail.length, LIMITE_GMAIL)}
+            </Text>
           </Text>
-        </Text>
+        )}
       </Stack>
 
       <Paper withBorder p="sm" w={320} style={{ flexShrink: 0 }}>

@@ -1,4 +1,4 @@
-import { Notification, createTheme, type MantineColorsTuple } from "@mantine/core";
+import { Notification, createTheme, type CSSVariablesResolver, type MantineColorsTuple } from "@mantine/core";
 
 /** Palette de l'éditeur, Eau sèche : Encre, Eau (couleur d'accent) et Sec. */
 export const COULEURS = {
@@ -32,3 +32,6 @@ export const theme = createTheme({
     Notification: Notification.extend({ styles: { description: { whiteSpace: "pre-line" } } }),
   },
 });
+
+/** Textes d'aide (« dimmed ») plus contrastés que le gris de Mantine : lisibles sans effort, comme dans Automat-PDF. */
+export const variables: CSSVariablesResolver = () => ({ variables: {}, light: { "--mantine-color-dimmed": "#5f666d" }, dark: {} });
